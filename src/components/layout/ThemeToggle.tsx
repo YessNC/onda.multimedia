@@ -9,7 +9,7 @@ type ThemeToggleProps = {
 export default function ThemeToggle({ className }: ThemeToggleProps) {
   const { preference, theme, toggleTheme } = useTheme()
   const isDark = theme === 'dark'
-  const label = isDark ? 'Cambiar a modo dia' : 'Cambiar a modo noche'
+  const label = isDark ? 'Cambiar a modo día' : 'Cambiar a modo noche'
 
   return (
     <button
@@ -18,11 +18,11 @@ export default function ThemeToggle({ className }: ThemeToggleProps) {
       aria-label={label}
       title={`${label}${preference === 'system' ? ' (sistema)' : ''}`}
       className={cn(
-        'group relative inline-flex h-11 w-11 items-center justify-center rounded-md border border-onda-purple/25 bg-white/65 text-onda-purple shadow-sm transition duration-300 hover:border-onda-purple hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-lavender dark:hover:bg-onda-purple/15',
+        'group relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-onda-purple shadow-[0_0_20px_rgba(123,44,255,0.18)] transition duration-300 hover:border-onda-neon hover:bg-onda-purple/10 dark:border-onda-purple/25 dark:bg-white/5 dark:text-onda-lavender dark:hover:bg-onda-purple/15',
         className,
       )}
     >
-      <span className="absolute inset-0 rounded-md opacity-0 shadow-[0_0_22px_rgba(157,78,221,0.42)] transition group-hover:opacity-100" />
+      <span className="absolute inset-0 rounded-full opacity-0 transition duration-300 group-hover:opacity-100 bg-gradient-to-br from-onda-purple/10 to-transparent" />
       {isDark ? <Moon className="relative h-5 w-5" /> : <Sun className="relative h-5 w-5" />}
     </button>
   )

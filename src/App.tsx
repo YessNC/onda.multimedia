@@ -11,7 +11,7 @@ import Servicios from './routes/Servicios'
 
 function App() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white text-zinc-950 transition-colors duration-500 dark:bg-onda-black dark:text-onda-soft">
+    <div className="min-h-screen overflow-x-hidden bg-transparent text-zinc-950 transition-colors duration-500 dark:bg-transparent dark:text-onda-soft">
       <Header />
       <main>
         <Routes>

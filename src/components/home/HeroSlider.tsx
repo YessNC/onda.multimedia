@@ -1,44 +1,94 @@
-import { Autoplay, EffectFade, Pagination } from 'swiper/modules'
-import { Swiper, SwiperSlide } from 'swiper/react'
+import { Autoplay, Keyboard, Mousewheel, Pagination } from 'swiper/modules'
+import { Swiper, SwiperSlide, useSwiper } from 'swiper/react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import 'swiper/css'
-import 'swiper/css/effect-fade'
 import 'swiper/css/pagination'
-import { useTheme } from '../../lib/theme'
-import HeroSlide from './HeroSlide'
+import HeroSlide, { type HeroSlideData } from './HeroSlide'
 
-const slides = [
+const slides: HeroSlideData[] = [
   {
-    eyebrow: 'Eventos · Audiovisual · Musica',
-    title: 'Frecuencia multimedia para escenarios reales',
-    description:
-      'Una base premium para producir experiencias, contenido y artistas urbanos con una identidad visual nocturna, tecnologica y lista para escalar.',
+    kind: 'brand',
   },
   {
-    eyebrow: 'Casa Matriz Freirina',
-    title: 'Produccion con pulso urbano y vision nacional',
-    description:
-      'ONDA MULTIMEDIA nace desde Freirina con foco en eventos, sonido, visuales, desarrollo musical y representacion artistica.',
+    kind: 'artist',
+    name: 'Vektorben',
+    tagline: 'Urbano experimental en frecuencia Onda.',
+    backgroundImage: '/assets/artists/vektorben-web.webp',
+    backgroundPosition: 'center',
+  },
+  {
+    kind: 'artist',
+    name: 'Nueva Frecuencia',
+    tagline: 'Proxima portada de artista.',
+    accent:
+      'radial-gradient(circle at 22% 28%, rgba(168,85,247,0.34), transparent 24%), radial-gradient(circle at 78% 70%, rgba(36,36,48,0.9), transparent 34%), linear-gradient(135deg, #050505 0%, #17101f 58%, #050505 100%)',
+  },
+  {
+    kind: 'artist',
+    name: 'Sesion Onda',
+    tagline: 'Lanzamientos con pulso audiovisual.',
+    accent:
+      'radial-gradient(circle at 24% 68%, rgba(123,44,255,0.34), transparent 26%), radial-gradient(circle at 82% 25%, rgba(192,132,252,0.2), transparent 30%), linear-gradient(135deg, #07070a 0%, #101018 62%, #050505 100%)',
+  },
+  {
+    kind: 'artist',
+    name: 'Artista Invitado',
+    tagline: 'Espacio preparado para la siguiente portada.',
+    accent:
+      'radial-gradient(circle at 18% 30%, rgba(255,255,255,0.12), transparent 22%), radial-gradient(circle at 78% 74%, rgba(168,85,247,0.28), transparent 30%), linear-gradient(135deg, #050505 0%, #12111a 52%, #08050d 100%)',
   },
 ]
 
-export default function HeroSlider() {
-  const { theme } = useTheme()
-  const heroImage = theme === 'dark' ? '/assets/hero/onda-hero-bg-night.png' : '/assets/hero/onda-hero-bg-day.png'
+function HeroSliderControls() {
+  const swiper = useSwiper()
 
   return (
-    <Swiper
-      modules={[Autoplay, EffectFade, Pagination]}
-      effect="fade"
-      loop
-      pagination={{ clickable: true }}
-      autoplay={{ delay: 6200, disableOnInteraction: false }}
-      className="onda-hero-swiper"
-    >
-      {slides.map((slide) => (
-        <SwiperSlide key={slide.title}>
-          <HeroSlide {...slide} image={heroImage} />
-        </SwiperSlide>
-      ))}
-    </Swiper>
+    <div className="pointer-events-none absolute right-4 top-1/2 z-20 hidden -translate-y-1/2 flex-col gap-3 md:flex lg:right-8">
+      <button
+        type="button"
+        aria-label="Slide anterior"
+        onClick={() => swiper.slidePrev()}
+        className="hero-slider-control pointer-events-auto"
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+      <button
+        type="button"
+        aria-label="Slide siguiente"
+        onClick={() => swiper.slideNext()}
+        className="hero-slider-control pointer-events-auto"
+      >
+        <ChevronRight className="h-5 w-5" />
+      </button>
+    </div>
+  )
+}
+
+export default function HeroSlider() {
+  return (
+    <section className="relative overflow-hidden" aria-label="Destacados ONDA Multimedia">
+      <Swiper
+        modules={[Autoplay, Keyboard, Mousewheel, Pagination]}
+        loop
+        autoplay={{ delay: 7200, disableOnInteraction: false, pauseOnMouseEnter: true }}
+        grabCursor
+        keyboard={{ enabled: true }}
+        mousewheel={{ forceToAxis: true, releaseOnEdges: true, sensitivity: 0.7 }}
+        pagination={{ clickable: true }}
+        resistanceRatio={0.78}
+        simulateTouch
+        speed={850}
+        threshold={8}
+        touchRatio={1}
+        className="onda-hero-swiper"
+      >
+        {slides.map((slide, index) => (
+          <SwiperSlide key={slide.kind === 'brand' ? 'onda-brand' : `${slide.name}-${index}`}>
+            <HeroSlide slide={slide} />
+          </SwiperSlide>
+        ))}
+        <HeroSliderControls />
+      </Swiper>
+    </section>
   )
 }

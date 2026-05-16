@@ -42,21 +42,23 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    linear-gradient(135deg, rgba(245, 243, 255, 0.96), rgba(255, 255, 255, 0.98)),
-    linear-gradient(rgba(123, 44, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(123, 44, 255, 0.08) 1px, transparent 1px);
-  background-size: auto, 46px 46px, 46px 46px;
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(123, 44, 255, 0.12), transparent 18%),
+    radial-gradient(circle at 85% 15%, rgba(168, 85, 247, 0.08), transparent 20%),
+    linear-gradient(180deg, rgba(246, 244, 255, 0.98), #ffffff 100%);
+  background-color: #ffffff;
+  background-size: auto;
   color: #18181b;
   font-family: var(--font-sans);
 }
 
 .dark body {
-  background:
-    linear-gradient(135deg, rgba(5, 5, 5, 0.98), rgba(11, 11, 18, 0.96)),
-    linear-gradient(rgba(157, 78, 221, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(157, 78, 221, 0.08) 1px, transparent 1px);
-  background-size: auto, 48px 48px, 48px 48px;
+  background-image:
+    radial-gradient(circle at 78% 15%, rgba(157, 78, 221, 0.22), transparent 18%),
+    radial-gradient(circle at 20% 20%, rgba(123, 44, 255, 0.14), transparent 15%),
+    linear-gradient(180deg, #050505 0%, #0b0b12 100%);
+  background-color: #050505;
+  background-size: auto;
   color: #f5f3ff;
 }
 
@@ -78,6 +80,12 @@ button {
   font: inherit;
 }
 
+@property --scratch-reveal {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 img {
   display: block;
   max-width: 100%;
@@ -94,16 +102,156 @@ img {
   }
 
   .glass-panel {
-    border: 1px solid rgba(123, 44, 255, 0.18);
-    background: rgba(255, 255, 255, 0.74);
-    box-shadow: 0 24px 70px rgba(24, 24, 27, 0.09);
-    backdrop-filter: blur(22px);
+    border: 1px solid rgba(123, 44, 255, 0.22);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: 0 24px 70px rgba(24, 24, 27, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+    backdrop-filter: blur(24px) saturate(145%);
   }
 
   .dark .glass-panel {
-    border-color: rgba(192, 132, 252, 0.22);
-    background: rgba(11, 11, 18, 0.68);
-    box-shadow: 0 28px 90px rgba(123, 44, 255, 0.18);
+    border-color: rgba(192, 132, 252, 0.26);
+    background: rgba(11, 11, 18, 0.62);
+    box-shadow: 0 28px 90px rgba(123, 44, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .onda-hero-swiper {
+    min-height: 76svh;
+    background: #050505;
+  }
+
+  @media (min-width: 1024px) {
+    .onda-hero-swiper {
+      min-height: 82vh;
+    }
+  }
+
+  .onda-hero-swiper .swiper-slide {
+    height: auto;
+  }
+
+  .onda-hero-swiper .swiper-pagination {
+    bottom: 1rem;
+    left: 50%;
+    display: inline-flex;
+    width: auto;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    padding: 0.5rem 0.65rem;
+    box-shadow: 0 0 32px rgba(123, 44, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(22px) saturate(150%);
+    transform: translateX(-50%);
+  }
+
+  .onda-hero-swiper > .swiper-pagination-bullets,
+  .onda-hero-swiper .swiper-pagination-bullets.swiper-pagination-horizontal {
+    right: auto !important;
+    left: 50% !important;
+    width: auto !important;
+    transform: translateX(-50%) !important;
+  }
+
+  .onda-hero-swiper .swiper-pagination-bullet {
+    width: 0.48rem;
+    height: 0.48rem;
+    margin: 0;
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    background: rgba(255, 255, 255, 0.48);
+    opacity: 1;
+    transition:
+      width 220ms ease,
+      background 220ms ease,
+      box-shadow 220ms ease,
+      border-color 220ms ease;
+  }
+
+  .onda-hero-swiper .swiper-pagination-bullet-active {
+    width: 1.8rem;
+    border-color: rgba(192, 132, 252, 0.72);
+    background: linear-gradient(90deg, #7b2cff, #c084fc);
+    box-shadow: 0 0 18px rgba(168, 85, 247, 0.58);
+    border-radius: 999px;
+  }
+
+  .hero-glass-button {
+    display: inline-flex;
+    min-height: 3rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1.05rem;
+    color: #ffffff;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+    text-align: center;
+    text-transform: uppercase;
+    box-shadow: 0 0 28px rgba(123, 44, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(22px) saturate(155%);
+    transition:
+      border-color 220ms ease,
+      background 220ms ease,
+      box-shadow 220ms ease,
+      transform 220ms ease;
+  }
+
+  .hero-glass-button:hover {
+    border-color: rgba(192, 132, 252, 0.72);
+    box-shadow: 0 0 38px rgba(168, 85, 247, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    transform: translateY(-1px);
+  }
+
+  .hero-glass-button-primary {
+    background: linear-gradient(135deg, rgba(123, 44, 255, 0.72), rgba(168, 85, 247, 0.34));
+  }
+
+  .hero-glass-button-secondary {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .hero-slider-control {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    box-shadow: 0 0 28px rgba(123, 44, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(20px) saturate(150%);
+    transition:
+      border-color 220ms ease,
+      background 220ms ease,
+      box-shadow 220ms ease,
+      transform 220ms ease;
+  }
+
+  .hero-slider-control:hover {
+    border-color: rgba(192, 132, 252, 0.66);
+    background: rgba(123, 44, 255, 0.2);
+    box-shadow: 0 0 34px rgba(168, 85, 247, 0.34);
+    transform: scale(1.04);
+  }
+
+  @media (max-width: 640px) {
+    .hero-glass-button {
+      width: min(100%, 18rem);
+      min-height: 2.85rem;
+      padding-inline: 0.9rem;
+      font-size: 0.64rem;
+    }
+
+    .onda-hero-swiper .swiper-pagination {
+      bottom: 0.8rem;
+    }
   }
 
   .neon-border {
@@ -135,6 +283,56 @@ img {
       linear-gradient(90deg, rgba(157, 78, 221, 0.14) 1px, transparent 1px),
       linear-gradient(135deg, rgba(5, 5, 5, 0.8), rgba(123, 44, 255, 0.18));
     background-size: 42px 42px, 42px 42px, auto;
+  }
+
+  .scratch-reveal-overlay {
+    border-radius: inherit;
+    background:
+      radial-gradient(circle at 22% 18%, rgba(192, 132, 252, 0.32), transparent 28%),
+      radial-gradient(circle at 78% 82%, rgba(123, 44, 255, 0.26), transparent 34%),
+      repeating-linear-gradient(90deg, rgba(192, 132, 252, 0.13) 0 1px, transparent 1px 18px),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 11px),
+      linear-gradient(135deg, rgba(5, 5, 5, 0.92), rgba(43, 13, 92, 0.82), rgba(5, 5, 5, 0.88));
+    -webkit-mask-image: radial-gradient(
+      circle at var(--scratch-x) var(--scratch-y),
+      transparent 0,
+      transparent var(--scratch-reveal),
+      #000 calc(var(--scratch-reveal) + 38px)
+    );
+    mask-image: radial-gradient(
+      circle at var(--scratch-x) var(--scratch-y),
+      transparent 0,
+      transparent var(--scratch-reveal),
+      #000 calc(var(--scratch-reveal) + 38px)
+    );
+    transition:
+      --scratch-reveal 680ms cubic-bezier(0.19, 1, 0.22, 1),
+      opacity 260ms ease;
+  }
+
+  .scratch-reveal-overlay::before {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.16) 42%, transparent 58%),
+      repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 9px);
+    content: '';
+    mix-blend-mode: screen;
+    opacity: 0.58;
+  }
+
+  .scratch-reveal-overlay::after {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.14), transparent 38%);
+    box-shadow: inset 0 0 42px rgba(192, 132, 252, 0.2);
+    content: '';
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scratch-reveal-overlay {
+      transition: opacity 160ms ease;
+    }
   }
 
   .text-balance {

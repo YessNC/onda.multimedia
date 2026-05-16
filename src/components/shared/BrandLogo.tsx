@@ -5,9 +5,10 @@ import { cn } from '../../lib/utils'
 type BrandLogoProps = {
   className?: string
   compact?: boolean
+  imageClassName?: string
 }
 
-export default function BrandLogo({ className, compact = false }: BrandLogoProps) {
+export default function BrandLogo({ className, compact = false, imageClassName }: BrandLogoProps) {
   const [isMissing, setIsMissing] = useState(false)
 
   return (
@@ -20,7 +21,7 @@ export default function BrandLogo({ className, compact = false }: BrandLogoProps
         <img
           src="/assets/brand/logo-onda.png"
           alt="ONDA MULTIMEDIA"
-          className={cn('h-10 w-auto object-contain', compact ? 'max-w-32' : 'max-w-44')}
+          className={cn('h-10 w-auto object-contain', compact ? 'max-w-32' : 'max-w-44', imageClassName)}
           onError={() => setIsMissing(true)}
         />
       ) : (
