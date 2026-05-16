@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: 'Orbitron', 'Sora', sans-serif;
+  --font-sans: 'Sora', system-ui, sans-serif;
+  --color-onda-black: #050505;
+  --color-onda-night: #0b0b12;
+  --color-onda-white: #ffffff;
+  --color-onda-soft: #f5f3ff;
+  --color-onda-purple: #7b2cff;
+  --color-onda-neon: #9d4edd;
+  --color-onda-electric: #a855f7;
+  --color-onda-lavender: #c084fc;
+  --color-onda-steel: #18181b;
+  --color-onda-muted: #a1a1aa;
+}
+
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(245, 243, 255, 0.96), rgba(255, 255, 255, 0.98)),
+    linear-gradient(rgba(123, 44, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(123, 44, 255, 0.08) 1px, transparent 1px);
+  background-size: auto, 46px 46px, 46px 46px;
+  color: #18181b;
+  font-family: var(--font-sans);
+}
+
+.dark body {
+  background:
+    linear-gradient(135deg, rgba(5, 5, 5, 0.98), rgba(11, 11, 18, 0.96)),
+    linear-gradient(rgba(157, 78, 221, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(157, 78, 221, 0.08) 1px, transparent 1px);
+  background-size: auto, 48px 48px, 48px 48px;
+  color: #f5f3ff;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(157, 78, 221, 0.35);
+  color: #ffffff;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+@layer components {
+  .onda-container {
+    width: min(1180px, calc(100% - 32px));
+    margin-inline: auto;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .glass-panel {
+    border: 1px solid rgba(123, 44, 255, 0.18);
+    background: rgba(255, 255, 255, 0.74);
+    box-shadow: 0 24px 70px rgba(24, 24, 27, 0.09);
+    backdrop-filter: blur(22px);
+  }
+
+  .dark .glass-panel {
+    border-color: rgba(192, 132, 252, 0.22);
+    background: rgba(11, 11, 18, 0.68);
+    box-shadow: 0 28px 90px rgba(123, 44, 255, 0.18);
+  }
+
+  .neon-border {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .neon-border::before {
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(123, 44, 255, 0.8), rgba(192, 132, 252, 0.2), rgba(157, 78, 221, 0.65));
+    content: '';
+    opacity: 0.55;
+  }
+
+  .tech-grid {
+    background:
+      linear-gradient(rgba(168, 85, 247, 0.16) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(168, 85, 247, 0.13) 1px, transparent 1px),
+      linear-gradient(135deg, rgba(123, 44, 255, 0.18), rgba(255, 255, 255, 0.06));
+    background-size: 42px 42px, 42px 42px, auto;
+  }
+
+  .dark .tech-grid {
+    background:
+      linear-gradient(rgba(192, 132, 252, 0.16) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(157, 78, 221, 0.14) 1px, transparent 1px),
+      linear-gradient(135deg, rgba(5, 5, 5, 0.8), rgba(123, 44, 255, 0.18));
+    background-size: 42px 42px, 42px 42px, auto;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
