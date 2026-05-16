@@ -115,18 +115,26 @@ img {
   }
 
   .onda-hero-swiper {
+    height: 76svh;
     min-height: 76svh;
     background: #050505;
   }
 
+  .onda-hero-swiper .swiper-wrapper,
+  .onda-hero-swiper .swiper-slide {
+    height: 100%;
+    min-height: 100%;
+  }
+
   @media (min-width: 1024px) {
     .onda-hero-swiper {
+      height: 82vh;
       min-height: 82vh;
     }
   }
 
   .onda-hero-swiper .swiper-slide {
-    height: auto;
+    height: 100%;
   }
 
   .onda-hero-swiper .swiper-pagination {
@@ -241,6 +249,10 @@ img {
     transform: scale(1.04);
   }
 
+  .vektorben-hero-image {
+    object-position: 72% top;
+  }
+
   @media (max-width: 640px) {
     .hero-glass-button {
       width: min(100%, 18rem);
@@ -251,6 +263,12 @@ img {
 
     .onda-hero-swiper .swiper-pagination {
       bottom: 0.8rem;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .vektorben-hero-image {
+      object-position: center top;
     }
   }
 

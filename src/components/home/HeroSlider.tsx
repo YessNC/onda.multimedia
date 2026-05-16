@@ -11,10 +11,9 @@ const slides: HeroSlideData[] = [
   },
   {
     kind: 'artist',
-    name: 'Vektorben',
-    tagline: 'Urbano experimental en frecuencia Onda.',
+    name: 'VEKTORBEN',
     backgroundImage: '/assets/artists/vektorben-web.webp',
-    backgroundPosition: 'center',
+    backgroundPosition: 'center top',
   },
   {
     kind: 'artist',
