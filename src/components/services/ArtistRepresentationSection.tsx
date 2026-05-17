@@ -21,7 +21,7 @@ export default function ArtistRepresentationSection() {
               <h3 className="font-display text-lg font-bold uppercase tracking-[0.15em] text-zinc-950 dark:text-white">
                 {artist.name}
               </h3>
-              <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-onda-muted">{artist.role}</p>
+              <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-onda-muted">{artist.heroPhrase}</p>
             </GlowCard>
           ))}
         </div>

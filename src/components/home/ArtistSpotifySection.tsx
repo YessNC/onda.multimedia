@@ -3,18 +3,17 @@ import SectionTitle from '../shared/SectionTitle'
 
 export default function ArtistSpotifySection() {
   return (
-    <section className="py-20">
+    <section className="relative overflow-hidden py-20">
+      <div className="pointer-events-none absolute inset-x-0 top-12 h-px bg-gradient-to-r from-transparent via-onda-purple/40 to-transparent" />
       <div className="onda-container">
-        <div className="rounded-[2rem] border border-white/20 bg-white/80 p-8 shadow-[0_30px_80px_rgba(123,44,255,0.08)] backdrop-blur-3xl dark:border-onda-purple/20 dark:bg-onda-black/70 dark:shadow-[0_30px_90px_rgba(123,44,255,0.2)]">
+        <div className="mb-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <SectionTitle
             eyebrow="Artistas"
-            title="Roster urbano listo para crecer"
-            subtitle="La estructura queda preparada para conectar musica, campañas y perfiles oficiales sin implementar todavia integraciones reales."
+            title="Nuestros artistas"
+            subtitle="Canciones destacadas, perfiles oficiales y presencia urbana conectada con Spotify desde una experiencia propia de ONDA MULTIMEDIA."
           />
-          <div className="mt-10">
-            <ArtistTabs />
-          </div>
         </div>
+        <ArtistTabs />
       </div>
     </section>
   )

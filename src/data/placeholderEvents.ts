@@ -4,6 +4,7 @@ export type PlaceholderEvent = {
   date: string
   place: string
   imagePath: string
+  isPublished: boolean
   status: 'proximo' | 'archivo'
 }
 
@@ -14,6 +15,7 @@ export const placeholderEvents: PlaceholderEvent[] = [
     date: 'Pronto',
     place: 'Freirina, Chile',
     imagePath: '/assets/events/event-placeholder-01.jpg',
+    isPublished: false,
     status: 'proximo',
   },
   {
@@ -22,6 +24,7 @@ export const placeholderEvents: PlaceholderEvent[] = [
     date: 'Por confirmar',
     place: 'Atacama',
     imagePath: '/assets/events/event-placeholder-02.jpg',
+    isPublished: false,
     status: 'proximo',
   },
   {
@@ -30,6 +33,7 @@ export const placeholderEvents: PlaceholderEvent[] = [
     date: 'En agenda',
     place: 'Casa Matriz',
     imagePath: '/assets/events/event-placeholder-03.jpg',
+    isPublished: false,
     status: 'archivo',
   },
 ]

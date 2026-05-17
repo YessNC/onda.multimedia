@@ -1,9 +1,16 @@
 import { ArrowRight } from 'lucide-react'
+import { placeholderEvents } from '../../data/placeholderEvents'
 import EventsCarousel from '../events/EventsCarousel'
 import CTAButton from '../shared/CTAButton'
 import SectionTitle from '../shared/SectionTitle'
 
 export default function EventsPreviewSection() {
+  const publishedEvents = placeholderEvents.filter((event) => event.isPublished)
+
+  if (publishedEvents.length === 0) {
+    return null
+  }
+
   return (
     <section className="py-20">
       <div className="onda-container">
@@ -18,7 +25,7 @@ export default function EventsPreviewSection() {
               Ver cartelera
             </CTAButton>
           </div>
-          <EventsCarousel />
+          <EventsCarousel events={publishedEvents} />
         </div>
       </div>
     </section>

@@ -9,8 +9,8 @@ Ubicar aqui los archivos finales respetando esta estructura:
 - `hero/onda-hero-bg-night.png`
 - `hero/onda-hero-bg-day.png`
 - `artists/vektorben-hero.png`
-- `artists/giovan-e-hero.png`
-- `artists/astes-hero.png`
+- `artists/giovane-portada.webp`
+- `artists/astes-portada.webp`
 - `casa-matriz/freirina-01.jpg`
 - `casa-matriz/freirina-02.jpg`
 - `casa-matriz/estudio-01.jpg`

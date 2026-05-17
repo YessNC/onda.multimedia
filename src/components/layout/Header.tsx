@@ -8,6 +8,7 @@ import ThemeToggle from './ThemeToggle'
 
 const navItems: NavItem[] = [
   { label: 'Home', to: '/' },
+  { label: 'Artistas', to: '/artistas' },
   { label: 'Eventos', to: '/eventos' },
   { label: 'Servicios', to: '/servicios' },
   { label: 'Contacto', to: '/contacto' },

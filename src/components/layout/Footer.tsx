@@ -8,6 +8,7 @@ const footerGroups = [
     title: 'Navegacion',
     links: [
       { label: 'Home', to: '/' },
+      { label: 'Artistas', to: '/artistas' },
       { label: 'Servicios', to: '/servicios' },
       { label: 'Eventos', to: '/eventos' },
       { label: 'Contacto', to: '/contacto' },
@@ -25,9 +26,9 @@ const footerGroups = [
   {
     title: 'Artistas',
     links: [
-      { label: 'Vektorben', to: '/' },
-      { label: 'Giovan-e', to: '/' },
-      { label: 'Astes', to: '/' },
+      { label: 'Vektorben', to: '/artistas' },
+      { label: 'Giovan-e', to: '/artistas' },
+      { label: 'Astes', to: '/artistas' },
     ],
   },
 ]
