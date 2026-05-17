@@ -69,7 +69,7 @@ export default function ArtistTabs() {
               <Sparkles className="h-5 w-5" aria-hidden="true" />
             </div>
             <p className="font-display text-xs font-bold uppercase tracking-[0.24em] text-onda-purple dark:text-onda-lavender">
-              Artista destacado
+              {t('artist.featured')}
             </p>
             <h3 className="mt-3 font-display text-3xl font-extrabold uppercase tracking-[0.12em] text-zinc-950 sm:text-4xl dark:text-white">
               {activeArtist.name}

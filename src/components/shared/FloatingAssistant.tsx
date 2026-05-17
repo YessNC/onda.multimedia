@@ -3,6 +3,7 @@ import { Bot, Send, Sparkles, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useTheme } from '../../lib/theme'
 import { cn } from '../../lib/utils'
+import { useI18n } from '../../hooks/useI18n'
 
 const robotDaySrc = '/assets/brand/robot-day.png'
 const robotNightSrc = '/assets/brand/robot-night.png'
@@ -21,36 +22,9 @@ type QuickOption = {
   message: string
 }
 
-const quickOptions: QuickOption[] = [
-  {
-    label: 'Quiero cotizar un evento',
-    message: 'Hola, quiero cotizar un evento con Onda Multimedia.',
-  },
-  {
-    label: 'Necesito produccion audiovisual',
-    message: 'Hola, necesito informacion sobre produccion audiovisual.',
-  },
-  {
-    label: 'Busco representacion artistica',
-    message: 'Hola, quiero informacion sobre representacion de artistas urbanos.',
-  },
-  {
-    label: 'Quiero grabar en la casa estudio',
-    message: 'Hola, quiero consultar por grabacion en la casa estudio.',
-  },
-  {
-    label: 'Hablar con el equipo',
-    message: 'Hola, quiero hablar con el equipo de Onda Multimedia.',
-  },
-]
+const quickOptions: QuickOption[] = []
 
-const initialMessages: ChatMessage[] = [
-  {
-    id: 'assistant-welcome',
-    role: 'assistant',
-    text: 'Hola, soy el asistente de Onda Multimedia. En que podemos ayudarte?',
-  },
-]
+const initialMessages: ChatMessage[] = []
 
 let messageCounter = 0
 
@@ -65,36 +39,7 @@ function buildWhatsappUrl(message: string) {
   return whatsappUrl
 }
 
-function sendMessageToAssistant(message: string): ChatMessage {
-  // La integracion real debe hacerse mediante un backend seguro:
-  // React FloatingChatWidget -> Supabase Edge Function, Vercel Serverless Function
-  // o Node/Express API -> modelo de IA -> respuesta al usuario. No colocar API keys en el frontend.
-  const normalizedMessage = message.toLowerCase()
-  let text =
-    'Perfecto. Puedo orientarte sobre servicios, artistas, eventos, produccion musical, audiovisual o casa estudio. Para avanzar con una cotizacion, puedes enviar este mensaje por WhatsApp.'
-
-  if (normalizedMessage.includes('evento')) {
-    text =
-      'Excelente. El equipo puede ayudarte con produccion de eventos, puesta en escena y coordinacion tecnica. Te recomiendo enviar el mensaje por WhatsApp para revisar fecha, lugar y alcance.'
-  } else if (normalizedMessage.includes('audiovisual')) {
-    text =
-      'Buenisimo. Podemos conversar sobre grabacion, contenido para redes, videoclips o cobertura. Envia el mensaje por WhatsApp y el equipo te pedira los detalles clave.'
-  } else if (normalizedMessage.includes('representacion') || normalizedMessage.includes('artista')) {
-    text =
-      'Perfecto. Onda trabaja con artistas urbanos y proyectos musicales. Puedes enviar este mensaje por WhatsApp para coordinar una conversacion con el equipo.'
-  } else if (normalizedMessage.includes('casa') || normalizedMessage.includes('estudio') || normalizedMessage.includes('grabacion')) {
-    text =
-      'Genial. Para consultas sobre casa matriz o casa estudio, conviene enviar el mensaje por WhatsApp con el tipo de sesion, fecha tentativa y objetivo de grabacion.'
-  } else if (normalizedMessage.includes('equipo') || normalizedMessage.includes('hablar')) {
-    text = 'Claro. Te puedo derivar al equipo de Onda Multimedia por WhatsApp con tu mensaje prellenado.'
-  }
-
-  return {
-    id: createMessageId('assistant'),
-    role: 'assistant',
-    text,
-  }
-}
+// sendMessageToAssistant will be created inside the component to access translations
 
 function QuickMessageButton({ option, onSelect }: { option: QuickOption; onSelect: (message: string) => void }) {
   return (
@@ -129,10 +74,13 @@ function ChatBubble({ message }: { message: ChatMessage }) {
 
 export default function FloatingAssistant() {
   const { theme } = useTheme()
+  const { t } = useI18n()
   const desiredSrc = theme === 'dark' ? robotNightSrc : robotDaySrc
   const [isOpen, setIsOpen] = useState(false)
   const [draftMessage, setDraftMessage] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    { id: 'assistant-welcome', role: 'assistant', text: t('assistant.welcome') },
+  ])
   const [failedSrcs, setFailedSrcs] = useState<string[]>([])
   const src = failedSrcs.includes(desiredSrc) ? robotDaySrc : desiredSrc
   const useFallbackIcon = failedSrcs.includes(src)
@@ -145,7 +93,7 @@ export default function FloatingAssistant() {
       {
         id: createMessageId('assistant'),
         role: 'assistant',
-        text: 'Perfecto, deje ese mensaje listo para enviarlo por WhatsApp. Puedes editarlo antes de mandarlo.',
+        text: t('assistant.ready-msg'),
       },
     ])
   }
@@ -164,11 +112,39 @@ export default function FloatingAssistant() {
       role: 'user',
       text: trimmedMessage,
     }
-    const assistantMessage = sendMessageToAssistant(trimmedMessage)
+      const assistantMessage = sendMessageToAssistant(trimmedMessage)
 
     setMessages((current) => [...current, userMessage, assistantMessage])
     setDraftMessage('')
     window.open(buildWhatsappUrl(trimmedMessage), '_blank', 'noopener,noreferrer')
+  }
+
+  // build local quick options and initial messages using translations
+  const localQuickOptions: QuickOption[] = [
+    { label: t('assistant.quick-1'), message: t('assistant.quick-1-msg') },
+    { label: t('assistant.quick-2'), message: t('assistant.quick-2-msg') },
+    { label: t('assistant.quick-3'), message: t('assistant.quick-3-msg') },
+    { label: t('assistant.quick-4'), message: t('assistant.quick-4-msg') },
+    { label: t('assistant.quick-5'), message: t('assistant.quick-5-msg') },
+  ]
+
+  // runtime sendMessageToAssistant using translations and simple keyword matching (es/en)
+  function sendMessageToAssistantRuntime(message: string): ChatMessage {
+    const normalized = message.toLowerCase()
+    let responseKey = 'assistant.default-response'
+
+    if (/(evento|event)/i.test(normalized)) responseKey = 'assistant.event-response'
+    else if (/(audiovisual|audiovisual)/i.test(normalized)) responseKey = 'assistant.audiovisual-response'
+    else if (/(representacion|representación|artist|artista)/i.test(normalized)) responseKey = 'assistant.artist-response'
+    else if (/(casa|estudio|grabacion|grabación|record)/i.test(normalized)) responseKey = 'assistant.studio-response'
+    else if (/(equipo|hablar|team|talk)/i.test(normalized)) responseKey = 'assistant.team-response'
+
+    return { id: createMessageId('assistant'), role: 'assistant', text: t(responseKey) }
+  }
+
+  // ensure functions reference the runtime sender
+  function sendMessageToAssistant(message: string) {
+    return sendMessageToAssistantRuntime(message)
   }
 
   return (
@@ -178,7 +154,7 @@ export default function FloatingAssistant() {
           <motion.section
             key="floating-chat-widget"
             role="dialog"
-            aria-label="Chat flotante de Onda Multimedia"
+            aria-label={t('assistant.dialog-aria')}
             className="fixed bottom-[6.1rem] right-4 z-50 flex max-h-[75svh] w-[calc(100vw-2rem)] max-w-[22rem] flex-col overflow-hidden rounded-xl border border-onda-purple/18 bg-white/[0.86] text-zinc-950 shadow-[0_28px_90px_rgba(123,44,255,0.2)] backdrop-blur-3xl sm:bottom-[7.3rem] sm:right-7 sm:max-h-[72vh] dark:border-onda-lavender/24 dark:bg-onda-black/[0.78] dark:text-white dark:shadow-[0_28px_100px_rgba(123,44,255,0.34)]"
             initial={{ opacity: 0, y: 22, x: 12, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
@@ -197,18 +173,18 @@ export default function FloatingAssistant() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h2 className="truncate font-display text-xs font-extrabold uppercase tracking-[0.13em] text-zinc-950 dark:text-white">
-                    Asistente Onda
+                    {t('assistant.title')}
                   </h2>
                   <Sparkles className="h-3.5 w-3.5 shrink-0 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
                 </div>
                 <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-onda-muted">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.9)]" />
-                  online
+                  {t('assistant.status')}
                 </p>
               </div>
               <button
                 type="button"
-                aria-label="Cerrar chat de Onda Multimedia"
+                aria-label={t('assistant.close-aria')}
                 onClick={() => setIsOpen(false)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-onda-purple/14 bg-white/68 text-zinc-600 transition duration-300 hover:border-onda-purple/32 hover:bg-onda-purple/10 hover:text-onda-purple dark:border-white/10 dark:bg-white/[0.06] dark:text-onda-soft dark:hover:border-onda-lavender/34 dark:hover:bg-white/10 dark:hover:text-white"
               >
@@ -225,10 +201,10 @@ export default function FloatingAssistant() {
 
               <div className="mt-3 grid gap-1.5">
                 <p className="font-display text-[0.58rem] font-bold uppercase tracking-[0.16em] text-onda-purple dark:text-onda-lavender">
-                  Opciones rapidas
+                  {t('assistant.quick-options')}
                 </p>
                 <div className="grid gap-1.5">
-                  {quickOptions.map((option) => (
+                  {localQuickOptions.map((option) => (
                     <QuickMessageButton key={option.label} option={option} onSelect={handleQuickOption} />
                   ))}
                 </div>
@@ -240,14 +216,14 @@ export default function FloatingAssistant() {
               onSubmit={handleSubmit}
             >
               <label htmlFor="onda-assistant-message" className="sr-only">
-                Escribe tu mensaje
+                {t('assistant.placeholder')}
               </label>
               <textarea
                 id="onda-assistant-message"
-                aria-label="Escribe tu mensaje"
+                aria-label={t('assistant.placeholder')}
                 value={draftMessage}
                 onChange={(event) => setDraftMessage(event.target.value)}
-                placeholder="Escribe tu mensaje..."
+                placeholder={t('assistant.placeholder')}
                 rows={2}
                 className="min-h-[3.4rem] resize-none rounded-lg border border-onda-purple/16 bg-white/72 px-3 py-2 text-sm leading-5 text-zinc-800 outline-none shadow-inner shadow-onda-purple/5 backdrop-blur-xl transition focus:border-onda-purple/40 focus:ring-2 focus:ring-onda-purple/12 dark:border-white/10 dark:bg-white/[0.06] dark:text-white dark:placeholder:text-onda-muted dark:focus:border-onda-lavender/34"
               />
@@ -257,7 +233,7 @@ export default function FloatingAssistant() {
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-onda-purple/28 bg-onda-purple px-4 py-2.5 font-display text-[0.64rem] font-extrabold uppercase tracking-[0.13em] text-white shadow-[0_0_28px_rgba(123,44,255,0.24)] transition duration-300 hover:-translate-y-0.5 hover:bg-onda-electric hover:shadow-[0_0_38px_rgba(168,85,247,0.36)] disabled:pointer-events-none disabled:opacity-45"
               >
                 <Send className="h-4 w-4" aria-hidden="true" />
-                Enviar por WhatsApp
+                {t('assistant.send')}
               </button>
             </form>
           </motion.section>
@@ -266,7 +242,7 @@ export default function FloatingAssistant() {
 
       <motion.button
         type="button"
-        aria-label={isOpen ? 'Cerrar chat de Onda Multimedia' : 'Abrir chat de Onda Multimedia'}
+        aria-label={isOpen ? t('assistant.close-aria') : t('assistant.open-aria')}
         onClick={() => setIsOpen((current) => !current)}
         className="group fixed bottom-5 right-5 z-50 flex h-[4.8rem] w-[4.8rem] items-center justify-center transition duration-300 sm:bottom-7 sm:right-7 sm:h-24 sm:w-24"
         animate={{ y: [0, -8, 0] }}
@@ -277,13 +253,13 @@ export default function FloatingAssistant() {
         <span className="pointer-events-none absolute inset-x-2 bottom-1 h-7 rounded-[999px] bg-onda-purple/20 blur-xl transition duration-300 group-hover:bg-onda-electric/28 dark:bg-onda-purple/28" />
         {!isOpen ? (
           <span className="pointer-events-none absolute bottom-full right-0 mb-3 w-max max-w-[220px] rounded-md border border-onda-purple/12 bg-white/88 px-3 py-2 text-xs font-semibold text-zinc-800 opacity-0 shadow-[0_16px_50px_rgba(123,44,255,0.16)] backdrop-blur-xl transition duration-300 group-hover:translate-y-[-2px] group-hover:opacity-100 dark:border-white/16 dark:bg-black/78 dark:text-white">
-            &iquest;Hablamos de tu proyecto?
+            {t('assistant.tooltip')}
           </span>
         ) : null}
         {!useFallbackIcon ? (
           <img
             src={src}
-            alt="Asistente de ONDA MULTIMEDIA"
+            alt={t('assistant.robot-alt')}
             className="relative h-[4.4rem] w-auto object-contain drop-shadow-[0_16px_30px_rgba(123,44,255,0.34)] transition duration-300 group-hover:drop-shadow-[0_18px_40px_rgba(168,85,247,0.48)] sm:h-[5.7rem]"
             onError={handleImageError}
           />

@@ -78,6 +78,9 @@ export default {
   'artist.astes': 'Artista urbano parte del ecosistema musical de ONDA MULTIMEDIA.',
   'artist.astes-phrase': 'Una propuesta fresca para la escena urbana.',
 
+  // Artist UI
+  'artist.featured': 'Artista destacado',
+
   // Events Preview Section
   'events-preview.eyebrow': 'Eventos',
   'events-preview.title': 'Cartelera preparada',
@@ -233,4 +236,19 @@ export default {
   'artistas.title': 'Nuestros artistas',
   'artistas.description':
     'Perfiles oficiales, canciones destacadas y conexión directa con Spotify para el universo musical de ONDA MULTIMEDIA.',
-}
+  // Hero / cards
+  'hero.view-artist': 'Ver artista',
+  'hero.listen-youtube': 'Escuchar en YouTube',
+  'hero.listen-spotify': 'Escuchar en Spotify',
+  'hero.open-spotify': 'Abrir Spotify de',
+  'hero.open-instagram': 'Abrir Instagram de',
+
+  // Tracks / cards
+  'track.play': 'Reproducir',
+  'track.open-spotify': 'Abrir en Spotify',
+  'track.featured': 'Destacada',
+
+  // Scratch card
+  'scratch.discover': 'Descubre con la manito',
+  'scratch.image-aria': 'Descubrir imagen:',
+} 

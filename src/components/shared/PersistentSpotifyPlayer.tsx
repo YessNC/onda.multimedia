@@ -1,9 +1,20 @@
 import { ExternalLink, Maximize2, Minimize2, Music2, X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { cn } from '../../lib/utils'
 import { useSpotifyPlayer } from '../../lib/spotifyPlayer.ts'
 
 export default function PersistentSpotifyPlayer() {
-  const { closePlayer, currentArtist, currentTrack, isMinimized, isOpen, toggleMinimized } = useSpotifyPlayer()
+  const { closePlayer, currentArtist, currentTrack, isMinimized, isOpen, justOpened, toggleMinimized } = useSpotifyPlayer()
+  const playerRef = useRef<HTMLAsideElement>(null)
+
+  // Scroll suave hacia el player cuando se abre
+  useEffect(() => {
+    if (isOpen && playerRef.current) {
+      setTimeout(() => {
+        playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }, 100)
+    }
+  }, [isOpen])
 
   if (!isOpen || !currentTrack || !currentArtist) {
     return null
@@ -11,6 +22,7 @@ export default function PersistentSpotifyPlayer() {
 
   return (
     <aside
+      ref={playerRef}
       className={cn(
         'fixed bottom-[6.75rem] left-4 right-4 z-40 mx-auto max-w-xl transition-all duration-300 sm:bottom-6 sm:left-6 sm:right-auto sm:mx-0 sm:w-[30rem]',
         isMinimized && 'max-w-md sm:w-[24rem]',
@@ -18,7 +30,12 @@ export default function PersistentSpotifyPlayer() {
       aria-label="Reproductor persistente Spotify"
       aria-live="polite"
     >
-      <div className="overflow-hidden rounded-lg border border-onda-purple/30 bg-white/88 shadow-[0_24px_80px_rgba(123,44,255,0.22)] backdrop-blur-3xl dark:border-onda-lavender/30 dark:bg-onda-black/88 dark:shadow-[0_24px_90px_rgba(123,44,255,0.32)]">
+      <div
+        className={cn(
+          'overflow-hidden rounded-lg border border-onda-purple/30 bg-white/88 shadow-[0_24px_80px_rgba(123,44,255,0.22)] backdrop-blur-3xl transition-all duration-500 dark:border-onda-lavender/30 dark:bg-onda-black/88 dark:shadow-[0_24px_90px_rgba(123,44,255,0.32)]',
+          justOpened && 'border-onda-purple shadow-[0_24px_120px_rgba(123,44,255,0.48)] dark:shadow-[0_24px_140px_rgba(123,44,255,0.64)]',
+        )}
+      >
         <div className="flex items-center gap-3 border-b border-onda-purple/12 p-3 dark:border-white/10">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-onda-purple text-white shadow-[0_0_28px_rgba(123,44,255,0.36)]">
             <Music2 className="h-5 w-5" aria-hidden="true" />
@@ -71,6 +88,11 @@ export default function PersistentSpotifyPlayer() {
           )}
         >
           <div className="min-h-0 overflow-hidden">
+            {justOpened && (
+              <div className="animate-in fade-in duration-300 bg-onda-purple/20 px-3 py-2 text-center text-xs font-semibold text-onda-purple dark:bg-onda-purple/20 dark:text-onda-lavender">
+                👆 Presiona el botón play para escuchar
+              </div>
+            )}
             <div className="p-3">
               {/* Spotify Embed does not expose real volume control here. Advanced volume/playback controls require Spotify Web Playback SDK with OAuth/Premium or authorized first-party audio files. */}
               <iframe

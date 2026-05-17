@@ -1,6 +1,7 @@
 import { ExternalLink, Music2, Play } from 'lucide-react'
 import type { Artist, Track } from '../../data/artists'
 import { useSpotifyPlayer } from '../../lib/spotifyPlayer.ts'
+import { useI18n } from '../../hooks/useI18n'
 import CTAButton from '../shared/CTAButton'
 
 type SpotifyTrackCardProps = {
@@ -10,6 +11,7 @@ type SpotifyTrackCardProps = {
 
 export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProps) {
   const { playTrack } = useSpotifyPlayer()
+  const { t } = useI18n()
 
   return (
     <article className="glass-panel flex min-h-[23rem] flex-col overflow-hidden rounded-lg">
@@ -25,9 +27,9 @@ export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProp
         </div>
         {track.isFeatured ? (
           <span className="rounded-full border border-onda-purple/25 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-onda-purple dark:text-onda-lavender">
-            Destacada
+            {t('track.featured')}
           </span>
-        ) : null}
+        ) : null} 
       </div>
 
       <div className="px-5">
@@ -48,7 +50,7 @@ export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProp
           icon={<Play className="h-4 w-4 fill-current" aria-hidden="true" />}
           className="w-full px-4"
         >
-          Reproducir
+          {t('track.play')}
         </CTAButton>
         <CTAButton
           href={track.spotifyTrackUrl}
@@ -58,7 +60,7 @@ export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProp
           icon={<ExternalLink className="h-4 w-4" aria-hidden="true" />}
           className="w-full px-4"
         >
-          Abrir en Spotify
+          {t('track.open-spotify')}
         </CTAButton>
       </div>
     </article>

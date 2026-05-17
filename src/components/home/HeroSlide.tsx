@@ -21,8 +21,10 @@ type ArtistHeroSlide = {
   backgroundImage?: string
   backgroundPosition?: string
   kind: 'artist'
-  name: string
+  name?: string
+  nameKey?: string
   tagline?: string
+  taglineKey?: string
 }
 
 export type HeroSlideData = BrandHeroSlide | ArtistHeroSlide
@@ -284,7 +286,10 @@ function BrandSlide() {
 
 function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
   const hasImage = Boolean(slide.backgroundImage)
-  const isVektorben = slide.name.toLowerCase() === 'vektorben'
+  const { t } = useI18n()
+  const displayName = slide.nameKey ? t(slide.nameKey) : slide.name ?? ''
+  const displayTagline = slide.taglineKey ? t(slide.taglineKey) : slide.tagline
+  const isVektorben = displayName.toLowerCase() === 'vektorben'
   const fallbackBackground =
     slide.accent ??
     'radial-gradient(circle at 20% 25%, rgba(168,85,247,0.32), transparent 24%), radial-gradient(circle at 80% 70%, rgba(123,44,255,0.28), transparent 24%), linear-gradient(135deg, #050505 0%, #121018 55%, #050505 100%)'
@@ -347,10 +352,10 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
               isVektorben ? 'text-3xl sm:text-4xl lg:text-5xl' : 'text-4xl sm:text-5xl lg:text-6xl',
             )}
           >
-            {slide.name}
+            {displayName}
           </h2>
-          {!isVektorben && slide.tagline ? (
-            <p className="mt-3 max-w-md text-sm font-medium text-white/78 sm:text-base">{slide.tagline}</p>
+          {!isVektorben && displayTagline ? (
+            <p className="mt-3 max-w-md text-sm font-medium text-white/78 sm:text-base">{displayTagline}</p>
           ) : null}
 
           {isVektorben ? (
@@ -360,25 +365,25 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-white/18 bg-white/10 px-4 font-display text-[0.62rem] font-bold uppercase tracking-[0.14em] text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]"
               >
                 <User className="h-3.5 w-3.5" aria-hidden="true" />
-                Ver artista
+                {t('hero.view-artist')}
               </a>
-              <VektorbenSocialLink href={vektorbenSpotifyUrl} label="Abrir Spotify de Vektorben">
+              <VektorbenSocialLink href={vektorbenSpotifyUrl} label={`${t('hero.open-spotify')} ${displayName}`}>
                 <SpotifyIcon />
               </VektorbenSocialLink>
-              <VektorbenSocialLink href={vektorbenInstagramUrl} label="Abrir Instagram de Vektorben">
+              <VektorbenSocialLink href={vektorbenInstagramUrl} label={`${t('hero.open-instagram')} ${displayName}`}>
                 <InstagramIcon />
               </VektorbenSocialLink>
             </div>
           ) : (
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <HeroGlassButton href="#" icon={<User className="h-4 w-4" />} className="w-full">
-                Ver artista
+                {t('hero.view-artist')}
               </HeroGlassButton>
               <HeroGlassButton href="#" icon={<Play className="h-4 w-4" />} className="w-full">
-                Escuchar en YouTube
+                {t('hero.listen-youtube')}
               </HeroGlassButton>
               <HeroGlassButton href="#" icon={<Music className="h-4 w-4" />} className="w-full">
-                Escuchar en Spotify
+                {t('hero.listen-spotify')}
               </HeroGlassButton>
             </div>
           )}

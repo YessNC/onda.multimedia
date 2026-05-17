@@ -78,6 +78,9 @@ export default {
   'artist.astes': 'Urban artist part of ONDA MULTIMEDIA musical ecosystem.',
   'artist.astes-phrase': 'A fresh proposal for the urban scene.',
 
+  // Artist UI
+  'artist.featured': 'Featured artist',
+
   // Events Preview Section
   'events-preview.eyebrow': 'Events',
   'events-preview.title': 'Event Calendar Ready',
@@ -233,4 +236,19 @@ export default {
   'artistas.title': 'Our Artists',
   'artistas.description':
     'Official profiles, featured songs and direct connection with Spotify for the ONDA MULTIMEDIA musical universe.',
+  // Hero / cards
+  'hero.view-artist': 'View artist',
+  'hero.listen-youtube': 'Listen on YouTube',
+  'hero.listen-spotify': 'Listen on Spotify',
+  'hero.open-spotify': 'Open Spotify profile for',
+  'hero.open-instagram': 'Open Instagram profile for',
+
+  // Tracks / cards
+  'track.play': 'Play',
+  'track.open-spotify': 'Open on Spotify',
+  'track.featured': 'Featured',
+
+  // Scratch card
+  'scratch.discover': 'Discover with the hand',
+  'scratch.image-aria': 'Discover image:',
 }

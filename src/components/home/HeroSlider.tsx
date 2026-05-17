@@ -12,28 +12,28 @@ const slides: HeroSlideData[] = [
   },
   {
     kind: 'artist',
-    name: 'VEKTORBEN',
+    nameKey: 'hero.vektorben',
     backgroundImage: '/assets/artists/vektorben-web.webp',
     backgroundPosition: 'center top',
   },
   {
     kind: 'artist',
-    name: 'Nueva Frecuencia',
-    tagline: 'Proxima portada de artista.',
+    nameKey: 'hero.nueva-frecuencia',
+    taglineKey: 'hero.next-cover',
     accent:
       'radial-gradient(circle at 22% 28%, rgba(168,85,247,0.34), transparent 24%), radial-gradient(circle at 78% 70%, rgba(36,36,48,0.9), transparent 34%), linear-gradient(135deg, #050505 0%, #17101f 58%, #050505 100%)',
   },
   {
     kind: 'artist',
-    name: 'Sesion Onda',
-    tagline: 'Lanzamientos con pulso audiovisual.',
+    nameKey: 'hero.onda-session',
+    taglineKey: 'hero.audio-launches',
     accent:
       'radial-gradient(circle at 24% 68%, rgba(123,44,255,0.34), transparent 26%), radial-gradient(circle at 82% 25%, rgba(192,132,252,0.2), transparent 30%), linear-gradient(135deg, #07070a 0%, #101018 62%, #050505 100%)',
   },
   {
     kind: 'artist',
-    name: 'Artista Invitado',
-    tagline: 'Espacio preparado para la siguiente portada.',
+    nameKey: 'hero.guest-artist',
+    taglineKey: 'hero.next-cover-placeholder',
     accent:
       'radial-gradient(circle at 18% 30%, rgba(255,255,255,0.12), transparent 22%), radial-gradient(circle at 78% 74%, rgba(168,85,247,0.28), transparent 30%), linear-gradient(135deg, #050505 0%, #12111a 52%, #08050d 100%)',
   },

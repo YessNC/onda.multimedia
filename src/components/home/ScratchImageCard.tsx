@@ -2,6 +2,7 @@ import { Hand, Sparkles } from 'lucide-react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { cn } from '../../lib/utils'
+import { useI18n } from '../../hooks/useI18n' 
 
 type ScratchImageCardProps = {
   alt: string
@@ -78,6 +79,7 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
   const lastPointRef = useRef<ScratchPoint | null>(null)
   const [isMissing, setIsMissing] = useState(false)
   const [hasScratched, setHasScratched] = useState(false)
+  const { t } = useI18n()
 
   const drawCover = useCallback(() => {
     const canvas = canvasRef.current
@@ -239,7 +241,7 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
     <button
       ref={cardRef}
       type="button"
-      aria-label={`Descubrir imagen: ${alt}`}
+      aria-label={`${t('scratch.image-aria')} ${alt}`}
       className={cn(
         'group/scratch relative block h-full min-h-56 w-full touch-none appearance-none overflow-hidden rounded-lg border border-onda-lavender/20 bg-onda-black/80 p-0 text-left outline-none',
         'shadow-[0_18px_46px_rgba(5,5,5,0.18),0_0_34px_rgba(123,44,255,0.16)] transition duration-300',
@@ -285,7 +287,7 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
         <span className="inline-flex max-w-[11rem] flex-col items-center gap-2 rounded-md border border-white/15 bg-onda-black/48 px-4 py-3 text-center text-onda-soft shadow-[0_0_28px_rgba(168,85,247,0.28)] backdrop-blur-xl">
           <Hand className="h-5 w-5 text-onda-lavender" />
           <span className="font-display text-[0.62rem] font-bold uppercase leading-5 tracking-[0.16em]">
-            Descubre con la manito
+            {t('scratch.discover')}
           </span>
         </span>
       </div>

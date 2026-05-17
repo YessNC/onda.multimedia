@@ -8,6 +8,7 @@ export type SpotifyPlayerContextValue = {
   currentTrack: Track | null
   isMinimized: boolean
   isOpen: boolean
+  justOpened: boolean
   closePlayer: () => void
   expandPlayer: () => void
   playTrack: (track: Track, artist: Artist) => void
