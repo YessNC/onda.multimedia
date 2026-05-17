@@ -8,8 +8,8 @@ export default function ArtistRepresentationSection() {
     <section className="pb-20">
       <div className="onda-container">
         <SectionTitle
-          eyebrow="Representacion"
-          title="Artistas urbanos con direccion"
+          eyebrow="Representación"
+          title="Artistas urbanos con dirección"
           subtitle="Base preparada para sumar presskits, booking, agenda y contenido oficial de cada talento."
         />
         <div className="mt-10 grid gap-4 md:grid-cols-3">

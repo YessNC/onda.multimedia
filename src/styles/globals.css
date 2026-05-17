@@ -217,6 +217,18 @@ img {
     background: rgba(255, 255, 255, 0.12);
   }
 
+  .brand-hero-button.hero-glass-button-secondary {
+    border-color: rgba(123, 44, 255, 0.3);
+    background: rgba(255, 255, 255, 0.68);
+    color: #4c1d95;
+  }
+
+  .dark .brand-hero-button.hero-glass-button-secondary {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+
   .hero-slider-control {
     display: inline-flex;
     width: 2.75rem;

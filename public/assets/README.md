@@ -3,6 +3,7 @@
 Ubicar aqui los archivos finales respetando esta estructura:
 
 - `brand/logo-onda.png`
+- `brand/logo-onda-day.png`
 - `brand/robot-night.png`
 - `brand/robot-day.png`
 - `brand/facebook-cover.png`

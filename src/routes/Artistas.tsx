@@ -9,7 +9,7 @@ export default function Artistas() {
           <SectionTitle
             eyebrow="Roster"
             title="Nuestros artistas"
-            subtitle="Perfiles oficiales, canciones destacadas y conexion directa con Spotify para el universo musical de ONDA MULTIMEDIA."
+            subtitle="Perfiles oficiales, canciones destacadas y conexión directa con Spotify para el universo musical de ONDA MULTIMEDIA."
           />
         </div>
         <ArtistTabs />

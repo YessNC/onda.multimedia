@@ -2,10 +2,10 @@ import { motion } from 'framer-motion'
 import { ArrowDown, ArrowRight, Calendar, Music, Play, User } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { useBrandLogoAsset } from '../../lib/brandAssets'
 import { useTheme } from '../../lib/theme'
 import { cn } from '../../lib/utils'
 
-const logoSrc = '/assets/brand/logo-onda.png'
 const robotDaySrc = '/assets/brand/robot-day.png'
 const robotNightSrc = '/assets/brand/robot-night.png'
 const vektorbenSpotifyUrl = 'https://open.spotify.com/intl-es/artist/60f1mSGeUUhevHXVgZpAii?si=diUtB478Sb20GNgTdbMysA'
@@ -120,8 +120,9 @@ function HeroAtmosphere() {
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#f5f0ff_0%,#1d0a34_48%,#050505_100%)] dark:bg-[linear-gradient(180deg,#050505_0%,#11071e_48%,#050505_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,0.18)_0%,rgba(5,5,5,0.78)_44%,rgba(123,44,255,0.22)_62%,rgba(5,5,5,0.58)_100%)] dark:bg-[linear-gradient(90deg,rgba(5,5,5,0.82)_0%,rgba(20,6,39,0.72)_50%,rgba(5,5,5,0.76)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#7b2cff_0%,#b795ff_30%,#f3edff_66%,#ffffff_100%)] dark:bg-[linear-gradient(180deg,#050505_0%,#11071e_48%,#050505_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.5)_48%,rgba(255,255,255,0.96)_100%)] dark:bg-[linear-gradient(90deg,rgba(5,5,5,0.82)_0%,rgba(20,6,39,0.72)_50%,rgba(5,5,5,0.76)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.38)_0%,rgba(255,255,255,0.06)_42%,rgba(123,44,255,0.08)_62%,rgba(255,255,255,0.42)_100%)] dark:hidden" />
       <div className="absolute inset-0 opacity-[0.2] mix-blend-screen tech-grid dark:opacity-[0.24]" />
       <div className="absolute inset-x-[-10%] top-[18%] h-24 rotate-[-4deg] bg-[linear-gradient(90deg,transparent,rgba(192,132,252,0.18),transparent)] blur-2xl" />
       <div className="absolute inset-x-[-8%] bottom-[18%] h-20 rotate-[3deg] bg-[linear-gradient(90deg,transparent,rgba(123,44,255,0.2),transparent)] blur-2xl" />
@@ -206,6 +207,7 @@ function SwipeIndicator() {
 
 function BrandSlide() {
   const robot = useRobotAsset()
+  const logo = useBrandLogoAsset()
 
   return (
     <section className="relative h-full min-h-full overflow-hidden px-4 sm:px-6 lg:px-8">
@@ -242,11 +244,19 @@ function BrandSlide() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.9, ease: 'easeOut' }}
           >
-            <img
-              src={logoSrc}
-              alt="ONDA MULTIMEDIA"
-              className="mx-auto w-full object-contain drop-shadow-[0_0_24px_rgba(123,44,255,0.42)] sm:drop-shadow-[0_0_42px_rgba(168,85,247,0.36)]"
-            />
+            <div className="pointer-events-none absolute inset-x-[-4%] top-[-8%] h-[82%] rounded-full bg-white/70 blur-3xl dark:hidden" />
+            {!logo.isMissing ? (
+              <img
+                src={logo.src}
+                alt="ONDA MULTIMEDIA"
+                className="relative mx-auto w-full object-contain drop-shadow-[0_0_24px_rgba(123,44,255,0.42)] sm:drop-shadow-[0_0_42px_rgba(168,85,247,0.36)]"
+                onError={logo.onError}
+              />
+            ) : (
+              <h1 className="font-display text-5xl font-black uppercase leading-none text-white drop-shadow-[0_0_34px_rgba(168,85,247,0.45)] sm:text-7xl">
+                ONDA MULTIMEDIA
+              </h1>
+            )}
           </motion.div>
 
           <motion.div
@@ -255,10 +265,10 @@ function BrandSlide() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.28 }}
           >
-            <HeroGlassButton to="/servicios" icon={<ArrowRight className="h-4 w-4" />} variant="primary">
+            <HeroGlassButton className="brand-hero-button" to="/servicios" icon={<ArrowRight className="h-4 w-4" />} variant="primary">
               Ver servicios
             </HeroGlassButton>
-            <HeroGlassButton to="/eventos" icon={<Calendar className="h-4 w-4" />}>
+            <HeroGlassButton className="brand-hero-button" to="/eventos" icon={<Calendar className="h-4 w-4" />}>
               Ver eventos
             </HeroGlassButton>
           </motion.div>

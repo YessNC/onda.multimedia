@@ -10,8 +10,8 @@ export default function ServicesHero() {
         <div className="max-w-4xl">
           <SectionTitle
             eyebrow="Servicios"
-            title="Produccion integral para cultura urbana"
-            subtitle="Eventos, audiovisual, musica y representacion conectados bajo una identidad premium y tecnologica."
+            title="Producción integral para cultura urbana"
+            subtitle="Eventos, audiovisual, música y representación conectados bajo una identidad premium y tecnológica."
           />
           <div className="mt-8">
             <CTAButton to="/contacto" icon={<ArrowRight className="h-4 w-4" />}>
