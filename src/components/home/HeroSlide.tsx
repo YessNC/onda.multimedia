@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { useBrandLogoAsset } from '../../lib/brandAssets'
 import { useTheme } from '../../lib/theme'
 import { cn } from '../../lib/utils'
+import { useI18n } from '../../hooks/useI18n'
 
 const robotDaySrc = '/assets/brand/robot-day.png'
 const robotNightSrc = '/assets/brand/robot-night.png'
@@ -206,6 +207,7 @@ function SwipeIndicator() {
 }
 
 function BrandSlide() {
+  const { t } = useI18n()
   const robot = useRobotAsset()
   const logo = useBrandLogoAsset()
 
@@ -266,10 +268,10 @@ function BrandSlide() {
             transition={{ duration: 0.65, delay: 0.28 }}
           >
             <HeroGlassButton className="brand-hero-button" to="/servicios" icon={<ArrowRight className="h-4 w-4" />} variant="primary">
-              Ver servicios
+              {t('nav.services')}
             </HeroGlassButton>
             <HeroGlassButton className="brand-hero-button" to="/eventos" icon={<Calendar className="h-4 w-4" />}>
-              Ver eventos
+              {t('nav.events')}
             </HeroGlassButton>
           </motion.div>
 

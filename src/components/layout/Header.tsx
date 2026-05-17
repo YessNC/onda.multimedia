@@ -1,22 +1,25 @@
 import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { useI18n } from '../../hooks/useI18n'
 import { cn } from '../../lib/utils'
 import BrandLogo from '../shared/BrandLogo'
+import LanguageToggle from './LanguageToggle'
 import MobileMenu, { type NavItem } from './MobileMenu'
 import ThemeToggle from './ThemeToggle'
 
-const navItems: NavItem[] = [
-  { label: 'Home', to: '/' },
-  { label: 'Artistas', to: '/artistas' },
-  { label: 'Eventos', to: '/eventos' },
-  { label: 'Servicios', to: '/servicios' },
-  { label: 'Contacto', to: '/contacto' },
-]
-
 export default function Header() {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+
+  const navItems: NavItem[] = [
+    { label: t('nav.home'), to: '/' },
+    { label: t('nav.artists'), to: '/artistas' },
+    { label: t('nav.events'), to: '/eventos' },
+    { label: t('nav.services'), to: '/servicios' },
+    { label: t('nav.contact'), to: '/contacto' },
+  ]
 
   useEffect(() => {
     const updateScrollState = () => setIsScrolled(window.scrollY > 8)
@@ -30,18 +33,20 @@ export default function Header() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 border-b backdrop-blur-3xl backdrop-saturate-150 transition duration-300 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-onda-purple/38 before:to-transparent dark:before:via-onda-lavender/42',
+        'fixed inset-x-0 top-0 z-50 w-full border-b transition duration-300 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-onda-purple/38 before:to-transparent dark:before:via-onda-lavender/42',
         isScrolled
-          ? 'border-onda-purple/16 bg-white/[0.88] shadow-[0_18px_80px_rgba(123,44,255,0.14)] dark:border-white/16 dark:bg-onda-night/82 dark:shadow-[0_18px_80px_rgba(123,44,255,0.18)]'
-          : 'border-onda-purple/8 bg-white shadow-[0_10px_34px_rgba(24,24,27,0.06)] dark:border-white/10 dark:bg-onda-night/68 dark:shadow-[0_12px_64px_rgba(123,44,255,0.14)]',
+          ? 'backdrop-blur-xl border-onda-purple/16 bg-white/[0.88] shadow-[0_18px_80px_rgba(123,44,255,0.14)] dark:border-white/16 dark:bg-onda-night/82 dark:shadow-[0_18px_80px_rgba(123,44,255,0.18)]'
+          : 'backdrop-blur-none border-onda-purple/8 bg-white/95 shadow-[0_10px_34px_rgba(24,24,27,0.06)] dark:border-white/10 dark:bg-onda-night/70 dark:shadow-[0_12px_64px_rgba(123,44,255,0.14)]',
       )}
     >
-      <div className="onda-container relative flex h-20 items-center justify-between gap-2 py-2 sm:gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+      <div className="onda-container relative flex h-20 items-center justify-between gap-2 py-2 sm:gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_auto_minmax(0,1fr)]">
         <BrandLogo className="min-w-0 shrink lg:justify-self-start" imageClassName="h-10 max-w-[9rem] sm:h-14 sm:max-w-[13.5rem]" />
+
+        <LanguageToggle />
 
         <nav
           className="hidden items-center gap-1 justify-self-center rounded-lg border border-onda-purple/12 bg-white/[0.82] px-2 py-1.5 shadow-[0_0_32px_rgba(123,44,255,0.1)] backdrop-blur-2xl lg:flex dark:border-white/14 dark:bg-white/[0.07] dark:shadow-[0_0_32px_rgba(123,44,255,0.14)]"
-          aria-label="Navegacion principal"
+          aria-label={t('nav.main-aria')}
         >
           {navItems.map((item) => (
             <NavLink
@@ -65,15 +70,15 @@ export default function Header() {
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 lg:justify-self-end">
           <Link
             to="/contacto"
-            aria-label="Cotiza tu proyecto"
+            aria-label={t('header.quote-cta')}
             className="hidden min-h-11 w-32 items-center justify-center rounded-md border border-onda-purple/20 bg-onda-purple/8 px-4 py-3 text-center font-display text-[0.68rem] font-bold uppercase tracking-[0.14em] text-onda-purple shadow-[0_0_28px_rgba(123,44,255,0.12)] backdrop-blur-2xl transition duration-300 hover:border-onda-purple/45 hover:bg-onda-purple/12 hover:shadow-[0_0_36px_rgba(168,85,247,0.18)] xl:inline-flex dark:border-onda-lavender/30 dark:bg-white/[0.07] dark:text-white dark:shadow-[0_0_28px_rgba(123,44,255,0.2)] dark:hover:border-onda-lavender/60 dark:hover:bg-onda-purple/16 dark:hover:shadow-[0_0_36px_rgba(168,85,247,0.3)]"
           >
-            Cotizar
+            {t('nav.quote')}
           </Link>
           <ThemeToggle />
           <button
             type="button"
-            aria-label={isOpen ? 'Cerrar menu' : 'Abrir menu'}
+            aria-label={isOpen ? t('nav.close-menu') : t('nav.open-menu')}
             onClick={() => setIsOpen((current) => !current)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-onda-purple/18 bg-white/80 text-onda-purple shadow-[0_0_22px_rgba(123,44,255,0.1)] backdrop-blur-xl transition duration-300 hover:border-onda-purple hover:bg-onda-purple/10 lg:hidden dark:border-onda-purple/30 dark:bg-white/5 dark:text-onda-lavender dark:shadow-[0_0_22px_rgba(123,44,255,0.14)]"
           >

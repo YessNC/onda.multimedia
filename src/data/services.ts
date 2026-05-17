@@ -2,14 +2,14 @@ import { AudioLines, CalendarDays, Clapperboard, Mic2 } from 'lucide-react'
 
 export type Service = {
   id: string
-  title: string
-  summary: string
+  titleKey: string
+  summaryKey: string
 }
 
 export type ServiceCategory = {
   id: string
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
   icon: typeof CalendarDays
   services: Service[]
 }
@@ -17,73 +17,73 @@ export type ServiceCategory = {
 export const serviceCategories: ServiceCategory[] = [
   {
     id: 'eventos',
-    label: 'Eventos',
-    description: 'Produccion tecnica, puesta en escena y direccion de experiencias en vivo.',
+    labelKey: 'service.eventos',
+    descriptionKey: 'service.eventos-desc',
     icon: CalendarDays,
     services: [
       {
         id: 'produccion-general',
-        title: 'Produccion general',
-        summary: 'Planificacion, coordinacion, proveedores y ejecucion integral del evento.',
+        titleKey: 'service.produccion-general',
+        summaryKey: 'service.produccion-general-desc',
       },
       {
         id: 'escenario',
-        title: 'Escenario y tecnica',
-        summary: 'Sonido, luces, backline, visuales y soporte de operacion en terreno.',
+        titleKey: 'service.escenario-tecnica',
+        summaryKey: 'service.escenario-tecnica-desc',
       },
     ],
   },
   {
     id: 'audiovisual',
-    label: 'Audiovisual',
-    description: 'Contenido visual para marcas, artistas, eventos y campanas digitales.',
+    labelKey: 'service.audiovisual',
+    descriptionKey: 'service.audiovisual-desc',
     icon: Clapperboard,
     services: [
       {
         id: 'videoclips',
-        title: 'Videoclips y sesiones',
-        summary: 'Direccion, rodaje, edicion y piezas listas para plataformas.',
+        titleKey: 'service.videoclips',
+        summaryKey: 'service.videoclips-desc',
       },
       {
         id: 'cobertura',
-        title: 'Cobertura de eventos',
-        summary: 'Registro multicamara, aftermovies, reels y fotografia editorial.',
+        titleKey: 'service.cobertura',
+        summaryKey: 'service.cobertura-desc',
       },
     ],
   },
   {
     id: 'musical',
-    label: 'Musica',
-    description: 'Desarrollo sonoro, grabacion, mezcla y direccion artistica.',
+    labelKey: 'service.musica',
+    descriptionKey: 'service.musica-desc',
     icon: AudioLines,
     services: [
       {
         id: 'produccion-musical',
-        title: 'Produccion musical',
-        summary: 'Beats, arreglos, grabacion vocal y postproduccion.',
+        titleKey: 'service.produccion-musical',
+        summaryKey: 'service.produccion-musical-desc',
       },
       {
         id: 'desarrollo',
-        title: 'Desarrollo de identidad',
-        summary: 'Acompanamiento creativo para encontrar una propuesta artistica solida.',
+        titleKey: 'service.identidad',
+        summaryKey: 'service.identidad-desc',
       },
     ],
   },
   {
     id: 'representacion',
-    label: 'Artistas',
-    description: 'Representacion y estrategia para talentos urbanos emergentes.',
+    labelKey: 'service.artistas',
+    descriptionKey: 'service.artistas-desc',
     icon: Mic2,
     services: [
       {
         id: 'booking',
-        title: 'Booking y shows',
-        summary: 'Gestion de fechas, oportunidades y coordinacion de presentaciones.',
+        titleKey: 'service.booking',
+        summaryKey: 'service.booking-desc',
       },
       {
         id: 'estrategia',
-        title: 'Estrategia artistica',
-        summary: 'Plan de lanzamientos, contenido, imagen y crecimiento de audiencia.',
+        titleKey: 'service.estrategia',
+        summaryKey: 'service.estrategia-desc',
       },
     ],
   },

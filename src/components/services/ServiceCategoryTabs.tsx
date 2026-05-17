@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { serviceCategories } from '../../data/services'
 import { cn } from '../../lib/utils'
+import { useI18n } from '../../hooks/useI18n'
 import ServiceAccordion from './ServiceAccordion'
 
 export default function ServiceCategoryTabs() {
+  const { t } = useI18n()
   const [activeCategoryId, setActiveCategoryId] = useState(serviceCategories[0].id)
   const activeCategory = serviceCategories.find((category) => category.id === activeCategoryId) ?? serviceCategories[0]
   const ActiveIcon = activeCategory.icon
@@ -32,9 +34,9 @@ export default function ServiceCategoryTabs() {
                   </span>
                   <span>
                     <span className="block font-display text-sm font-bold uppercase tracking-[0.16em] text-zinc-950 dark:text-white">
-                      {category.label}
+                      {t(category.labelKey)}
                     </span>
-                    <span className="mt-1 block text-sm text-zinc-600 dark:text-onda-muted">{category.description}</span>
+                    <span className="mt-1 block text-sm text-zinc-600 dark:text-onda-muted">{t(category.descriptionKey)}</span>
                   </span>
                 </button>
               )
@@ -48,9 +50,9 @@ export default function ServiceCategoryTabs() {
               </span>
               <div>
                 <h2 className="font-display text-xl font-extrabold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
-                  {activeCategory.label}
+                  {t(activeCategory.labelKey)}
                 </h2>
-                <p className="mt-2 text-sm leading-7 text-zinc-600 dark:text-onda-muted">{activeCategory.description}</p>
+                <p className="mt-2 text-sm leading-7 text-zinc-600 dark:text-onda-muted">{t(activeCategory.descriptionKey)}</p>
               </div>
             </div>
             <ServiceAccordion services={activeCategory.services} />

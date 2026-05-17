@@ -1,16 +1,19 @@
 import { Mic2 } from 'lucide-react'
 import { artists } from '../../data/artists'
+import { useI18n } from '../../hooks/useI18n'
 import GlowCard from '../shared/GlowCard'
 import SectionTitle from '../shared/SectionTitle'
 
 export default function ArtistRepresentationSection() {
+  const { t } = useI18n()
+
   return (
     <section className="pb-20">
       <div className="onda-container">
         <SectionTitle
-          eyebrow="Representación"
-          title="Artistas urbanos con dirección"
-          subtitle="Base preparada para sumar presskits, booking, agenda y contenido oficial de cada talento."
+          eyebrow={t('representation.eyebrow')}
+          title={t('representation.title')}
+          subtitle={t('representation.description')}
         />
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {artists.map((artist, index) => (
@@ -21,7 +24,7 @@ export default function ArtistRepresentationSection() {
               <h3 className="font-display text-lg font-bold uppercase tracking-[0.15em] text-zinc-950 dark:text-white">
                 {artist.name}
               </h3>
-              <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-onda-muted">{artist.heroPhrase}</p>
+              <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-onda-muted">{t(artist.heroPhraseKey)}</p>
             </GlowCard>
           ))}
         </div>

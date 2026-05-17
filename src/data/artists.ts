@@ -13,8 +13,8 @@ export type Artist = {
   name: string
   slug: string
   heroImage: string
-  description: string
-  heroPhrase: string
+  descriptionKey: string
+  heroPhraseKey: string
   spotifyProfileUrl: string
   spotifyArtistEmbedUrl: string
   tracks: Track[]
@@ -26,8 +26,8 @@ export const artists: Artist[] = [
     name: 'Vektorben',
     slug: 'vektorben',
     heroImage: '/assets/artists/vektorben-portada.webp',
-    description: 'Artista urbano parte del universo creativo de ONDA MULTIMEDIA.',
-    heroPhrase: 'Sonido urbano con identidad propia.',
+    descriptionKey: 'artist.vektorben',
+    heroPhraseKey: 'artist.vektorben-phrase',
     spotifyProfileUrl: 'https://open.spotify.com/intl-es/artist/60f1mSGeUUhevHXVgZpAii?si=UHTTuaz0SX2KV00Os9wIeA',
     spotifyArtistEmbedUrl: 'https://open.spotify.com/embed/artist/60f1mSGeUUhevHXVgZpAii',
     tracks: [
@@ -65,8 +65,8 @@ export const artists: Artist[] = [
     name: 'Giovan-e',
     slug: 'giovan-e',
     heroImage: '/assets/artists/giovane-portada.webp',
-    description: 'Artista urbano parte del catálogo creativo de ONDA MULTIMEDIA.',
-    heroPhrase: 'Energía, calle y propuesta musical.',
+    descriptionKey: 'artist.giovane',
+    heroPhraseKey: 'artist.giovane-phrase',
     spotifyProfileUrl: 'https://open.spotify.com/intl-es/artist/41BsWiQu4cfQoSSiohNba6?si=-LBw624nQpyU16rhX6S6Jg',
     spotifyArtistEmbedUrl: 'https://open.spotify.com/embed/artist/41BsWiQu4cfQoSSiohNba6',
     tracks: [
@@ -86,8 +86,8 @@ export const artists: Artist[] = [
     name: 'Astes',
     slug: 'astes',
     heroImage: '/assets/artists/astes-portada.webp',
-    description: 'Artista urbano parte del ecosistema musical de ONDA MULTIMEDIA.',
-    heroPhrase: 'Una propuesta fresca para la escena urbana.',
+    descriptionKey: 'artist.astes',
+    heroPhraseKey: 'artist.astes-phrase',
     spotifyProfileUrl: 'https://open.spotify.com/intl-es/artist/67jwyFsdYM27RjZEcc6xUa?si=CopMXQVoRYGQCRLzSntv9w',
     spotifyArtistEmbedUrl: 'https://open.spotify.com/embed/artist/67jwyFsdYM27RjZEcc6xUa',
     tracks: [

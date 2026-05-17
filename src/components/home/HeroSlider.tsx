@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import 'swiper/css'
 import 'swiper/css/pagination'
 import HeroSlide, { type HeroSlideData } from './HeroSlide'
+import { useI18n } from '../../hooks/useI18n'
 
 const slides: HeroSlideData[] = [
   {
@@ -39,13 +40,14 @@ const slides: HeroSlideData[] = [
 ]
 
 function HeroSliderControls() {
+  const { t } = useI18n()
   const swiper = useSwiper()
 
   return (
     <div className="pointer-events-none absolute right-4 top-1/2 z-20 hidden -translate-y-1/2 flex-col gap-3 md:flex lg:right-8">
       <button
         type="button"
-        aria-label="Slide anterior"
+        aria-label={t('hero.prev-slide')}
         onClick={() => swiper.slidePrev()}
         className="hero-slider-control pointer-events-auto"
       >
@@ -53,7 +55,7 @@ function HeroSliderControls() {
       </button>
       <button
         type="button"
-        aria-label="Slide siguiente"
+        aria-label={t('hero.next-slide')}
         onClick={() => swiper.slideNext()}
         className="hero-slider-control pointer-events-auto"
       >
@@ -64,8 +66,10 @@ function HeroSliderControls() {
 }
 
 export default function HeroSlider() {
+  const { t } = useI18n()
+
   return (
-    <section className="relative overflow-hidden" aria-label="Destacados ONDA Multimedia">
+    <section className="relative overflow-hidden" aria-label={t('hero.highlights')}>
       <Swiper
         modules={[Autoplay, Keyboard, Mousewheel, Pagination]}
         loop

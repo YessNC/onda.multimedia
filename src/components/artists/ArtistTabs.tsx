@@ -2,11 +2,13 @@ import { ExternalLink, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { artists } from '../../data/artists'
 import { cn } from '../../lib/utils'
+import { useI18n } from '../../hooks/useI18n'
 import AssetFrame from '../shared/AssetFrame'
 import CTAButton from '../shared/CTAButton'
 import SpotifyTrackCarousel from './SpotifyTrackCarousel'
 
 export default function ArtistTabs() {
+  const { t } = useI18n()
   const safeArtists = Array.isArray(artists) ? artists : []
   const firstArtist = safeArtists[0]
   const [activeArtistId, setActiveArtistId] = useState(() => firstArtist?.id ?? '')
@@ -22,7 +24,7 @@ export default function ArtistTabs() {
     <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
       <div
         role="tablist"
-        aria-label="Seleccionar artista"
+        aria-label={t('artists.title')}
         className="flex gap-2 overflow-x-auto rounded-lg border border-onda-purple/20 bg-white/62 p-2 shadow-[0_18px_60px_rgba(123,44,255,0.08)] backdrop-blur-2xl lg:sticky lg:top-28 lg:grid lg:overflow-visible dark:border-onda-lavender/20 dark:bg-onda-black/58"
       >
         {safeArtists.map((artist) => (
@@ -40,7 +42,7 @@ export default function ArtistTabs() {
             )}
           >
             <span className="block font-display text-xs font-extrabold uppercase tracking-[0.16em]">{artist.name}</span>
-            <span className="mt-2 block text-xs leading-5 opacity-80">{artist.heroPhrase}</span>
+            <span className="mt-2 block text-xs leading-5 opacity-80">{t(artist.heroPhraseKey)}</span>
           </button>
         ))}
       </div>
@@ -58,7 +60,7 @@ export default function ArtistTabs() {
               <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-onda-lavender">
                 ONDA MULTIMEDIA
               </p>
-              <p className="mt-2 text-sm font-semibold">{activeArtist.heroPhrase}</p>
+              <p className="mt-2 text-sm font-semibold">{t(activeArtist.heroPhraseKey)}</p>
             </div>
           </AssetFrame>
 
@@ -73,7 +75,7 @@ export default function ArtistTabs() {
               {activeArtist.name}
             </h3>
             <p className="mt-4 max-w-xl text-base leading-8 text-zinc-600 dark:text-onda-muted">
-              {activeArtist.description}
+              {t(activeArtist.descriptionKey)}
             </p>
             <div className="mt-7">
               <CTAButton
@@ -83,7 +85,7 @@ export default function ArtistTabs() {
                 variant="secondary"
                 icon={<ExternalLink className="h-4 w-4" aria-hidden="true" />}
               >
-                Ver perfil en Spotify
+                {t('artists.profile-link')}
               </CTAButton>
             </div>
           </div>
@@ -92,7 +94,7 @@ export default function ArtistTabs() {
         <div>
           <div className="mb-5 flex items-center justify-between gap-4">
             <h4 className="font-display text-lg font-extrabold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
-              Canciones destacadas
+              {t('artists.featured')}
             </h4>
             <span className="hidden h-px flex-1 bg-gradient-to-r from-onda-purple/35 to-transparent sm:block" />
           </div>

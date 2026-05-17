@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { NavLink } from 'react-router-dom'
+import { useI18n } from '../../hooks/useI18n'
 import CTAButton from '../shared/CTAButton'
 
 export type NavItem = {
@@ -14,6 +15,7 @@ type MobileMenuProps = {
 }
 
 export default function MobileMenu({ isOpen, navItems, onClose }: MobileMenuProps) {
+  const { t } = useI18n()
   return (
     <AnimatePresence>
       {isOpen ? (
@@ -45,7 +47,7 @@ export default function MobileMenu({ isOpen, navItems, onClose }: MobileMenuProp
               ))}
             </div>
             <CTAButton to="/contacto" className="mt-3 w-full" onClick={onClose}>
-              Cotiza tu proyecto
+              {t('nav.quote-full')}
             </CTAButton>
           </nav>
         </motion.div>

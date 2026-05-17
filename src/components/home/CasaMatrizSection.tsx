@@ -1,51 +1,54 @@
 import { ArrowUpRight, CalendarCheck, MapPin } from 'lucide-react'
 import CTAButton from '../shared/CTAButton'
 import ScratchImageCard from './ScratchImageCard'
+import { useI18n } from '../../hooks/useI18n'
 
 const casaMatrizAssets = [
   {
-    alt: 'Casa matriz de Onda Multimedia en Freirina',
+    alt: 'casamatriz.img-1-alt',
     className: 'aspect-[4/5] sm:aspect-auto sm:row-span-2',
     src: '/assets/casa-matriz/casa-matriz-01.webp',
   },
   {
-    alt: 'Espacio creativo de la casa matriz',
+    alt: 'casamatriz.img-2-alt',
     className: 'aspect-[4/3] sm:aspect-auto',
     src: '/assets/casa-matriz/casa-matriz-02.webp',
   },
   {
-    alt: 'Detalle interior de la casa matriz',
+    alt: 'casamatriz.img-3-alt',
     className: 'aspect-[4/3] sm:aspect-auto',
     src: '/assets/casa-matriz/casa-matriz-03.webp',
   },
   {
-    alt: 'Zona de trabajo audiovisual en Freirina',
+    alt: 'casamatriz.img-4-alt',
     className: 'aspect-[4/5] sm:aspect-auto sm:row-span-2',
     src: '/assets/casa-matriz/casa-matriz-04.webp',
   },
   {
-    alt: 'Casa estudio de Onda Multimedia',
+    alt: 'casamatriz.img-5-alt',
     className: 'aspect-[4/3] sm:aspect-auto',
     src: '/assets/casa-matriz/estudio-01.webp',
   },
   {
-    alt: 'Sala de produccion musical',
+    alt: 'casamatriz.img-6-alt',
     className: 'aspect-[4/3] sm:aspect-auto',
     src: '/assets/casa-matriz/estudio-02.webp',
   },
   {
-    alt: 'Sesion de grabacion en casa matriz',
+    alt: 'casamatriz.img-7-alt',
     className: 'aspect-[4/3] sm:aspect-auto',
     src: '/assets/casa-matriz/grabacion-01.webp',
   },
   {
-    alt: 'Experiencia en vivo producida por Onda Multimedia',
+    alt: 'casamatriz.img-8-alt',
     className: 'aspect-[4/3] sm:aspect-auto',
     src: '/assets/casa-matriz/evento-01.webp',
   },
 ]
 
 export default function CasaMatrizSection() {
+  const { t } = useI18n()
+
   return (
     <section id="casa-matriz" className="relative isolate overflow-hidden py-20 sm:py-24">
       <div
@@ -63,21 +66,19 @@ export default function CasaMatrizSection() {
             <div className="glass-panel rounded-lg p-6 sm:p-8 lg:p-9">
               <p className="mb-4 inline-flex items-center gap-2 font-display text-xs font-bold uppercase tracking-[0.26em] text-onda-purple dark:text-onda-lavender">
                 <MapPin className="h-4 w-4" aria-hidden="true" />
-                Freirina
+                {t('casamatriz.eyebrow')}
               </p>
 
               <h2 className="max-w-xl font-display text-3xl font-extrabold uppercase tracking-[0.1em] text-zinc-950 sm:text-4xl dark:text-white">
-                Conoce nuestra casa matriz
+                {t('casamatriz.title')}
               </h2>
 
               <p className="mt-5 max-w-xl text-lg font-semibold leading-8 text-zinc-700 dark:text-onda-soft">
-                Desde Freirina creamos experiencias, contenido y sonido con identidad propia.
+                {t('casamatriz.subtitle')}
               </p>
 
               <p className="mt-5 max-w-xl text-sm leading-7 text-zinc-600 dark:text-onda-muted sm:text-base sm:leading-8">
-                Nuestra casa matriz en Freirina es el punto de encuentro donde nacen proyectos audiovisuales,
-                musicales y experiencias en vivo. Un espacio pensado para crear, grabar, producir, conectar artistas
-                y desarrollar contenido con identidad urbana y profesional.
+                {t('casamatriz.description')}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -86,7 +87,7 @@ export default function CasaMatrizSection() {
                   icon={<ArrowUpRight className="h-4 w-4" aria-hidden="true" />}
                   className="w-full border border-onda-lavender/35 bg-[linear-gradient(135deg,rgba(123,44,255,0.78),rgba(192,132,252,0.2))] shadow-[0_0_32px_rgba(123,44,255,0.32)] backdrop-blur-xl sm:w-auto"
                 >
-                  Conoce la casa estudio
+                  {t('casamatriz.cta-studio')}
                 </CTAButton>
                 <CTAButton
                   to="/contacto"
@@ -94,7 +95,7 @@ export default function CasaMatrizSection() {
                   icon={<CalendarCheck className="h-4 w-4" aria-hidden="true" />}
                   className="w-full border-onda-lavender/30 bg-white/60 shadow-[0_0_28px_rgba(123,44,255,0.12)] backdrop-blur-xl dark:bg-white/10 sm:w-auto"
                 >
-                  Agenda una visita
+                  {t('casamatriz.cta-visit')}
                 </CTAButton>
               </div>
             </div>
@@ -107,7 +108,7 @@ export default function CasaMatrizSection() {
             />
             <div className="relative grid grid-cols-1 gap-3 sm:auto-rows-[9.6rem] sm:grid-cols-2 lg:auto-rows-[8.8rem] xl:auto-rows-[10rem]">
               {casaMatrizAssets.map((asset) => (
-                <ScratchImageCard key={asset.src} src={asset.src} alt={asset.alt} className={asset.className} />
+                <ScratchImageCard key={asset.src} src={asset.src} alt={t(asset.alt)} className={asset.className} />
               ))}
             </div>
           </div>

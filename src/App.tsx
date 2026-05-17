@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom'
+import { I18nProvider } from './contexts/I18nContext'
 import Footer from './components/layout/Footer'
 import Header from './components/layout/Header'
 import FloatingAssistant from './components/shared/FloatingAssistant'
@@ -14,25 +15,27 @@ import Servicios from './routes/Servicios'
 
 function App() {
   return (
-    <SpotifyPlayerProvider>
-      <div className="min-h-screen overflow-x-hidden bg-transparent text-zinc-950 transition-colors duration-500 dark:bg-transparent dark:text-onda-soft">
-        <Header />
-        <main>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/artistas" element={<Artistas />} />
-            <Route path="/servicios" element={<Servicios />} />
-            <Route path="/eventos" element={<Eventos />} />
-            <Route path="/contacto" element={<Contacto />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/eventos" element={<AdminEventos />} />
-          </Routes>
-        </main>
-        <Footer />
-        <FloatingAssistant />
-        <PersistentSpotifyPlayer />
-      </div>
-    </SpotifyPlayerProvider>
+    <I18nProvider>
+      <SpotifyPlayerProvider>
+        <div className="min-h-screen overflow-x-hidden bg-transparent text-zinc-950 transition-colors duration-500 dark:bg-transparent dark:text-onda-soft">
+          <Header />
+          <main className="pt-20">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/artistas" element={<Artistas />} />
+              <Route path="/servicios" element={<Servicios />} />
+              <Route path="/eventos" element={<Eventos />} />
+              <Route path="/contacto" element={<Contacto />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/eventos" element={<AdminEventos />} />
+            </Routes>
+          </main>
+          <Footer />
+          <FloatingAssistant />
+          <PersistentSpotifyPlayer />
+        </div>
+      </SpotifyPlayerProvider>
+    </I18nProvider>
   )
 }
 
