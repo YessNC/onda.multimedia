@@ -3,4 +3,4 @@ export function cn(...classes: Array<string | false | null | undefined>) {
 }
 
 export const whatsappQuoteUrl =
-  'https://wa.me/569XXXXXXXX?text=Hola%2C%20quiero%20cotizar%20un%20proyecto%20con%20Onda%20Multimedia.'
+  'https://wa.me/56954546129?text=Hola%2C%20quiero%20cotizar%20un%20proyecto%20con%20Onda%20Multimedia.'

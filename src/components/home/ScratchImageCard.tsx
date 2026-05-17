@@ -14,7 +14,7 @@ type ScratchPoint = {
   y: number
 }
 
-const getBrushSize = (width: number, height: number) => Math.max(30, Math.min(48, Math.min(width, height) * 0.16))
+const getBrushSize = (width: number, height: number) => Math.max(58, Math.min(92, Math.min(width, height) * 0.3))
 
 const paintScratchCover = (context: CanvasRenderingContext2D, width: number, height: number, scale: number) => {
   context.clearRect(0, 0, width, height)
