@@ -83,7 +83,7 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="https://instagram.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 transition hover:text-onda-purple dark:hover:text-onda-lavender">
+                <a href="https://www.instagram.com/onda.multimedia/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 transition hover:text-onda-purple dark:hover:text-onda-lavender">
                   <Camera className="h-4 w-4" /> {t('footer.instagram')}
                 </a>
               </li>

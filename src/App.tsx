@@ -1,4 +1,5 @@
-import { Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { I18nProvider } from './contexts/I18nContext'
 import Footer from './components/layout/Footer'
 import Header from './components/layout/Header'
@@ -13,11 +14,22 @@ import Eventos from './routes/Eventos'
 import Home from './routes/Home'
 import Servicios from './routes/Servicios'
 
+function ScrollToTop() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+
+  return null
+}
+
 function App() {
   return (
     <I18nProvider>
       <SpotifyPlayerProvider>
         <div className="min-h-screen overflow-x-hidden bg-transparent text-zinc-950 transition-colors duration-500 dark:bg-transparent dark:text-onda-soft">
+          <ScrollToTop />
           <Header />
           <main className="pt-20">
             <Routes>
