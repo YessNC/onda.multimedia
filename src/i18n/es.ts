@@ -72,9 +72,9 @@ export default {
 
   // Artist Descriptions
   'artist.vektorben': 'Artista urbano parte del universo creativo de ONDA MULTIMEDIA.',
-  'artist.vektorben-phrase': 'Sonido urbano con identidad propia.',
+  'artist.vektorben-phrase': 'Energía, calle e identidad propia.',
   'artist.giovane': 'Artista urbano parte del catálogo creativo de ONDA MULTIMEDIA.',
-  'artist.giovane-phrase': 'Energía, calle y propuesta musical.',
+  'artist.giovane-phrase': 'Sonido urbano con propuesta musical única.',
   'artist.astes': 'Artista urbano parte del ecosistema musical de ONDA MULTIMEDIA.',
   'artist.astes-phrase': 'Una propuesta fresca para la escena urbana.',
 

@@ -1,4 +1,6 @@
 import React, { createContext, useEffect, useState } from 'react'
+import es from '../i18n/es'
+import en from '../i18n/en'
 
 export type Language = 'es' | 'en'
 
@@ -14,27 +16,32 @@ interface I18nProviderProps {
   children: React.ReactNode
 }
 
-export function I18nProvider({ children }: I18nProviderProps) {
-  const [language, setLanguageState] = useState<Language>(() => {
-    const stored = localStorage.getItem('language')
-    return (stored as Language) || 'es'
-  })
+const dictionaries: Record<Language, Record<string, string>> = {
+  es,
+  en,
+}
 
-  const [translations, setTranslations] = useState<Record<string, string>>({})
+const getInitialLanguage = (): Language => {
+  const stored = localStorage.getItem('language')
+
+  if (stored === 'es' || stored === 'en') {
+    return stored
+  }
+
+  return 'es'
+}
+
+export function I18nProvider({ children }: I18nProviderProps) {
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage)
+
+  const [translations, setTranslations] = useState<Record<string, string>>(
+    dictionaries[language] || dictionaries.es
+  )
 
   useEffect(() => {
     localStorage.setItem('language', language)
-    loadTranslations(language)
+    setTranslations(dictionaries[language] || dictionaries.es)
   }, [language])
-
-  const loadTranslations = async (lang: Language) => {
-    try {
-      const module = await import(`../i18n/${lang}`)
-      setTranslations(module.default)
-    } catch (error) {
-      console.error(`Error loading translations for ${lang}:`, error)
-    }
-  }
 
   const t = (key: string): string => {
     return translations[key] || key
