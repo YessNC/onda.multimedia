@@ -5,6 +5,7 @@ import 'swiper/css'
 import 'swiper/css/pagination'
 import HeroSlide, { type HeroSlideData } from './HeroSlide'
 import { useI18n } from '../../hooks/useI18n'
+import { useRef } from 'react'
 
 const slides: HeroSlideData[] = [
   {
@@ -67,6 +68,7 @@ function HeroSliderControls() {
 
 export default function HeroSlider() {
   const { t } = useI18n()
+  const autoplayResumeRef = useRef<number | null>(null)
 
   return (
     <section className="relative overflow-hidden" aria-label={t('hero.highlights')}>
@@ -83,6 +85,27 @@ export default function HeroSlider() {
         speed={850}
         threshold={8}
         touchRatio={1}
+        onSlideChange={(swiper) => {
+          try {
+            if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+              if (swiper.autoplay) {
+                swiper.autoplay.stop()
+                // clear previous timer if any
+                if (autoplayResumeRef.current) window.clearTimeout(autoplayResumeRef.current)
+                autoplayResumeRef.current = window.setTimeout(() => {
+                  try {
+                    swiper.autoplay.start()
+                  } catch (e) {
+                    // ignore
+                  }
+                  autoplayResumeRef.current = null
+                }, 900)
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }}
         className="onda-hero-swiper"
       >
         {slides.map((slide, index) => (

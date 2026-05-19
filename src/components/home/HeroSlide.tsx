@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { ArrowDown, ArrowRight, Calendar, Music, Play, User } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useBrandLogoAsset } from '../../lib/brandAssets'
 import { useTheme } from '../../lib/theme'
@@ -86,31 +86,45 @@ function HeroGlassButton({ children, className, href, icon, to, variant = 'secon
 }
 
 function SpotifyIcon() {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const color = isDark ? '#ffffff' : '#18181b'
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="currentColor">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="currentColor" color={color}>
       <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.59 14.42a.69.69 0 0 1-.95.23c-2.6-1.59-5.88-1.95-9.74-1.07a.69.69 0 1 1-.3-1.35c4.22-.96 7.84-.54 10.76 1.25.32.19.43.62.23.94Zm1.22-2.72a.86.86 0 0 1-1.18.28c-2.98-1.83-7.51-2.36-11.03-1.29a.86.86 0 1 1-.5-1.65c4.02-1.22 9.02-.63 12.43 1.46.4.25.53.78.28 1.2Zm.1-2.83C14.34 8.75 8.45 8.55 5.04 9.59a1.03 1.03 0 1 1-.6-1.97c3.92-1.19 10.43-.96 14.52 1.46a1.03 1.03 0 0 1-1.05 1.79Z" />
     </svg>
   )
 }
 
 function InstagramIcon() {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const color = isDark ? '#ffffff' : '#18181b'
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none">
-      <rect width="16" height="16" x="4" y="4" rx="4.4" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="16.7" cy="7.35" r="1" fill="currentColor" />
+      <rect width="16" height="16" x="4" y="4" rx="4.4" stroke="currentColor" strokeWidth="1.8" color={color} />
+      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" color={color} />
+      <circle cx="16.7" cy="7.35" r="1" fill="currentColor" color={color} />
     </svg>
   )
 }
 
 function VektorbenSocialLink({ children, href, label }: { children: ReactNode; href: string; label: string }) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+
   return (
     <a
       href={href}
       aria-label={label}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]"
+      className={cn(
+        'inline-flex h-10 w-10 items-center justify-center rounded-md border transition duration-300 backdrop-blur-xl',
+        isDark
+          ? 'border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
+          : 'border-zinc-800/60 bg-zinc-900/15 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
+      )}
     >
       {children}
     </a>
@@ -189,7 +203,7 @@ function SwipeIndicator() {
   return (
     <motion.div
       aria-hidden="true"
-      className="mt-8 flex flex-col items-center gap-2 text-onda-purple dark:text-onda-lavender"
+      className="mt-8 flex flex-col items-center gap-2 text-onda-purple dark:text-onda-lavender md:mt-4 md:-translate-y-4 pointer-events-none"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.65, duration: 0.55 }}
@@ -212,9 +226,22 @@ function BrandSlide() {
   const { t } = useI18n()
   const robot = useRobotAsset()
   const logo = useBrandLogoAsset()
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const updateIsMobile = (event: MediaQueryListEvent) => setIsMobile(event.matches)
+
+    setIsMobile(mediaQuery.matches)
+    mediaQuery.addEventListener('change', updateIsMobile)
+
+    return () => mediaQuery.removeEventListener('change', updateIsMobile)
+  }, [])
 
   return (
-    <section className="relative h-full min-h-full overflow-hidden px-4 sm:px-6 lg:px-8">
+    <section className="relative h-full min-h-full overflow-hidden px-4 sm:px-6 lg:px-8 pt-20 md:pt-0">
       <HeroAtmosphere />
       <div className="onda-container relative z-10 flex h-full min-h-full items-center justify-center py-10 sm:py-12">
         <motion.div
@@ -225,7 +252,7 @@ function BrandSlide() {
         >
           <div className="pointer-events-none absolute inset-x-[6%] top-[38%] h-20 -translate-y-1/2 bg-[linear-gradient(90deg,transparent,rgba(192,132,252,0.24),transparent)] blur-2xl" />
 
-          {!robot.isMissing ? (
+          {!robot.isMissing && !isMobile ? (
             <motion.img
               src={robot.src}
               alt="Robot ONDA Multimedia"
@@ -287,9 +314,11 @@ function BrandSlide() {
 function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
   const hasImage = Boolean(slide.backgroundImage)
   const { t } = useI18n()
+  const { theme } = useTheme()
   const displayName = slide.nameKey ? t(slide.nameKey) : slide.name ?? ''
   const displayTagline = slide.taglineKey ? t(slide.taglineKey) : slide.tagline
   const isVektorben = displayName.toLowerCase() === 'vektorben'
+  const isDark = theme === 'dark'
   const fallbackBackground =
     slide.accent ??
     'radial-gradient(circle at 20% 25%, rgba(168,85,247,0.32), transparent 24%), radial-gradient(circle at 80% 70%, rgba(123,44,255,0.28), transparent 24%), linear-gradient(135deg, #050505 0%, #121018 55%, #050505 100%)'
@@ -337,10 +366,12 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
       >
         <motion.div
           className={cn(
-            'rounded-lg border border-white/18 bg-black/28 shadow-[0_26px_100px_rgba(123,44,255,0.22)] backdrop-blur-2xl',
+            'rounded-lg border backdrop-blur-2xl',
             isVektorben
-              ? 'w-full max-w-[24rem] bg-black/24 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[26rem] sm:p-5'
-              : 'max-w-xl p-5 sm:p-6',
+              ? isDark
+                ? 'w-full max-w-[24rem] border-white/18 bg-black/24 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[26rem] sm:p-5'
+                : 'w-full max-w-[24rem] border-onda-purple/35 bg-white/95 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.16)] sm:max-w-[26rem] sm:p-5'
+              : 'max-w-xl border-white/18 bg-black/28 p-5 shadow-[0_26px_100px_rgba(123,44,255,0.22)] sm:p-6',
           )}
           initial={{ opacity: 0, y: 26 }}
           animate={{ opacity: 1, y: 0 }}
@@ -348,8 +379,12 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
         >
           <h2
             className={cn(
-              'font-display font-black uppercase leading-none text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)]',
-              isVektorben ? 'text-3xl sm:text-4xl lg:text-5xl' : 'text-4xl sm:text-5xl lg:text-6xl',
+              'font-display font-black uppercase leading-none',
+              isVektorben
+                ? isDark
+                  ? 'text-3xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-4xl lg:text-5xl'
+                  : 'text-3xl text-zinc-900 sm:text-4xl lg:text-5xl'
+                : 'text-4xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-5xl lg:text-6xl',
             )}
           >
             {displayName}
@@ -362,7 +397,12 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
             <div className="mt-5 flex flex-wrap items-center gap-2">
               <a
                 href="#"
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-white/18 bg-white/10 px-4 font-display text-[0.62rem] font-bold uppercase tracking-[0.14em] text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]"
+                className={cn(
+                  'inline-flex h-10 items-center justify-center gap-2 rounded-md border font-display text-[0.62rem] font-bold uppercase tracking-[0.14em] transition duration-300 backdrop-blur-xl',
+                  isDark
+                    ? 'border-white/18 bg-white/10 px-4 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
+                    : 'border-zinc-800/60 bg-zinc-900/15 px-4 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
+                )}
               >
                 <User className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('hero.view-artist')}

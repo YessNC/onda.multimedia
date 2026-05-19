@@ -5,16 +5,17 @@ export default function LanguageToggle() {
 
   return (
     <button
+      type="button"
       onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
-      className="hidden items-center gap-1 rounded-md border border-onda-purple/18 bg-white/80 px-3 py-2 font-display text-[0.68rem] font-bold uppercase tracking-[0.18em] text-onda-purple shadow-[0_0_22px_rgba(123,44,255,0.1)] transition duration-300 hover:border-onda-purple hover:bg-onda-purple/10 lg:inline-flex dark:border-onda-purple/30 dark:bg-white/5 dark:text-onda-lavender dark:shadow-[0_0_22px_rgba(123,44,255,0.14)]"
+      className="group relative inline-flex h-10 shrink-0 items-center overflow-hidden rounded-full border border-onda-purple/20 bg-white/[0.82] px-2 text-[0.68rem] font-display font-bold uppercase tracking-[0.12em] text-onda-purple shadow-[0_0_20px_rgba(123,44,255,0.12)] backdrop-blur-xl transition duration-300 hover:border-onda-purple/45 hover:bg-white sm:h-11 dark:border-onda-lavender/30 dark:bg-white/[0.08] dark:text-onda-lavender dark:shadow-[0_0_20px_rgba(123,44,255,0.18)]"
       aria-label={`Switch to ${language === 'es' ? 'English' : 'Español'}`}
       title={`${language === 'es' ? 'English' : 'Español'}`}
     >
-      <span className={language === 'es' ? 'text-onda-purple dark:text-onda-lavender' : 'opacity-50'}>
+      <span className={language === 'es' ? 'px-2 text-onda-purple dark:text-onda-lavender' : 'px-2 opacity-50'}>
         ES
       </span>
       <span className="opacity-30">|</span>
-      <span className={language === 'en' ? 'text-onda-purple dark:text-onda-lavender' : 'opacity-50'}>
+      <span className={language === 'en' ? 'px-2 text-onda-purple dark:text-onda-lavender' : 'px-2 opacity-50'}>
         EN
       </span>
     </button>

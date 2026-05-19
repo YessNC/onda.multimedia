@@ -22,10 +22,6 @@ type QuickOption = {
   message: string
 }
 
-const quickOptions: QuickOption[] = []
-
-const initialMessages: ChatMessage[] = []
-
 let messageCounter = 0
 
 function createMessageId(prefix: string) {

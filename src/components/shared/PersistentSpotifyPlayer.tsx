@@ -5,7 +5,7 @@ import { useSpotifyPlayer } from '../../lib/spotifyPlayer.ts'
 
 export default function PersistentSpotifyPlayer() {
   const { closePlayer, currentArtist, currentTrack, isMinimized, isOpen, justOpened, toggleMinimized } = useSpotifyPlayer()
-  const playerRef = useRef<HTMLAsideElement>(null)
+  const playerRef = useRef<HTMLElement | null>(null)
 
   // Scroll suave hacia el player cuando se abre
   useEffect(() => {

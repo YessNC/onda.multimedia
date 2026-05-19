@@ -11,7 +11,7 @@ export default function EventCard({ event }: EventCardProps) {
   const { t } = useI18n()
   return (
     <article className="glass-panel overflow-hidden rounded-lg">
-      <AssetFrame src={event.imagePath} alt={event.title} className="aspect-[16/10] rounded-none border-0" />
+      <AssetFrame src={event.imagePath} alt={t(event.titleKey)} className="aspect-[16/10] rounded-none border-0" />
       <div className="p-5">
         <span className="rounded-full border border-onda-purple/25 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-onda-purple dark:text-onda-lavender">
           {event.status === 'proximo' ? t('events.upcoming') : t('events.archive')}
@@ -21,10 +21,10 @@ export default function EventCard({ event }: EventCardProps) {
         </h3>
         <div className="mt-4 grid gap-2 text-sm text-zinc-600 dark:text-onda-muted">
           <span className="inline-flex items-center gap-2">
-            <CalendarDays className="h-4 w-4" /> {event.date}
+            <CalendarDays className="h-4 w-4" /> {t(event.dateKey)}
           </span>
           <span className="inline-flex items-center gap-2">
-            <MapPin className="h-4 w-4" /> {event.place}
+            <MapPin className="h-4 w-4" /> {t(event.placeKey)}
           </span>
         </div>
       </div>
