@@ -201,17 +201,17 @@ export default {
   // Admin
   'admin.eyebrow': 'Admin',
   'admin.login-title': 'Acceso administrador',
-  'admin.login-description': 'Vista preparada para autenticar administradores cuando se integre el backend.',
+  'admin.login-description': 'Acceso seguro para administradores de ONDA Multimedia.',
   'admin.events-title': 'Gestion visual de eventos',
   'admin.events-description': 'Estructura no funcional preparada para futuro CRUD, subida de imagenes y conexion a Supabase.',
 
   // Admin Form
   'admin-form.email': 'Email',
-  'admin-form.email-placeholder': 'admin@ondamultimedia.cl',
+  'admin-form.email-placeholder': 'admin@ondamultimedia.com',
   'admin-form.password': 'Password',
   'admin-form.password-placeholder': '••••••••',
   'admin-form.submit': 'Entrar',
-  'admin-form.disclaimer': 'Acceso visual reservado. La autenticacion real se integrara en una etapa posterior.',
+  'admin-form.disclaimer': 'Autenticacion conectada a Supabase Auth.',
 
   // Event Form
   'event-form.new': 'Nuevo evento',

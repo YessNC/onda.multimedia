@@ -201,17 +201,17 @@ export default {
   // Admin
   'admin.eyebrow': 'Admin',
   'admin.login-title': 'Administrator access',
-  'admin.login-description': 'View prepared to authenticate administrators when backend is integrated.',
+  'admin.login-description': 'Secure access for ONDA Multimedia administrators.',
   'admin.events-title': 'Visual event management',
   'admin.events-description': 'Non-functional structure prepared for future CRUD, image upload and Supabase connection.',
 
   // Admin Form
   'admin-form.email': 'Email',
-  'admin-form.email-placeholder': 'admin@ondamultimedia.cl',
+  'admin-form.email-placeholder': 'admin@ondamultimedia.com',
   'admin-form.password': 'Password',
   'admin-form.password-placeholder': '••••••••',
   'admin-form.submit': 'Enter',
-  'admin-form.disclaimer': 'Visual access reserved. Real authentication will be integrated in a later stage.',
+  'admin-form.disclaimer': 'Authentication connected to Supabase Auth.',
 
   // Event Form
   'event-form.new': 'New event',

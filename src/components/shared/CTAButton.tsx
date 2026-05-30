@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils'
 type CTAButtonProps = {
   children: ReactNode
   className?: string
+  disabled?: boolean
   href?: string
   icon?: ReactNode
   onClick?: () => void
@@ -27,6 +28,7 @@ const variants = {
 export default function CTAButton({
   children,
   className,
+  disabled = false,
   href,
   icon,
   onClick,
@@ -37,7 +39,7 @@ export default function CTAButton({
   variant = 'primary',
 }: CTAButtonProps) {
   const buttonClassName = cn(
-    'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 py-3 text-center font-display text-xs font-bold uppercase tracking-[0.18em] transition duration-300',
+    'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 py-3 text-center font-display text-xs font-bold uppercase tracking-[0.18em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-60',
     variants[variant],
     className,
   )
@@ -50,7 +52,12 @@ export default function CTAButton({
 
   if (to) {
     return (
-      <Link to={to} onClick={onClick} className={buttonClassName}>
+      <Link
+        to={to}
+        onClick={disabled ? undefined : onClick}
+        aria-disabled={disabled}
+        className={buttonClassName}
+      >
         {content}
       </Link>
     )
@@ -58,14 +65,21 @@ export default function CTAButton({
 
   if (href) {
     return (
-      <a href={href} target={target} rel={rel} onClick={onClick} className={buttonClassName}>
+      <a
+        href={disabled ? undefined : href}
+        target={target}
+        rel={rel}
+        onClick={disabled ? undefined : onClick}
+        aria-disabled={disabled}
+        className={buttonClassName}
+      >
         {content}
       </a>
     )
   }
 
   return (
-    <button type={type} onClick={onClick} className={buttonClassName}>
+    <button type={type} onClick={onClick} disabled={disabled} className={buttonClassName}>
       {content}
     </button>
   )

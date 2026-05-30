@@ -6,8 +6,11 @@ import Header from './components/layout/Header'
 import FloatingAssistant from './components/shared/FloatingAssistant'
 import PersistentSpotifyPlayer from './components/shared/PersistentSpotifyPlayer'
 import SpotifyPlayerProvider from './components/shared/SpotifyPlayerProvider'
+import ProtectedAdminRoute from './components/admin/ProtectedAdminRoute'
+import AdminPanel from './routes/AdminPanel'
 import AdminEventos from './routes/AdminEventos'
 import AdminLogin from './routes/AdminLogin'
+import AdminResetPassword from './routes/AdminResetPassword'
 import Artistas from './routes/Artistas'
 import Contacto from './routes/Contacto'
 import Eventos from './routes/Eventos'
@@ -39,7 +42,23 @@ function App() {
               <Route path="/eventos" element={<Eventos />} />
               <Route path="/contacto" element={<Contacto />} />
               <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin/eventos" element={<AdminEventos />} />
+              <Route path="/admin/reset-password" element={<AdminResetPassword />} />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedAdminRoute>
+                    <AdminPanel />
+                  </ProtectedAdminRoute>
+                }
+              />
+              <Route
+                path="/admin/eventos"
+                element={
+                  <ProtectedAdminRoute>
+                    <AdminEventos />
+                  </ProtectedAdminRoute>
+                }
+              />
             </Routes>
           </main>
           <Footer />
