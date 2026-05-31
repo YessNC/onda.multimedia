@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { BrowserQRCodeReader } from '@zxing/browser'
 import { Camera, CameraOff, Loader2, QrCode, RotateCcw } from 'lucide-react'
-import { Html5Qrcode, Html5QrcodeSupportedFormats, type Html5QrcodeCameraScanConfig } from 'html5-qrcode'
 import CTAButton from '../shared/CTAButton'
 
 type QRScannerProps = {
@@ -10,6 +10,10 @@ type QRScannerProps = {
 }
 
 type ScannerStatus = 'idle' | 'starting' | 'scanning' | 'detected' | 'error'
+
+type ScannerControls = {
+  stop: () => void
+}
 
 function isLocalhost(hostname: string) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
@@ -21,51 +25,9 @@ function nextFrame() {
   })
 }
 
-async function waitForVisibleElement(elementId: string) {
-  await nextFrame()
-  await nextFrame()
-
-  const element = document.getElementById(elementId)
-
-  if (!element) {
-    throw new Error('No encontramos el contenedor del lector QR.')
-  }
-
-  const rect = element.getBoundingClientRect()
-
-  if (rect.width < 80 || rect.height < 160) {
-    await nextFrame()
-  }
-
-  return element
-}
-
-function patchScannerVideo(elementId: string) {
-  const root = document.getElementById(elementId)
-  const video = root?.querySelector('video') as HTMLVideoElement | null
-
-  if (!video) return
-
-  video.setAttribute('playsinline', 'true')
-  video.setAttribute('webkit-playsinline', 'true')
-  video.autoplay = true
-  video.muted = true
-
-  video.style.width = '100%'
-  video.style.height = '100%'
-  video.style.minHeight = '320px'
-  video.style.objectFit = 'cover'
-  video.style.display = 'block'
-  video.style.background = '#000'
-
-  void video.play().catch(() => {
-    // En iOS a veces play() falla aunque el stream quede activo.
-  })
-}
-
 function getCameraErrorMessage(error: unknown) {
   if (!window.isSecureContext && !isLocalhost(window.location.hostname)) {
-    return 'La camara requiere HTTPS para funcionar. Abre esta pagina desde el dominio seguro.'
+    return 'La cámara requiere HTTPS para funcionar. Abre esta página desde el dominio seguro.'
   }
 
   const name = error instanceof DOMException ? error.name : ''
@@ -73,11 +35,11 @@ function getCameraErrorMessage(error: unknown) {
   const details = `${name} ${message}`.toLowerCase()
 
   if (details.includes('notallowed') || details.includes('permission') || details.includes('denied')) {
-    return 'No pudimos acceder a la camara. Revisa los permisos del navegador.'
+    return 'No pudimos acceder a la cámara. Revisa los permisos del navegador.'
   }
 
   if (details.includes('notfound') || details.includes('devicesnotfound') || details.includes('no camera')) {
-    return 'No encontramos una camara disponible en este dispositivo.'
+    return 'No encontramos una cámara disponible en este dispositivo.'
   }
 
   if (
@@ -86,39 +48,23 @@ function getCameraErrorMessage(error: unknown) {
     details.includes('in use') ||
     details.includes('could not start video')
   ) {
-    return 'No pudimos iniciar la camara. Puede estar ocupada por otra aplicacion.'
+    return 'No pudimos iniciar la cámara. Puede estar ocupada por otra aplicación.'
   }
 
   if (details.includes('overconstrained') || details.includes('constraint')) {
-    return 'No pudimos iniciar la camara trasera. Reintenta o usa la validacion manual.'
+    return 'No pudimos iniciar la cámara trasera. Reintenta o usa la validación manual.'
   }
 
-  return 'No pudimos acceder a la camara. Revisa los permisos del navegador.'
-}
-
-async function getFallbackCamera(): Promise<string | MediaTrackConstraints> {
-  try {
-    const cameras = await Html5Qrcode.getCameras()
-    const rearCamera = cameras.find((camera) =>
-      /back|rear|environment|trasera|posterior|ambiente/i.test(camera.label),
-    )
-
-    return rearCamera?.id || cameras[0]?.id || { facingMode: { ideal: 'environment' } }
-  } catch {
-    return { facingMode: { ideal: 'environment' } }
-  }
+  return 'No pudimos acceder a la cámara. Revisa los permisos del navegador.'
 }
 
 export default function QRScanner({ disabled = false, onScan, startSignal = 0 }: QRScannerProps) {
-  const reactId = useId()
-  const scannerElementId = useMemo(() => `onda-qr-scanner-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`, [reactId])
-
   const [status, setStatus] = useState<ScannerStatus>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [lastScannedText, setLastScannedText] = useState('')
 
-  const scannerRef = useRef<Html5Qrcode | null>(null)
-  const stopPromiseRef = useRef<Promise<void> | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const controlsRef = useRef<ScannerControls | null>(null)
   const hasDetectedRef = useRef(false)
   const isMountedRef = useRef(true)
   const lastStartSignalRef = useRef(startSignal)
@@ -132,49 +78,48 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
     onScanRef.current = onScan
   }, [onScan])
 
-  const stopScanner = useCallback(async (nextStatus: ScannerStatus = 'idle') => {
-    if (stopPromiseRef.current) {
-      await stopPromiseRef.current
+  const stopVideoTracks = useCallback(() => {
+    const video = videoRef.current
+    const stream = video?.srcObject as MediaStream | null
+
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
     }
 
-    const scanner = scannerRef.current
-
-    if (!scanner) {
-      if (isMountedRef.current) setStatus(nextStatus)
-      return
-    }
-
-    const stopPromise = (async () => {
-      try {
-        if (scanner.isScanning) {
-          await scanner.stop()
-        }
-      } catch (error) {
-        console.warn('No pudimos detener el scanner QR:', error)
-      } finally {
-        try {
-          scanner.clear()
-        } catch (error) {
-          console.warn('No pudimos limpiar el scanner QR:', error)
-        }
-
-        if (scannerRef.current === scanner) {
-          scannerRef.current = null
-        }
-
-        if (isMountedRef.current) {
-          setStatus(nextStatus)
-        }
-      }
-    })()
-
-    stopPromiseRef.current = stopPromise
-    await stopPromise
-
-    if (stopPromiseRef.current === stopPromise) {
-      stopPromiseRef.current = null
+    if (video) {
+      video.pause()
+      video.srcObject = null
+      video.removeAttribute('src')
+      video.load()
     }
   }, [])
+
+  const stopScanner = useCallback(
+    async (nextStatus: ScannerStatus = 'idle') => {
+      try {
+        controlsRef.current?.stop()
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('No pudimos detener controles del scanner:', error)
+        }
+      }
+
+      controlsRef.current = null
+
+      try {
+        stopVideoTracks()
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('No pudimos detener stream de cámara:', error)
+        }
+      }
+
+      if (isMountedRef.current) {
+        setStatus(nextStatus)
+      }
+    },
+    [stopVideoTracks],
+  )
 
   useEffect(() => {
     isMountedRef.current = true
@@ -194,13 +139,13 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setStatus('error')
-      setErrorMessage('Este navegador no permite leer la camara. Tambien puedes pegar el token o URL manualmente.')
+      setErrorMessage('Este navegador no permite leer la cámara. También puedes pegar el código, token o URL manualmente.')
       return
     }
 
     if (!window.isSecureContext && !isLocalhost(window.location.hostname)) {
       setStatus('error')
-      setErrorMessage('La camara requiere HTTPS para funcionar. Tambien puedes pegar el token o URL manualmente.')
+      setErrorMessage('La cámara requiere HTTPS para funcionar. También puedes pegar el código, token o URL manualmente.')
       return
     }
 
@@ -211,91 +156,86 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
 
       setStatus('starting')
 
-      await waitForVisibleElement(scannerElementId)
+      await nextFrame()
+      await nextFrame()
 
-      const scanner = new Html5Qrcode(scannerElementId, {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: import.meta.env.DEV,
-      })
+      const video = videoRef.current
 
-      scannerRef.current = scanner
+      if (!video) {
+        throw new Error('No encontramos el contenedor de video del lector QR.')
+      }
 
-      const scanConfig: Html5QrcodeCameraScanConfig = {
-        fps: 8,
-        qrbox: (viewfinderWidth, viewfinderHeight) => {
-          const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72)
+      video.setAttribute('playsinline', 'true')
+      video.setAttribute('webkit-playsinline', 'true')
+      video.muted = true
+      video.autoplay = true
 
-          return {
-            height: Math.max(180, Math.min(size, 340)),
-            width: Math.max(180, Math.min(size, 340)),
-          }
+      const reader = new BrowserQRCodeReader()
+
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
       }
 
-      const handleDecoded = (decodedText: string) => {
-        const scannedText = decodedText.trim()
+      const controls = await reader.decodeFromConstraints(constraints, video, (result, error, scanControls) => {
+        if (result) {
+          const scannedText = result.getText().trim()
 
-        if (!scannedText || hasDetectedRef.current) return
+          if (!scannedText || hasDetectedRef.current) return
 
-        hasDetectedRef.current = true
-        setLastScannedText(scannedText)
-        setErrorMessage('')
-        onScanRef.current(scannedText)
-        void stopScanner('detected')
-      }
+          hasDetectedRef.current = true
+          setLastScannedText(scannedText)
+          setErrorMessage('')
 
-      const handleDecodeError = () => undefined
+          try {
+            scanControls.stop()
+          } catch {
+            // Si ya se detuvo, no bloqueamos.
+          }
+
+          stopVideoTracks()
+          onScanRef.current(scannedText)
+
+          if (isMountedRef.current) {
+            setStatus('detected')
+          }
+
+          return
+        }
+
+        if (import.meta.env.DEV && error?.name && error.name !== 'NotFoundException') {
+          console.debug('QR scan attempt:', error.name)
+        }
+      })
+
+      controlsRef.current = controls as ScannerControls
 
       try {
-        await scanner.start({ facingMode: { ideal: 'environment' } }, scanConfig, handleDecoded, handleDecodeError)
-      } catch (primaryError) {
-        if (import.meta.env.DEV) {
-          console.warn('No pudimos iniciar con facingMode environment. Intentando fallback:', primaryError)
-        }
-
-        try {
-          scanner.clear()
-        } catch {
-          // Continuar con fallback.
-        }
-
-        const fallbackCamera = await getFallbackCamera()
-        await scanner.start(fallbackCamera, scanConfig, handleDecoded, handleDecodeError)
+        await video.play()
+      } catch {
+        // iOS puede rechazar play() aunque el stream esté activo.
       }
-
-      patchScannerVideo(scannerElementId)
-
-      await nextFrame()
-      patchScannerVideo(scannerElementId)
 
       if (!hasDetectedRef.current && isMountedRef.current) {
         setStatus('scanning')
       }
     } catch (error) {
-      if (scannerRef.current) {
-        try {
-          if (scannerRef.current.isScanning) {
-            await scannerRef.current.stop()
-          }
-        } catch {
-          // Nada más que detener.
-        }
-
-        try {
-          scannerRef.current.clear()
-        } catch {
-          // Nada más que limpiar.
-        }
-
-        scannerRef.current = null
+      if (import.meta.env.DEV) {
+        console.warn('Error iniciando scanner QR:', error)
       }
+
+      await stopScanner('idle')
 
       if (isMountedRef.current) {
         setStatus('error')
-        setErrorMessage(`${getCameraErrorMessage(error)} Tambien puedes pegar el token o URL manualmente.`)
+        setErrorMessage(`${getCameraErrorMessage(error)} También puedes pegar el código, token o URL manualmente.`)
       }
     }
-  }, [disabled, scannerElementId, status, stopScanner])
+  }, [disabled, status, stopScanner, stopVideoTracks])
 
   useEffect(() => {
     if (!startSignal || lastStartSignalRef.current === startSignal) return
@@ -314,33 +254,37 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
         <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-onda-purple/16 text-onda-lavender">
           <Camera className="h-6 w-6" aria-hidden="true" />
         </div>
+
         <div className="min-w-0">
           <h2 className="font-display text-lg font-extrabold uppercase tracking-[0.13em] text-white">
-            Escanear con camara
+            Escanear con cámara
           </h2>
           <p className="mt-2 text-sm leading-6 text-onda-muted">
-            Usa la camara trasera del telefono para leer el QR de la entrada.
+            Usa la cámara trasera del teléfono para leer el QR de la entrada.
           </p>
         </div>
       </div>
 
       {status !== 'idle' ? (
         <div className="relative overflow-hidden rounded-lg border border-onda-purple/24 bg-black">
-          <div
-            id={scannerElementId}
-            className="relative grid aspect-[3/4] min-h-[20rem] w-full place-items-center overflow-hidden bg-black text-center text-sm text-onda-muted sm:aspect-video sm:min-h-[22rem]
-              [&_canvas]:!absolute [&_canvas]:!inset-0 [&_canvas]:!h-full [&_canvas]:!w-full
-              [&_video]:!absolute [&_video]:!inset-0 [&_video]:!block [&_video]:!h-full [&_video]:!min-h-[20rem] [&_video]:!w-full [&_video]:!bg-black [&_video]:!object-cover"
-          />
+          <div className="relative aspect-[3/4] min-h-[20rem] w-full overflow-hidden bg-black sm:aspect-video sm:min-h-[22rem]">
+            <video
+              ref={videoRef}
+              className="absolute inset-0 block h-full min-h-[20rem] w-full bg-black object-cover"
+              muted
+              playsInline
+              autoPlay
+            />
 
-          {isStarting ? (
-            <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/72 px-5 py-12 text-center text-sm font-semibold text-onda-soft">
-              <div className="grid justify-items-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-onda-lavender" aria-hidden="true" />
-                Iniciando camara...
+            {isStarting ? (
+              <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/72 px-5 py-12 text-center text-sm font-semibold text-onda-soft">
+                <div className="grid justify-items-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-onda-lavender" aria-hidden="true" />
+                  Iniciando cámara...
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -361,17 +305,17 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
           <CTAButton
             type="button"
             variant="secondary"
-            className="w-full min-h-14"
+            className="min-h-14 w-full"
             icon={<CameraOff className="h-5 w-5" aria-hidden="true" />}
             onClick={() => void stopScanner('idle')}
           >
-            Detener camara
+            Detener cámara
           </CTAButton>
         ) : status === 'error' || status === 'detected' ? (
           <CTAButton
             type="button"
             variant="secondary"
-            className="w-full min-h-14"
+            className="min-h-14 w-full"
             icon={<RotateCcw className="h-5 w-5" aria-hidden="true" />}
             onClick={handleRetry}
             disabled={disabled}
@@ -383,7 +327,7 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
         <CTAButton
           type="button"
           variant="primary"
-          className="w-full min-h-14 sm:col-span-2"
+          className="min-h-14 w-full sm:col-span-2"
           icon={
             isStarting ? (
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
@@ -394,7 +338,7 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
           onClick={handleRetry}
           disabled={disabled || isStarting || isScanning}
         >
-          {isStarting ? 'Abriendo camara...' : 'Escanear QR'}
+          {isStarting ? 'Abriendo cámara...' : 'Escanear QR'}
         </CTAButton>
       </div>
     </section>
