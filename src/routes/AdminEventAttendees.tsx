@@ -13,6 +13,7 @@ import {
   Loader2,
   QrCode,
   Save,
+  Trash2,
   Upload,
   Users,
   X,
@@ -28,9 +29,12 @@ import {
   INVITATION_TEMPLATE_BUCKET,
   buildAdminCheckInUrl,
   buildAttendeeFullName,
+  buildInvitationFileName,
+  buildInvitationStoragePath,
   createQrBlob,
   createQrDataUrl,
   downloadBlob,
+  getAccessCodePlacement,
   getAccessCodeText,
   normalizeQrBox,
   renderInvitationPng,
@@ -72,6 +76,7 @@ type EventAttendee = Record<string, unknown> & {
 }
 
 type GeneratedInvitation = Record<string, unknown> & {
+  access_code?: string | null
   attendee_id: string
   bucket?: string | null
   delivery_channel?: string | null
@@ -82,6 +87,7 @@ type GeneratedInvitation = Record<string, unknown> & {
   generated_by?: string | null
   id: string
   path?: string | null
+  qr_token?: string | null
   size_bytes?: number | null
 }
 
@@ -110,6 +116,8 @@ const inputClassName =
   'min-h-12 rounded-md border border-onda-purple/20 bg-white/70 px-4 py-3 text-sm outline-none transition focus:border-onda-purple dark:bg-white/5 dark:text-white'
 
 const actionButtonVariants = {
+  danger:
+    'border-red-500/45 bg-red-500/10 text-red-700 hover:border-red-500 hover:bg-red-500 hover:text-white dark:text-red-200',
   ghost:
     'border-white/10 bg-white/5 text-zinc-700 hover:border-onda-purple/40 hover:bg-onda-purple/10 dark:text-onda-soft',
   primary:
@@ -175,6 +183,26 @@ function createQrToken() {
 
 function getAttendeeAccessCode(attendee: EventAttendee | null | undefined) {
   return normalizeAccessCode(readString(attendee?.access_code))
+}
+
+function getInvitationAccessCode(
+  invitation: GeneratedInvitation,
+  attendee: EventAttendee | null | undefined,
+) {
+  return normalizeAccessCode(readString(invitation.access_code)) || getAttendeeAccessCode(attendee)
+}
+
+function buildInvitationDownloadName(
+  invitation: GeneratedInvitation,
+  attendee: EventAttendee | null | undefined,
+) {
+  return buildInvitationFileName({
+    accessCode: getInvitationAccessCode(invitation, attendee),
+    firstName: attendee?.first_name,
+    fullName: attendee ? getAttendeeName(attendee) : invitation.file_name,
+    lastName: attendee?.last_name,
+    qrToken: invitation.qr_token,
+  })
 }
 
 async function createUniqueAccessCodeForEvent(eventId: string, reservedCodes = new Set<string>()) {
@@ -421,6 +449,7 @@ export default function AdminEventAttendees() {
 
   const eventTitle = getEventTitle(eventRecord)
   const previewQrBox = normalizeQrBox(qrDraft)
+  const previewAccessCodePlacement = getAccessCodePlacement(templateImageSize.width, templateImageSize.height)
   const canShowQrOverlay =
     showQrPreview && Boolean(qrPreviewDataUrl) && templateImageSize.height > 0 && templateImageSize.width > 0
   const historyItems = historyAttendee
@@ -715,9 +744,23 @@ export default function AdminEventAttendees() {
         templateUrl: signedTemplate.signedUrl,
       })
       const timestamp = Date.now()
-      const attendeeFileName = sanitizeFileName(getAttendeeName(attendee)) || 'asistente'
-      const fileName = `${attendeeFileName}-invitation.png`
-      const storagePath = `events/${eventId}/attendees/${attendee.id}/${timestamp}-invitation.png`
+      const fileName = buildInvitationFileName({
+        accessCode,
+        firstName: attendee.first_name,
+        fullName: getAttendeeName(attendee),
+        lastName: attendee.last_name,
+        qrToken,
+      })
+      const storagePath = buildInvitationStoragePath({
+        accessCode,
+        attendeeId: attendee.id,
+        eventId,
+        firstName: attendee.first_name,
+        fullName: getAttendeeName(attendee),
+        lastName: attendee.last_name,
+        qrToken,
+        timestamp,
+      })
 
       const { error: uploadError } = await supabase.storage
         .from(GENERATED_INVITATIONS_BUCKET)
@@ -732,6 +775,7 @@ export default function AdminEventAttendees() {
       const generatedBy = sessionData.session?.user.id ?? null
 
       const { error: invitationError } = await supabase.from('generated_invitations').insert({
+        access_code: accessCode,
         attendee_id: attendee.id,
         bucket: GENERATED_INVITATIONS_BUCKET,
         delivery_channel: 'download',
@@ -815,7 +859,9 @@ export default function AdminEventAttendees() {
       if (error) throw error
       if (!data) throw new Error('No pudimos descargar la invitacion.')
 
-      downloadBlob(data, invitation.file_name || 'invitacion-onda.png')
+      const attendee = attendees.find((currentAttendee) => currentAttendee.id === invitation.attendee_id)
+
+      downloadBlob(data, buildInvitationDownloadName(invitation, attendee))
       await markInvitationDownloaded(invitation)
       setMessage('Descarga registrada en historial.')
     } catch (error) {
@@ -855,6 +901,61 @@ export default function AdminEventAttendees() {
 
       await navigator.clipboard.writeText(data.signedUrl)
       setMessage('Link temporal copiado por 60 segundos.')
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleDeleteInvitation(invitation: GeneratedInvitation) {
+    if (!invitation.path) {
+      setErrorMessage('Esta invitacion no tiene archivo asociado para eliminar.')
+      return
+    }
+
+    const attendee = attendees.find((currentAttendee) => currentAttendee.id === invitation.attendee_id)
+    const fileName = buildInvitationDownloadName(invitation, attendee)
+    const confirmed = window.confirm(
+      `Eliminar ${fileName}? Se borrara el archivo privado y el registro del historial.`,
+    )
+
+    if (!confirmed) return
+
+    resetMessages()
+    setBusyAction(`delete:${invitation.id}`)
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError) throw sessionError
+      if (!sessionData.session) throw new Error('Debes iniciar sesion como administrador para eliminar invitaciones.')
+
+      const { error: storageError } = await supabase.storage
+        .from(GENERATED_INVITATIONS_BUCKET)
+        .remove([invitation.path])
+
+      if (storageError) {
+        throw new Error(
+          `No pudimos borrar el archivo en Storage (${invitation.path}): ${storageError.message}. El registro no fue eliminado.`,
+        )
+      }
+
+      const { error: deleteError } = await supabase
+        .from('generated_invitations')
+        .delete()
+        .eq('id', invitation.id)
+
+      if (deleteError) {
+        throw new Error(
+          `El archivo se borro en Storage, pero no pudimos borrar el registro del historial: ${deleteError.message}.`,
+        )
+      }
+
+      setInvitations((currentInvitations) =>
+        currentInvitations.filter((currentInvitation) => currentInvitation.id !== invitation.id),
+      )
+      setMessage('Invitacion eliminada del historial.')
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
     } finally {
@@ -1109,12 +1210,15 @@ export default function AdminEventAttendees() {
                             }}
                           />
                           <span
-                            className="absolute text-center font-sans font-black tracking-[0.08em] text-black"
+                            className="absolute font-sans font-black tracking-[0.08em]"
                             style={{
-                              fontSize: 'clamp(10px, 2vw, 18px)',
-                              left: `${(previewQrBox.x / templateImageSize.width) * 100}%`,
-                              top: `${((previewQrBox.y + previewQrBox.height + 18) / templateImageSize.height) * 100}%`,
-                              width: `${(previewQrBox.width / templateImageSize.width) * 100}%`,
+                              color: previewAccessCodePlacement.color,
+                              fontSize: `clamp(10px, ${(previewAccessCodePlacement.fontSize / templateImageSize.width) * 100}vw, ${previewAccessCodePlacement.fontSize}px)`,
+                              left: `${(previewAccessCodePlacement.x / templateImageSize.width) * 100}%`,
+                              lineHeight: 1,
+                              maxWidth: `${((templateImageSize.width - previewAccessCodePlacement.x * 2) / templateImageSize.width) * 100}%`,
+                              textShadow: `0 2px 8px ${previewAccessCodePlacement.shadowColor}`,
+                              top: `${((previewAccessCodePlacement.y - previewAccessCodePlacement.fontSize) / templateImageSize.height) * 100}%`,
                             }}
                           >
                             {getAccessCodeText('DEMO123')}
@@ -1319,7 +1423,7 @@ export default function AdminEventAttendees() {
                                 <div className="mt-1">{attendee.phone || 'Sin telefono'}</div>
                               </td>
                               <td className="px-4 py-4 align-top text-zinc-600 dark:text-onda-muted">
-                                <div>{formatDateTime(attendee.invitation_generated_at)}</div>
+                                <div>{latestInvitation ? formatDateTime(latestInvitation.generated_at) : 'Sin fecha'}</div>
                                 <div className="mt-1 text-xs">
                                   {latestInvitation
                                     ? `${formatFileSize(latestInvitation.size_bytes)} - ${latestInvitation.download_count ?? 0} descargas`
@@ -1431,44 +1535,65 @@ export default function AdminEventAttendees() {
                 </div>
               ) : (
                 <div className="grid gap-3">
-                  {historyItems.map((invitation) => (
-                    <div
-                      key={invitation.id}
-                      className="rounded-lg border border-onda-purple/18 bg-white/58 p-4 dark:bg-white/5"
-                    >
-                      <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
-                        <div className="text-sm text-zinc-600 dark:text-onda-muted">
-                          <div className="font-semibold text-zinc-950 dark:text-white">
-                            {formatDateTime(invitation.generated_at)}
+                  {historyItems.map((invitation) => {
+                    const invitationAccessCode = getInvitationAccessCode(invitation, historyAttendee)
+                    const downloadFileName = buildInvitationDownloadName(invitation, historyAttendee)
+
+                    return (
+                      <div
+                        key={invitation.id}
+                        className="rounded-lg border border-onda-purple/18 bg-white/58 p-4 dark:bg-white/5"
+                      >
+                        <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
+                          <div className="text-sm text-zinc-600 dark:text-onda-muted">
+                            <div className="font-semibold text-zinc-950 dark:text-white">
+                              {formatDateTime(invitation.generated_at)}
+                            </div>
+                            <div className="mt-1">Generado por: {formatUserId(invitation.generated_by)}</div>
+                            <div className="mt-1">Codigo: {invitationAccessCode || 'Sin codigo'}</div>
+                            <div className="mt-1">Archivo: {downloadFileName}</div>
+                            <div className="mt-1">Canal: {invitation.delivery_channel || 'download'}</div>
+                            <div className="mt-1">
+                              Tamano: {formatFileSize(invitation.size_bytes)} - Descargas:{' '}
+                              {invitation.download_count ?? 0}
+                            </div>
+                            <div className="mt-1">Ultima descarga: {formatDateTime(invitation.downloaded_at)}</div>
                           </div>
-                          <div className="mt-1">Generado por: {formatUserId(invitation.generated_by)}</div>
-                          <div className="mt-1">Canal: {invitation.delivery_channel || 'download'}</div>
-                          <div className="mt-1">
-                            Tamano: {formatFileSize(invitation.size_bytes)} - Descargas:{' '}
-                            {invitation.download_count ?? 0}
+                          <div className="flex flex-wrap gap-2 md:justify-end">
+                            <ActionButton
+                              icon={<Download className="h-4 w-4" aria-hidden="true" />}
+                              onClick={() => void handleDownloadInvitation(invitation)}
+                              disabled={Boolean(busyAction)}
+                              variant="primary"
+                            >
+                              Descargar
+                            </ActionButton>
+                            <ActionButton
+                              icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                              onClick={() => void handleCopyInvitationLink(invitation)}
+                              disabled={Boolean(busyAction)}
+                            >
+                              Copiar link
+                            </ActionButton>
+                            <ActionButton
+                              icon={
+                                isBusy('delete', invitation.id) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                )
+                              }
+                              onClick={() => void handleDeleteInvitation(invitation)}
+                              disabled={Boolean(busyAction)}
+                              variant="danger"
+                            >
+                              Eliminar
+                            </ActionButton>
                           </div>
-                          <div className="mt-1">Ultima descarga: {formatDateTime(invitation.downloaded_at)}</div>
-                        </div>
-                        <div className="flex flex-wrap gap-2 md:justify-end">
-                          <ActionButton
-                            icon={<Download className="h-4 w-4" aria-hidden="true" />}
-                            onClick={() => void handleDownloadInvitation(invitation)}
-                            disabled={Boolean(busyAction)}
-                            variant="primary"
-                          >
-                            Descargar
-                          </ActionButton>
-                          <ActionButton
-                            icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
-                            onClick={() => void handleCopyInvitationLink(invitation)}
-                            disabled={Boolean(busyAction)}
-                          >
-                            Copiar link
-                          </ActionButton>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

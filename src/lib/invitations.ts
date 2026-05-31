@@ -10,6 +10,28 @@ export type InvitationQrBox = {
   y: number
 }
 
+export type InvitationAccessCodePlacement = {
+  color: string
+  fontSize: number
+  shadowColor: string
+  x: number
+  y: number
+}
+
+type InvitationFileNameInput = {
+  accessCode?: string | null
+  firstName?: string | null
+  fullName?: string | null
+  lastName?: string | null
+  qrToken?: string | null
+}
+
+type InvitationStoragePathInput = InvitationFileNameInput & {
+  attendeeId: string
+  eventId: string
+  timestamp: number
+}
+
 type InvitationRenderInput = {
   accessCode?: string
   qrBox: InvitationQrBox
@@ -61,6 +83,46 @@ export function sanitizeFileName(fileName: string) {
     .toLowerCase()
 }
 
+function sanitizeCodeSegment(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toUpperCase()
+}
+
+function getInvitationCodeSegment(accessCode?: string | null, qrToken?: string | null) {
+  const code = sanitizeCodeSegment(accessCode?.trim() ?? '')
+
+  if (code) return code
+
+  const tokenFallback = sanitizeCodeSegment((qrToken?.trim() ?? '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6))
+
+  return tokenFallback || 'SIN-CODIGO'
+}
+
+function getAttendeeSlug({ firstName, fullName, lastName }: InvitationFileNameInput) {
+  const firstLastName = buildAttendeeFullName(firstName ?? '', lastName ?? '')
+  return sanitizeFileName(firstLastName || fullName || '') || 'asistente'
+}
+
+export function buildInvitationFileName(input: InvitationFileNameInput) {
+  return `${getAttendeeSlug(input)}-invitation-${getInvitationCodeSegment(input.accessCode, input.qrToken)}.png`
+}
+
+export function buildInvitationStoragePath({
+  attendeeId,
+  eventId,
+  timestamp,
+  ...fileNameInput
+}: InvitationStoragePathInput) {
+  const attendeeSlug = getAttendeeSlug(fileNameInput)
+  const codeSegment = getInvitationCodeSegment(fileNameInput.accessCode, fileNameInput.qrToken)
+
+  return `events/${eventId}/attendees/${attendeeId}/${timestamp}-${attendeeSlug}-${codeSegment}-invitation.png`
+}
+
 export async function createQrDataUrl(qrPayload: string, size = 1024) {
   return QRCode.toDataURL(qrPayload, {
     color: {
@@ -81,7 +143,17 @@ export async function createQrBlob(qrPayload: string, size = 1024) {
 }
 
 export function getAccessCodeText(accessCode: string) {
-  return `CÓDIGO: ${accessCode}`
+  return `C\u00d3DIGO: ${accessCode}`
+}
+
+export function getAccessCodePlacement(canvasWidth: number, canvasHeight: number): InvitationAccessCodePlacement {
+  return {
+    color: '#ffffff',
+    fontSize: Math.max(18, Math.round(canvasWidth * 0.025)),
+    shadowColor: 'rgba(0, 0, 0, 0.82)',
+    x: Math.max(24, Math.round(canvasWidth * 0.044)),
+    y: Math.max(24, canvasHeight - Math.max(48, Math.round(canvasWidth * 0.067))),
+  }
 }
 
 function loadImage(src: string) {
@@ -107,30 +179,36 @@ function canvasToPngBlob(canvas: HTMLCanvasElement) {
   })
 }
 
-function drawAccessCode(context: CanvasRenderingContext2D, qrBox: InvitationQrBox, accessCode: string) {
+function drawAccessCode(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement, accessCode: string) {
   const code = accessCode.trim().toUpperCase()
 
   if (!code) return
 
-  const fontSize = Math.max(18, Math.round(qrBox.width * 0.095))
+  const placement = getAccessCodePlacement(canvas.width, canvas.height)
   const text = getAccessCodeText(code)
-  const x = qrBox.x + qrBox.width / 2
-  const y = qrBox.y + qrBox.height + 34
+  const maxWidth = Math.max(120, canvas.width - placement.x * 2)
 
   context.save()
-  context.font = `700 ${fontSize}px Arial, Helvetica, sans-serif`
-  context.fillStyle = '#050505'
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
+  context.font = `700 ${placement.fontSize}px Arial, Helvetica, sans-serif`
+  context.fillStyle = placement.color
+  context.shadowBlur = Math.max(4, Math.round(placement.fontSize * 0.35))
+  context.shadowColor = placement.shadowColor
+  context.shadowOffsetX = 1
+  context.shadowOffsetY = 2
+  context.textAlign = 'left'
+  context.textBaseline = 'alphabetic'
 
-  const maxWidth = qrBox.width
   const measuredWidth = context.measureText(text).width
 
   if (measuredWidth > maxWidth) {
-    context.font = `700 ${Math.max(14, Math.floor((fontSize * maxWidth) / measuredWidth))}px Arial, Helvetica, sans-serif`
+    const nextFontSize = Math.max(14, Math.floor((placement.fontSize * maxWidth) / measuredWidth))
+    context.font = `700 ${nextFontSize}px Arial, Helvetica, sans-serif`
   }
 
-  context.fillText(text, x, y, maxWidth)
+  context.lineWidth = Math.max(2, Math.round(placement.fontSize * 0.08))
+  context.strokeStyle = 'rgba(0, 0, 0, 0.42)'
+  context.strokeText(text, placement.x, placement.y, maxWidth)
+  context.fillText(text, placement.x, placement.y, maxWidth)
   context.restore()
 }
 
@@ -161,7 +239,7 @@ export async function renderInvitationPng({ accessCode = '', qrBox, qrPayload, t
     canvas.height = height
     context.drawImage(templateImage, 0, 0, width, height)
     context.drawImage(qrImage, qrBox.x, qrBox.y, qrBox.width, qrBox.height)
-    drawAccessCode(context, qrBox, accessCode)
+    drawAccessCode(context, canvas, accessCode)
 
     return canvasToPngBlob(canvas)
   } finally {
