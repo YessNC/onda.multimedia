@@ -104,7 +104,7 @@ function ActionButton({
       disabled={disabled}
       title={title ?? children}
       className={cn(
-        'inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 py-2 font-display text-[0.62rem] font-bold uppercase tracking-[0.12em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-50',
+        'admin-action-button disabled:cursor-not-allowed disabled:opacity-50',
         actionVariants[variant],
       )}
     >
@@ -130,7 +130,7 @@ function ActionLink({
       to={to}
       title={children}
       className={cn(
-        'inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 py-2 font-display text-[0.62rem] font-bold uppercase tracking-[0.12em] transition duration-300',
+        'admin-action-button',
         actionVariants[variant],
       )}
     >
@@ -173,7 +173,7 @@ export default function AdminEventTable({
               <th className="px-4 py-3">Acceso</th>
               <th className="px-4 py-3">Tickets</th>
               <th className="px-4 py-3">QR</th>
-              <th className="px-4 py-3">Acciones</th>
+              <th className="w-[13rem] px-4 py-3">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-onda-purple/10">
@@ -285,7 +285,7 @@ export default function AdminEventTable({
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="admin-action-list">
                       <ActionButton
                         icon={<Edit3 className="h-4 w-4" aria-hidden="true" />}
                         onClick={() => onEdit(event)}

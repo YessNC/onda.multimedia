@@ -159,6 +159,17 @@ export default function AdminEventos() {
     void loadEvents()
   }
 
+  function handleEventImageUpdated(event: EventRecord) {
+    setHighlightedEventId(event.id)
+    setEditingEvent(event)
+    setEvents((currentEvents) =>
+      currentEvents
+        .map((currentEvent) => (currentEvent.id === event.id ? event : currentEvent))
+        .sort(compareEventsByDate),
+    )
+    setActionMessage('Imagen del evento actualizada.')
+  }
+
   function handleNewEvent() {
     setErrorMessage('')
     setHighlightedEventId(null)
@@ -269,7 +280,7 @@ export default function AdminEventos() {
               onCancelEdit={handleCancelEdit}
               onSaved={handleSaved}
             />
-            <ImageUploader />
+            <ImageUploader event={editingEvent} onEventUpdated={handleEventImageUpdated} />
           </div>
         </div>
       </div>

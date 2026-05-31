@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
+import ImageUploader from '../components/admin/ImageUploader'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
 import {
@@ -353,6 +354,11 @@ export default function AdminEventAttendees() {
   function resetAttendeeForm() {
     setAttendeeForm(emptyAttendeeForm)
     setEditingAttendeeId(null)
+  }
+
+  function handleEventImageUpdated(event: AdminEvent) {
+    setEventRecord(event)
+    setMessage('Imagen del evento actualizada.')
   }
 
   function handleQrDraftChange(key: keyof InvitationQrBox, value: string) {
@@ -830,6 +836,8 @@ export default function AdminEventAttendees() {
           </div>
         ) : eventRecord ? (
           <div className="mt-10 grid gap-6">
+            <ImageUploader event={eventRecord} onEventUpdated={handleEventImageUpdated} />
+
             <div className="glass-panel rounded-lg p-5">
               <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
                 <div>

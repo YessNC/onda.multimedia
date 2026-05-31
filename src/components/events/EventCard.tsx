@@ -7,7 +7,7 @@ import {
   formatEventDate,
   getEventDateRaw,
   getEventDescription,
-  getEventImagePath,
+  getEventImageSource,
   getEventLocation,
   getEventTitle,
   getEventVisibility,
@@ -39,7 +39,7 @@ export default function EventCard({ event }: EventCardProps) {
       : t('events.archive')
     : getPublicEventStatusLabel(event)
   const description = isPlaceholder ? '' : getEventDescription(event)
-  const imagePath = isPlaceholder ? event.imagePath : getEventImagePath(event)
+  const imagePath = isPlaceholder ? event.imagePath : getEventImageSource(event)
   const visibility = isPlaceholder ? 'public' : getEventVisibility(event)
   const isPrivate = visibility === 'private'
   const hasTickets = !isPlaceholder && hasActiveTicketButton(event)

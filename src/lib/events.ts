@@ -1,7 +1,10 @@
+import { supabase } from './supabaseClient'
+
 export type EventStatus = 'draft' | 'upcoming' | 'archived' | 'cancelled'
 export type EventVisibility = 'public' | 'private'
 
 export type EventRecord = Record<string, unknown> & {
+  cover_image_path?: string | null
   id: string
   deleted_at?: string | null
   description?: string | null
@@ -20,6 +23,7 @@ export type EventRecord = Record<string, unknown> & {
 }
 
 export const DEFAULT_TICKET_LABEL = 'Comprar entradas'
+export const EVENT_IMAGES_BUCKET = 'event-images'
 
 export const eventStatusOptions: Array<{ label: string; value: EventStatus }> = [
   { label: 'Borrador', value: 'draft' },
@@ -162,6 +166,19 @@ export function isEventPublished(event: Record<string, unknown> | null | undefin
 export function getEventImagePath(event: Record<string, unknown> | null | undefined) {
   if (!event) return ''
   return readFirstText(event, ['image_path', 'cover_image_path', 'cover_url', 'image_url', 'poster_url'])
+}
+
+export function getEventCoverImageUrl(path: string) {
+  const normalizedPath = readString(path)
+
+  if (!normalizedPath) return ''
+  if (/^(https?:|data:|blob:)/i.test(normalizedPath) || normalizedPath.startsWith('/')) return normalizedPath
+
+  return supabase.storage.from(EVENT_IMAGES_BUCKET).getPublicUrl(normalizedPath).data.publicUrl
+}
+
+export function getEventImageSource(event: Record<string, unknown> | null | undefined) {
+  return getEventCoverImageUrl(getEventImagePath(event))
 }
 
 export function getTicketButtonLabel(event: Record<string, unknown> | null | undefined) {
