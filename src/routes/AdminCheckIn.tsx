@@ -12,6 +12,8 @@ import { supabase } from '../lib/supabaseClient'
 
 type EventAttendee = Record<string, unknown> & {
   access_code?: string | null
+  accepted_privacy?: boolean | null
+  accepted_terms?: boolean | null
   check_in_status?: string | null
   checked_in_at?: string | null
   email?: string | null
@@ -21,9 +23,10 @@ type EventAttendee = Record<string, unknown> & {
   id: string
   last_name?: string | null
   qr_token?: string | null
+  ticket_status?: string | null
 }
 
-type CheckInResultKind = 'already_used' | 'cancelled' | 'checked_in' | 'error' | 'not_found' | 'wrong_event'
+type CheckInResultKind = 'already_used' | 'cancelled' | 'checked_in' | 'error' | 'not_found' | 'pending' | 'wrong_event'
 
 type CheckInResult = {
   attendeeId?: string | null
@@ -43,6 +46,7 @@ const resultStyles: Record<CheckInResultKind, string> = {
   checked_in: 'border-emerald-400/40 bg-emerald-500/12 text-emerald-50 shadow-[0_0_42px_rgba(16,185,129,0.14)]',
   error: 'border-red-400/40 bg-red-500/12 text-red-50 shadow-[0_0_42px_rgba(239,68,68,0.13)]',
   not_found: 'border-red-400/40 bg-red-500/12 text-red-50 shadow-[0_0_42px_rgba(239,68,68,0.13)]',
+  pending: 'border-amber-400/40 bg-amber-500/12 text-amber-50 shadow-[0_0_42px_rgba(245,158,11,0.14)]',
   wrong_event: 'border-red-400/40 bg-red-500/12 text-red-50 shadow-[0_0_42px_rgba(239,68,68,0.13)]',
 }
 
@@ -52,6 +56,7 @@ const resultTitles: Record<CheckInResultKind, string> = {
   checked_in: 'Entrada valida',
   error: 'No pudimos validar',
   not_found: 'Entrada no encontrada',
+  pending: 'Entrada pendiente',
   wrong_event: 'Entrada pertenece a otro evento',
 }
 
@@ -73,7 +78,7 @@ function getAttendeeName(attendee: EventAttendee | null) {
 
 function getResultIcon(result: CheckInResultKind) {
   if (result === 'checked_in') return CheckCircle2
-  if (result === 'already_used') return AlertTriangle
+  if (result === 'already_used' || result === 'pending') return AlertTriangle
   return XCircle
 }
 
@@ -86,6 +91,7 @@ function normalizeResultKind(value: string): CheckInResultKind | '' {
     value === 'checked_in' ||
     value === 'error' ||
     value === 'not_found' ||
+    value === 'pending' ||
     value === 'wrong_event'
   ) {
     return value
@@ -280,8 +286,15 @@ async function validateLocally(input: string, targetEventId: string): Promise<Ch
   }
 
   const checkInStatus = readString(attendee.check_in_status)
+  const ticketStatus =
+    readString(attendee.ticket_status) ||
+    (checkInStatus === 'checked_in' || attendee.checked_in_at
+      ? 'used'
+      : checkInStatus === 'cancelled'
+        ? 'cancelled'
+        : 'pending')
 
-  if (checkInStatus === 'cancelled') {
+  if (checkInStatus === 'cancelled' || ticketStatus === 'cancelled') {
     const result: CheckInResult = {
       attendeeId: attendee.id,
       attendeeName: getAttendeeName(attendee),
@@ -303,7 +316,7 @@ async function validateLocally(input: string, targetEventId: string): Promise<Ch
     return result
   }
 
-  if (checkInStatus === 'checked_in' || readString(attendee.checked_in_at)) {
+  if (checkInStatus === 'checked_in' || readString(attendee.checked_in_at) || ticketStatus === 'used') {
     const result: CheckInResult = {
       attendeeId: attendee.id,
       attendeeName: getAttendeeName(attendee),
@@ -326,6 +339,28 @@ async function validateLocally(input: string, targetEventId: string): Promise<Ch
     return result
   }
 
+  if (ticketStatus !== 'generated' || !attendee.accepted_privacy || !attendee.accepted_terms) {
+    const result: CheckInResult = {
+      attendeeId: attendee.id,
+      attendeeName: getAttendeeName(attendee),
+      eventId: attendeeEventId || targetEventId || null,
+      message: 'Entrada pendiente de generacion o consentimiento legal.',
+      result: 'pending',
+      token: scannedValue,
+    }
+
+    await writeCheckInLog({
+      attendeeId: attendee.id,
+      eventId: result.eventId,
+      message: result.message,
+      result: result.result,
+      scannedBy,
+      token: scannedValue,
+    })
+
+    return result
+  }
+
   const checkedInAt = new Date().toISOString()
   const { error: updateError } = await supabase
     .from('event_attendees')
@@ -333,6 +368,7 @@ async function validateLocally(input: string, targetEventId: string): Promise<Ch
       check_in_status: 'checked_in',
       checked_in_at: checkedInAt,
       checked_in_by: scannedBy,
+      ticket_status: 'used',
     })
     .eq('id', attendee.id)
 

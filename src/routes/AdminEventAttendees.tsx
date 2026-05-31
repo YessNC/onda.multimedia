@@ -59,8 +59,13 @@ type AdminEvent = Record<string, unknown> & {
 
 type EventAttendee = Record<string, unknown> & {
   access_code?: string | null
+  accepted_privacy?: boolean | null
+  accepted_terms?: boolean | null
   check_in_status?: string | null
   checked_in_at?: string | null
+  community_consent?: boolean | null
+  community_consent_at?: string | null
+  consent_at?: string | null
   email?: string | null
   event_id?: string | null
   first_name?: string | null
@@ -68,11 +73,16 @@ type EventAttendee = Record<string, unknown> & {
   guest_type?: string | null
   id: string
   instagram_handle?: string | null
+  invitation_expires_at?: string | null
   invitation_generated_at?: string | null
+  invitation_token?: string | null
   last_name?: string | null
   notes?: string | null
   phone?: string | null
   qr_token?: string | null
+  ticket_downloaded_at?: string | null
+  ticket_generated_at?: string | null
+  ticket_status?: string | null
 }
 
 type GeneratedInvitation = Record<string, unknown> & {
@@ -181,6 +191,10 @@ function createQrToken() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function buildGuestInvitationUrl(invitationToken: string) {
+  return `${window.location.origin}/entrada/${encodeURIComponent(invitationToken)}`
+}
+
 function getAttendeeAccessCode(attendee: EventAttendee | null | undefined) {
   return normalizeAccessCode(readString(attendee?.access_code))
 }
@@ -235,19 +249,27 @@ async function ensureAttendeesAccessCodes(eventId: string, attendeeRows: EventAt
 
   for (const attendee of attendeeRows) {
     const currentCode = getAttendeeAccessCode(attendee)
+    const currentInvitationToken = readString(attendee.invitation_token)
+    const attendeePatch: Partial<EventAttendee> = {}
 
     if (currentCode) {
-      nextAttendees.push({ ...attendee, access_code: currentCode })
+      attendeePatch.access_code = currentCode
+    } else {
+      attendeePatch.access_code = await createUniqueAccessCodeForEvent(eventId, reservedCodes)
+    }
+
+    if (currentInvitationToken) {
+      attendeePatch.invitation_token = currentInvitationToken
+    } else {
+      attendeePatch.invitation_token = createQrToken()
+    }
+
+    if (currentCode && currentInvitationToken) {
+      nextAttendees.push({ ...attendee, access_code: currentCode, invitation_token: currentInvitationToken })
       continue
     }
 
-    const accessCode = await createUniqueAccessCodeForEvent(eventId, reservedCodes)
-    const { data, error } = await supabase
-      .from('event_attendees')
-      .update({ access_code: accessCode })
-      .eq('id', attendee.id)
-      .select('*')
-      .single()
+    const { data, error } = await supabase.from('event_attendees').update(attendeePatch).eq('id', attendee.id).select('*').single()
 
     if (error) throw error
 
@@ -308,15 +330,55 @@ function getCheckInStatusLabel(attendee: EventAttendee) {
   return 'Pendiente'
 }
 
-function getCheckInStatusClassName(attendee: EventAttendee) {
-  const status = readString(attendee.check_in_status)
+function getTicketStatus(attendee: EventAttendee) {
+  const checkInStatus = readString(attendee.check_in_status)
 
-  if (status === 'checked_in') {
+  if (checkInStatus === 'checked_in' || attendee.checked_in_at) return 'used'
+  if (checkInStatus === 'cancelled') return 'cancelled'
+
+  return readString(attendee.ticket_status) || 'pending'
+}
+
+function getTicketStatusLabel(attendee: EventAttendee) {
+  const status = getTicketStatus(attendee)
+
+  if (status === 'generated') return 'Generada'
+  if (status === 'used') return `Utilizada ${formatDateTime(attendee.checked_in_at)}`
+  if (status === 'cancelled') return 'Cancelada'
+  if (status === 'expired') return 'Vencida'
+  return 'Pendiente'
+}
+
+function getTicketStatusClassName(attendee: EventAttendee) {
+  const status = getTicketStatus(attendee)
+
+  if (status === 'generated') {
     return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
   }
 
-  if (status === 'cancelled') {
+  if (status === 'used') {
+    return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
+  }
+
+  if (status === 'cancelled' || status === 'expired') {
     return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200'
+  }
+
+  return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200'
+}
+
+function hasLegalConsent(attendee: EventAttendee) {
+  return Boolean(attendee.accepted_privacy && attendee.accepted_terms)
+}
+
+function getConsentStatusLabel(attendee: EventAttendee) {
+  if (!hasLegalConsent(attendee)) return 'Pendiente'
+  return attendee.consent_at ? `Aceptado ${formatDateTime(attendee.consent_at)}` : 'Aceptado'
+}
+
+function getConsentStatusClassName(attendee: EventAttendee) {
+  if (hasLegalConsent(attendee)) {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
   }
 
   return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200'
@@ -631,6 +693,7 @@ export default function AdminEventAttendees() {
           .update({
             ...attendeePayload,
             access_code: accessCode,
+            invitation_token: currentAttendee?.invitation_token || createQrToken(),
             qr_token: currentAttendee?.qr_token || createQrToken(),
           })
           .eq('id', editingAttendeeId)
@@ -644,6 +707,7 @@ export default function AdminEventAttendees() {
           ...attendeePayload,
           access_code: accessCode,
           event_id: eventId,
+          invitation_token: createQrToken(),
           qr_token: createQrToken(),
         })
 
@@ -667,6 +731,28 @@ export default function AdminEventAttendees() {
     const { data, error } = await supabase
       .from('event_attendees')
       .update({ qr_token: nextToken })
+      .eq('id', attendee.id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+
+    setAttendees((currentAttendees) =>
+      currentAttendees.map((currentAttendee) =>
+        currentAttendee.id === attendee.id ? (data as EventAttendee) : currentAttendee,
+      ),
+    )
+
+    return nextToken
+  }
+
+  async function ensureAttendeeInvitationToken(attendee: EventAttendee) {
+    if (attendee.invitation_token) return attendee.invitation_token
+
+    const nextToken = createQrToken()
+    const { data, error } = await supabase
+      .from('event_attendees')
+      .update({ invitation_token: nextToken })
       .eq('id', attendee.id)
       .select('*')
       .single()
@@ -719,6 +805,11 @@ export default function AdminEventAttendees() {
 
     if (!templatePath) {
       setErrorMessage('Sube una plantilla antes de generar invitaciones.')
+      return
+    }
+
+    if (getTicketStatus(attendee) === 'used' || getTicketStatus(attendee) === 'cancelled') {
+      setErrorMessage('No se puede generar una invitacion para una entrada utilizada o cancelada.')
       return
     }
 
@@ -800,7 +891,11 @@ export default function AdminEventAttendees() {
 
       const { error: attendeeUpdateError } = await supabase
         .from('event_attendees')
-        .update({ invitation_generated_at: generatedAt })
+        .update({
+          invitation_generated_at: generatedAt,
+          ticket_generated_at: hasLegalConsent(attendee) ? generatedAt : attendee.ticket_generated_at ?? null,
+          ticket_status: hasLegalConsent(attendee) ? 'generated' : getTicketStatus(attendee),
+        })
         .eq('id', attendee.id)
 
       if (attendeeUpdateError) throw attendeeUpdateError
@@ -974,6 +1069,52 @@ export default function AdminEventAttendees() {
 
       await navigator.clipboard.writeText(buildAdminCheckInUrl(qrToken, eventId))
       setMessage('Link QR copiado.')
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleCopyGuestInvitationLink(attendee: EventAttendee) {
+    resetMessages()
+    setBusyAction(`copy-guest-link:${attendee.id}`)
+
+    try {
+      const invitationToken = await ensureAttendeeInvitationToken(attendee)
+
+      if (!navigator.clipboard) throw new Error('Clipboard no esta disponible en este navegador.')
+
+      await navigator.clipboard.writeText(buildGuestInvitationUrl(invitationToken))
+      setMessage('Link unico de invitacion copiado.')
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleCancelTicket(attendee: EventAttendee) {
+    const confirmed = window.confirm(`Cancelar la entrada de ${getAttendeeName(attendee)}?`)
+
+    if (!confirmed) return
+
+    resetMessages()
+    setBusyAction(`cancel:${attendee.id}`)
+
+    try {
+      const { error } = await supabase
+        .from('event_attendees')
+        .update({
+          check_in_status: 'cancelled',
+          ticket_status: 'cancelled',
+        })
+        .eq('id', attendee.id)
+
+      if (error) throw error
+
+      setMessage('Entrada cancelada.')
+      await loadAdminData()
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
     } finally {
@@ -1376,11 +1517,13 @@ export default function AdminEventAttendees() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1120px] text-left text-sm">
+                    <table className="w-full min-w-[1420px] text-left text-sm">
                       <thead className="bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
                         <tr>
                           <th className="px-4 py-3">Asistente</th>
-                          <th className="px-4 py-3">Check-in</th>
+                          <th className="px-4 py-3">Entrada</th>
+                          <th className="px-4 py-3">Consentimiento</th>
+                          <th className="px-4 py-3">Comunidad</th>
                           <th className="px-4 py-3">Codigo</th>
                           <th className="px-4 py-3">Contacto</th>
                           <th className="px-4 py-3">Ultima invitacion</th>
@@ -1406,11 +1549,32 @@ export default function AdminEventAttendees() {
                                 <span
                                   className={cn(
                                     'inline-flex rounded-md border px-2.5 py-1.5 text-xs font-bold',
-                                    getCheckInStatusClassName(attendee),
+                                    getTicketStatusClassName(attendee),
                                   )}
                                 >
-                                  {getCheckInStatusLabel(attendee)}
+                                  {getTicketStatusLabel(attendee)}
                                 </span>
+                                <div className="mt-2 text-xs text-zinc-500 dark:text-onda-muted">
+                                  Check-in: {getCheckInStatusLabel(attendee)}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 align-top">
+                                <span
+                                  className={cn(
+                                    'inline-flex rounded-md border px-2.5 py-1.5 text-xs font-bold',
+                                    getConsentStatusClassName(attendee),
+                                  )}
+                                >
+                                  {getConsentStatusLabel(attendee)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 align-top text-zinc-600 dark:text-onda-muted">
+                                <div className="font-semibold text-zinc-950 dark:text-white">
+                                  {attendee.community_consent ? 'Si' : 'No'}
+                                </div>
+                                <div className="mt-1 text-xs">
+                                  {attendee.community_consent_at ? formatDateTime(attendee.community_consent_at) : 'Sin fecha'}
+                                </div>
                               </td>
                               <td className="px-4 py-4 align-top">
                                 <div className="font-display text-base font-extrabold tracking-[0.12em] text-zinc-950 dark:text-white">
@@ -1468,6 +1632,13 @@ export default function AdminEventAttendees() {
                                   </ActionButton>
                                   <ActionButton
                                     icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                                    onClick={() => void handleCopyGuestInvitationLink(attendee)}
+                                    disabled={Boolean(busyAction)}
+                                  >
+                                    Copiar link invitacion
+                                  </ActionButton>
+                                  <ActionButton
+                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
                                     onClick={() => void handleCopyQrLink(attendee)}
                                     disabled={Boolean(busyAction)}
                                   >
@@ -1486,6 +1657,24 @@ export default function AdminEventAttendees() {
                                     variant="ghost"
                                   >
                                     Editar
+                                  </ActionButton>
+                                  <ActionButton
+                                    icon={
+                                      isBusy('cancel', attendee.id) ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                      ) : (
+                                        <X className="h-4 w-4" aria-hidden="true" />
+                                      )
+                                    }
+                                    onClick={() => void handleCancelTicket(attendee)}
+                                    disabled={
+                                      Boolean(busyAction) ||
+                                      getTicketStatus(attendee) === 'cancelled' ||
+                                      getTicketStatus(attendee) === 'used'
+                                    }
+                                    variant="danger"
+                                  >
+                                    Cancelar entrada
                                   </ActionButton>
                                 </div>
                               </td>
