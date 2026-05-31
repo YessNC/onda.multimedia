@@ -33,6 +33,9 @@ function ScrollToTop() {
 }
 
 function App() {
+  const { pathname } = useLocation()
+  const showFloatingAssistant = !pathname.startsWith('/admin')
+
   return (
     <I18nProvider>
       <SpotifyPlayerProvider>
@@ -88,7 +91,7 @@ function App() {
             </Routes>
           </main>
           <Footer />
-          <FloatingAssistant />
+          {showFloatingAssistant ? <FloatingAssistant /> : null}
           <PersistentSpotifyPlayer />
         </div>
       </SpotifyPlayerProvider>

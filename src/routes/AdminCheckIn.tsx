@@ -286,15 +286,11 @@ async function validateLocally(input: string, targetEventId: string): Promise<Ch
   }
 
   const checkInStatus = readString(attendee.check_in_status)
-  const ticketStatus =
-    readString(attendee.ticket_status) ||
-    (checkInStatus === 'checked_in' || attendee.checked_in_at
-      ? 'used'
-      : checkInStatus === 'cancelled'
-        ? 'cancelled'
-        : 'pending')
+  const rawTicketStatus = readString(attendee.ticket_status)
+  const isCheckedIn = checkInStatus === 'checked_in' || Boolean(readString(attendee.checked_in_at))
+  const ticketStatus = rawTicketStatus === 'used' && !isCheckedIn ? 'generated' : rawTicketStatus || 'pending'
 
-  if (checkInStatus === 'cancelled' || ticketStatus === 'cancelled') {
+  if (checkInStatus === 'cancelled' || rawTicketStatus === 'cancelled') {
     const result: CheckInResult = {
       attendeeId: attendee.id,
       attendeeName: getAttendeeName(attendee),
@@ -316,7 +312,7 @@ async function validateLocally(input: string, targetEventId: string): Promise<Ch
     return result
   }
 
-  if (checkInStatus === 'checked_in' || readString(attendee.checked_in_at) || ticketStatus === 'used') {
+  if (isCheckedIn) {
     const result: CheckInResult = {
       attendeeId: attendee.id,
       attendeeName: getAttendeeName(attendee),
@@ -368,7 +364,6 @@ async function validateLocally(input: string, targetEventId: string): Promise<Ch
       check_in_status: 'checked_in',
       checked_in_at: checkedInAt,
       checked_in_by: scannedBy,
-      ticket_status: 'used',
     })
     .eq('id', attendee.id)
 
