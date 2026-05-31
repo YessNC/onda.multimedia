@@ -94,7 +94,7 @@ const emptyForm: GuestFormState = {
 const rawOccupationOptions = [
   'Producción Musical',
   'Artista',
-  'Producción Ejecutivo',
+  'Producción Ejecutiva',
   'Dirección Creativa',
   'Producción Audiovisual',
   'Modelaje',
