@@ -3,13 +3,13 @@ import type { FormEvent, ReactNode } from 'react'
 import { AlertTriangle, CalendarDays, CheckCircle2, Download, Loader2, QrCode, ShieldCheck, Ticket, UserRound } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import CTAButton from '../components/shared/CTAButton'
+import type { InvitationQrBox } from '../lib/invitations'
 import {
   DEFAULT_QR_BOX,
   INVITATION_TEMPLATE_BUCKET,
   buildAdminCheckInUrl,
   buildAttendeeFullName,
   buildInvitationFileName,
-  createQrDataUrl,
   downloadBlob,
   normalizeQrBox,
   renderInvitationPng,
@@ -83,10 +83,18 @@ type GuestFormState = {
   email: string
   firstName: string
   guestType: string
-  instagramHandle: string
   lastName: string
   legalAccepted: boolean
   phone: string
+}
+
+type TemplateUrlSource = 'public' | 'signed'
+
+type TemplateImageSize = {
+  height: number
+  naturalHeight: number
+  naturalWidth: number
+  width: number
 }
 
 const emptyForm: GuestFormState = {
@@ -94,7 +102,6 @@ const emptyForm: GuestFormState = {
   email: '',
   firstName: '',
   guestType: '',
-  instagramHandle: '',
   lastName: '',
   legalAccepted: false,
   phone: '',
@@ -141,9 +148,9 @@ function getErrorMessage(error: unknown) {
   return 'Ocurrió un error inesperado.'
 }
 
-function warnGuestInvitationError(context: string, error: unknown) {
+function warnGuestInvitationError(context: string, error: unknown, details?: Record<string, unknown>) {
   if (import.meta.env.DEV) {
-    console.warn(`[GuestInvitation] ${context}`, error)
+    console.warn(`[GuestInvitation] ${context}`, details ? { ...details, error } : error)
   }
 }
 
@@ -170,11 +177,6 @@ function getSafeGuestErrorMessage(error: unknown, fallbackMessage: string) {
   }
 
   return fallbackMessage
-}
-
-function normalizeInstagramHandle(value: string) {
-  const handle = value.trim().replace(/^@+/, '')
-  return handle ? `@${handle}` : ''
 }
 
 function formatDateTime(value?: string | null) {
@@ -227,7 +229,6 @@ function getFormStateFromInvitation(record: GuestInvitationRecord): GuestFormSta
     email: readString(record.email),
     firstName: readString(record.first_name),
     guestType: readString(record.guest_type),
-    instagramHandle: readString(record.instagram_handle),
     lastName: readString(record.last_name),
     legalAccepted: Boolean(record.accepted_privacy && record.accepted_terms),
     phone: readString(record.phone),
@@ -243,117 +244,6 @@ function readQrBox(record: GuestInvitationRecord) {
   })
 }
 
-function canvasToPngBlob(canvas: HTMLCanvasElement) {
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('No pudimos exportar la entrada como PNG.'))
-        return
-      }
-
-      resolve(blob)
-    }, 'image/png')
-  })
-}
-
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image()
-
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('No pudimos cargar el QR para la entrada.'))
-    image.src = src
-  })
-}
-
-function wrapCanvasText(context: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
-  const words = text.split(/\s+/)
-  let line = ''
-  let nextY = y
-
-  for (const word of words) {
-    const testLine = line ? `${line} ${word}` : word
-    const width = context.measureText(testLine).width
-
-    if (width > maxWidth && line) {
-      context.fillText(line, x, nextY)
-      line = word
-      nextY += lineHeight
-    } else {
-      line = testLine
-    }
-  }
-
-  if (line) {
-    context.fillText(line, x, nextY)
-  }
-}
-
-async function renderFallbackTicketPng(record: GuestInvitationRecord, qrPayload: string) {
-  const canvas = document.createElement('canvas')
-  const context = canvas.getContext('2d')
-
-  if (!context) {
-    throw new Error('Canvas no está disponible en este navegador.')
-  }
-
-  canvas.width = 1080
-  canvas.height = 1600
-
-  const qrDataUrl = await createQrDataUrl(qrPayload, 820)
-  const qrImage = await loadImage(qrDataUrl)
-  const eventTitle = readString(record.event_title) || 'Evento ONDA'
-  const attendeeName = getAttendeeName(record)
-  const eventDate = record.event_date ? formatEventDate(record.event_date) : 'Fecha por confirmar'
-  const eventLocation = readString(record.event_location) || 'Ubicación por confirmar'
-  const accessCode = readString(record.access_code)
-
-  context.fillStyle = '#050505'
-  context.fillRect(0, 0, canvas.width, canvas.height)
-
-  const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height)
-  gradient.addColorStop(0, 'rgba(123,44,255,0.55)')
-  gradient.addColorStop(0.5, 'rgba(192,132,252,0.16)')
-  gradient.addColorStop(1, 'rgba(5,5,5,0)')
-  context.fillStyle = gradient
-  context.fillRect(0, 0, canvas.width, canvas.height)
-
-  context.strokeStyle = 'rgba(192,132,252,0.55)'
-  context.lineWidth = 4
-  context.strokeRect(58, 58, canvas.width - 116, canvas.height - 116)
-
-  context.fillStyle = '#c084fc'
-  context.font = '700 34px Arial, Helvetica, sans-serif'
-  context.fillText('ONDA MULTIMEDIA', 90, 150)
-
-  context.fillStyle = '#ffffff'
-  context.font = '800 64px Arial, Helvetica, sans-serif'
-  wrapCanvasText(context, eventTitle.toUpperCase(), 90, 250, 900, 74)
-
-  context.fillStyle = '#f5f3ff'
-  context.font = '700 38px Arial, Helvetica, sans-serif'
-  context.fillText(attendeeName, 90, 480)
-
-  context.fillStyle = '#a1a1aa'
-  context.font = '500 30px Arial, Helvetica, sans-serif'
-  context.fillText(eventDate, 90, 545)
-  wrapCanvasText(context, eventLocation, 90, 595, 900, 40)
-
-  context.fillStyle = '#ffffff'
-  context.fillRect(210, 720, 660, 660)
-  context.drawImage(qrImage, 230, 740, 620, 620)
-
-  if (accessCode) {
-    context.fillStyle = '#ffffff'
-    context.font = '800 34px Arial, Helvetica, sans-serif'
-    context.textAlign = 'center'
-    context.fillText(`CÓDIGO: ${accessCode}`, canvas.width / 2, 1450)
-    context.textAlign = 'left'
-  }
-
-  return canvasToPngBlob(canvas)
-}
-
 export default function GuestInvitation() {
   const { invitationToken: routeToken } = useParams<{ invitationToken: string }>()
   const [searchParams] = useSearchParams()
@@ -364,9 +254,10 @@ export default function GuestInvitation() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPreparingPreview, setIsPreparingPreview] = useState(false)
   const [message, setMessage] = useState('')
+  const [previewError, setPreviewError] = useState('')
   const [previewImageUrl, setPreviewImageUrl] = useState('')
-  const [qrPreviewDataUrl, setQrPreviewDataUrl] = useState('')
   const [ticketPreviewBlob, setTicketPreviewBlob] = useState<Blob | null>(null)
 
   const ticketStatus = getTicketStatus(invitation)
@@ -422,12 +313,18 @@ export default function GuestInvitation() {
 
     async function loadPreview() {
       setPreviewImageUrl('')
-      setQrPreviewDataUrl('')
+      setPreviewError('')
       setTicketPreviewBlob(null)
+      setIsPreparingPreview(false)
 
-      if (!invitation?.qr_token || !invitation.event_id || !hasDownloadableTicket) return
+      if (!hasDownloadableTicket) return
 
-      const qrPayload = buildAdminCheckInUrl(invitation.qr_token, invitation.event_id)
+      if (!invitation?.qr_token || !invitation.event_id) {
+        setPreviewError('No pudimos preparar el QR de esta entrada. Contacta a producción.')
+        return
+      }
+
+      setIsPreparingPreview(true)
 
       try {
         const blob = await renderTicketBlob(invitation)
@@ -443,10 +340,12 @@ export default function GuestInvitation() {
         setPreviewImageUrl(nextObjectUrl)
       } catch (error) {
         warnGuestInvitationError('render local ticket preview', error)
-        const dataUrl = await createQrDataUrl(qrPayload, 768)
-
         if (isMounted) {
-          setQrPreviewDataUrl(dataUrl)
+          setPreviewError(getSafeGuestErrorMessage(error, 'No pudimos generar la entrada. Intenta nuevamente o contacta a producción.'))
+        }
+      } finally {
+        if (isMounted) {
+          setIsPreparingPreview(false)
         }
       }
     }
@@ -480,6 +379,61 @@ export default function GuestInvitation() {
     return ''
   }
 
+  async function renderTicketWithTemplateUrl({
+    accessCode,
+    qrBox,
+    qrPayload,
+    templateBucket,
+    templatePath,
+    templateUrl,
+    templateUrlSource,
+  }: {
+    accessCode: string
+    qrBox: InvitationQrBox
+    qrPayload: string
+    templateBucket: string
+    templatePath: string
+    templateUrl: string
+    templateUrlSource: TemplateUrlSource
+  }) {
+    let templateSize: TemplateImageSize = {
+      height: 0,
+      naturalHeight: 0,
+      naturalWidth: 0,
+      width: 0,
+    }
+
+    try {
+      return await renderInvitationPng({
+        accessCode,
+        onTemplateLoaded: (size) => {
+          templateSize = size
+        },
+        qrBox,
+        qrPayload,
+        templateUrl,
+      })
+    } catch (error) {
+      warnGuestInvitationError('render invitation template', error, {
+        accessCode,
+        qrHeight: qrBox.height,
+        qrPayload,
+        qrWidth: qrBox.width,
+        qrX: qrBox.x,
+        qrY: qrBox.y,
+        templateBucket,
+        templateHeight: templateSize.height,
+        templateNaturalHeight: templateSize.naturalHeight,
+        templateNaturalWidth: templateSize.naturalWidth,
+        templatePath,
+        templateUrl,
+        templateUrlSource,
+        templateWidth: templateSize.width,
+      })
+      throw error
+    }
+  }
+
   async function renderTicketBlob(record: GuestInvitationRecord) {
     const qrToken = readString(record.qr_token)
     const eventId = readString(record.event_id)
@@ -491,25 +445,63 @@ export default function GuestInvitation() {
     const qrPayload = buildAdminCheckInUrl(qrToken, eventId)
     const templatePath = readString(record.invitation_template_path)
     const templateBucket = readString(record.invitation_template_bucket) || INVITATION_TEMPLATE_BUCKET
+    const qrBox = readQrBox(record)
+    const accessCode = readString(record.access_code)
 
-    if (templatePath) {
-      const { data, error } = await supabase.storage.from(templateBucket).createSignedUrl(templatePath, 60)
+    if (!templatePath) {
+      throw new Error('No encontramos la plantilla de esta entrada. Contacta a producción.')
+    }
 
-      if (!error && data?.signedUrl) {
-        try {
-          return await renderInvitationPng({
-            accessCode: readString(record.access_code),
-            qrBox: readQrBox(record),
-            qrPayload,
-            templateUrl: data.signedUrl,
-          })
-        } catch (error) {
-          warnGuestInvitationError('render invitation template', error)
-        }
+    const publicTemplateUrl = readString(supabase.storage.from(templateBucket).getPublicUrl(templatePath).data.publicUrl)
+    let publicTemplateError: unknown = null
+
+    if (publicTemplateUrl) {
+      try {
+        return await renderTicketWithTemplateUrl({
+          accessCode,
+          qrBox,
+          qrPayload,
+          templateBucket,
+          templatePath,
+          templateUrl: publicTemplateUrl,
+          templateUrlSource: 'public',
+        })
+      } catch (error) {
+        publicTemplateError = error
       }
     }
 
-    return renderFallbackTicketPng(record, qrPayload)
+    const { data: signedTemplate, error: signedTemplateError } = await supabase.storage
+      .from(templateBucket)
+      .createSignedUrl(templatePath, 60)
+
+    if (signedTemplateError || !signedTemplate?.signedUrl) {
+      warnGuestInvitationError('create signed template url', signedTemplateError ?? new Error('Signed URL vacía.'), {
+        accessCode,
+        publicTemplateUrl,
+        qrHeight: qrBox.height,
+        qrPayload,
+        qrWidth: qrBox.width,
+        qrX: qrBox.x,
+        qrY: qrBox.y,
+        templateBucket,
+        templatePath,
+      })
+
+      throw publicTemplateError instanceof Error
+        ? publicTemplateError
+        : new Error('No pudimos cargar la plantilla de la entrada.')
+    }
+
+    return renderTicketWithTemplateUrl({
+      accessCode,
+      qrBox,
+      qrPayload,
+      templateBucket,
+      templatePath,
+      templateUrl: signedTemplate.signedUrl,
+      templateUrlSource: 'signed',
+    })
   }
 
   async function submitGuestInvitationForm() {
@@ -517,7 +509,7 @@ export default function GuestInvitation() {
       p_community_consent: form.communityConsent,
       p_email: form.email.trim(),
       p_first_name: form.firstName.trim(),
-      p_instagram_handle: normalizeInstagramHandle(form.instagramHandle),
+      p_instagram_handle: '',
       p_invitation_token: invitation?.invitation_token ?? invitationToken,
       p_last_name: form.lastName.trim(),
       p_occupation: form.guestType.trim(),
@@ -598,7 +590,7 @@ export default function GuestInvitation() {
         first_name: result.first_name ?? form.firstName.trim(),
         full_name: result.full_name ?? buildAttendeeFullName(form.firstName.trim(), form.lastName.trim()),
         guest_type: result.guest_type ?? form.guestType.trim(),
-        instagram_handle: result.instagram_handle ?? normalizeInstagramHandle(form.instagramHandle),
+        instagram_handle: result.instagram_handle ?? invitation.instagram_handle ?? null,
         last_name: result.last_name ?? form.lastName.trim(),
         phone: result.phone ?? form.phone.trim(),
         qr_token: result.qr_token ?? invitation.qr_token,
@@ -760,12 +752,19 @@ export default function GuestInvitation() {
               <div className="mt-6 overflow-hidden rounded-lg border border-onda-purple/24 bg-black p-3">
                 {previewImageUrl ? (
                   <img src={previewImageUrl} alt="Entrada digital ONDA" className="mx-auto max-h-[34rem] rounded-md object-contain" />
-                ) : qrPreviewDataUrl ? (
-                  <div className="grid justify-items-center gap-4 p-6 text-center">
-                    <img src={qrPreviewDataUrl} alt="Código QR de entrada" className="h-64 w-64 rounded-md bg-white p-3" />
-                    <p className="font-display text-sm font-bold uppercase tracking-[0.14em] text-white">
-                      {readString(invitation.access_code) ? `Código: ${invitation.access_code}` : 'Código QR'}
-                    </p>
+                ) : isPreparingPreview ? (
+                  <div className="grid min-h-64 place-items-center text-sm font-semibold text-onda-muted">
+                    <span className="inline-flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-onda-lavender" aria-hidden="true" />
+                      Preparando vista de entrada...
+                    </span>
+                  </div>
+                ) : previewError ? (
+                  <div className="grid min-h-64 place-items-center p-6 text-center text-sm font-semibold text-red-100">
+                    <span className="inline-flex max-w-sm items-center justify-center gap-3">
+                      <AlertTriangle className="h-5 w-5 shrink-0 text-red-200" aria-hidden="true" />
+                      {previewError}
+                    </span>
                   </div>
                 ) : (
                   <div className="grid min-h-64 place-items-center text-sm font-semibold text-onda-muted">
@@ -780,7 +779,7 @@ export default function GuestInvitation() {
                 className="mt-6 min-h-14 w-full"
                 icon={isDownloading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Download className="h-5 w-5" aria-hidden="true" />}
                 onClick={() => void handleDownloadTicket()}
-                disabled={isDownloading}
+                disabled={isDownloading || isPreparingPreview}
               >
                 {isDownloading ? 'Descargando...' : 'Descargar entrada'}
               </CTAButton>
@@ -842,18 +841,6 @@ export default function GuestInvitation() {
                   className={inputClassName}
                   autoComplete="tel"
                   required
-                />
-              </label>
-
-              <label className={labelClassName}>
-                Instagram opcional
-                <input
-                  type="text"
-                  value={form.instagramHandle}
-                  onChange={(inputEvent) => setForm((current) => ({ ...current, instagramHandle: inputEvent.target.value }))}
-                  className={inputClassName}
-                  autoComplete="off"
-                  placeholder="@usuario"
                 />
               </label>
 
