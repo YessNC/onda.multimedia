@@ -42,7 +42,7 @@ import {
   getAccessCodePlacement,
   getAccessCodeText,
   normalizeQrBox,
-  renderInvitationPng,
+  renderInvitationImage,
   sanitizeFileName,
 } from '../lib/invitations'
 import type { InvitationQrBox } from '../lib/invitations'
@@ -955,7 +955,7 @@ export default function AdminEventAttendees() {
       const accessCode = await ensureAttendeeAccessCode(attendee)
       const qrPayload = buildAdminCheckInUrl(qrToken, eventId)
       const qrBox = normalizeQrBox(qrDraft)
-      const invitationBlob = await renderInvitationPng({
+      const invitationBlob = await renderInvitationImage({
         accessCode,
         qrBox,
         qrPayload,

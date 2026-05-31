@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { AlertTriangle, CalendarDays, CheckCircle2, Download, Loader2, QrCode, ShieldCheck, Ticket, UserRound } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import CTAButton from '../components/shared/CTAButton'
-import type { InvitationQrBox } from '../lib/invitations'
 import {
   DEFAULT_QR_BOX,
   INVITATION_TEMPLATE_BUCKET,
@@ -12,7 +11,7 @@ import {
   buildInvitationFileName,
   downloadBlob,
   normalizeQrBox,
-  renderInvitationPng,
+  renderInvitationImage,
 } from '../lib/invitations'
 import { formatEventDate, readString } from '../lib/events'
 import { supabase } from '../lib/supabaseClient'
@@ -179,6 +178,20 @@ function getSafeGuestErrorMessage(error: unknown, fallbackMessage: string) {
   return fallbackMessage
 }
 
+function getPreviewErrorMessage(error: unknown) {
+  const message = getErrorMessage(error)
+
+  if (
+    message.startsWith('No encontramos la plantilla') ||
+    message.startsWith('No pudimos cargar la plantilla') ||
+    message.startsWith('La entrada no tiene token QR')
+  ) {
+    return message
+  }
+
+  return 'No pudimos preparar la vista de la entrada.'
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return 'Sin fecha'
 
@@ -248,6 +261,7 @@ export default function GuestInvitation() {
   const { invitationToken: routeToken } = useParams<{ invitationToken: string }>()
   const [searchParams] = useSearchParams()
   const invitationToken = readString(routeToken) || readString(searchParams.get('token'))
+  const previewObjectUrlRef = useRef('')
   const [errorMessage, setErrorMessage] = useState('')
   const [form, setForm] = useState<GuestFormState>(emptyForm)
   const [invitation, setInvitation] = useState<GuestInvitationRecord | null>(null)
@@ -308,18 +322,27 @@ export default function GuestInvitation() {
   }, [loadInvitation])
 
   useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current)
+        previewObjectUrlRef.current = ''
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     let isMounted = true
-    let objectUrl = ''
 
     async function loadPreview() {
-      setPreviewImageUrl('')
+      clearTicketPreview()
       setPreviewError('')
-      setTicketPreviewBlob(null)
       setIsPreparingPreview(false)
 
       if (!hasDownloadableTicket) return
 
-      if (!invitation?.qr_token || !invitation.event_id) {
+      const previewToken = readString(invitation?.qr_token) || readString(invitation?.invitation_token)
+
+      if (!previewToken || !invitation?.event_id) {
         setPreviewError('No pudimos preparar el QR de esta entrada. Contacta a producción.')
         return
       }
@@ -327,7 +350,7 @@ export default function GuestInvitation() {
       setIsPreparingPreview(true)
 
       try {
-        const blob = await renderTicketBlob(invitation)
+        const blob = await renderGuestInvitationBlob(invitation)
         const nextObjectUrl = URL.createObjectURL(blob)
 
         if (!isMounted) {
@@ -335,13 +358,13 @@ export default function GuestInvitation() {
           return
         }
 
-        objectUrl = nextObjectUrl
+        previewObjectUrlRef.current = nextObjectUrl
         setTicketPreviewBlob(blob)
         setPreviewImageUrl(nextObjectUrl)
       } catch (error) {
-        warnGuestInvitationError('render local ticket preview', error)
+        warnGuestInvitationError('public preview render failed', error)
         if (isMounted) {
-          setPreviewError(getSafeGuestErrorMessage(error, 'No pudimos generar la entrada. Intenta nuevamente o contacta a producción.'))
+          setPreviewError(getPreviewErrorMessage(error))
         }
       } finally {
         if (isMounted) {
@@ -354,9 +377,6 @@ export default function GuestInvitation() {
 
     return () => {
       isMounted = false
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
-      }
     }
   }, [hasDownloadableTicket, invitation])
 
@@ -364,6 +384,16 @@ export default function GuestInvitation() {
     if (!form.guestType || occupationOptions.includes(form.guestType)) return occupationOptions
     return [form.guestType, ...occupationOptions]
   }, [form.guestType])
+
+  function clearTicketPreview() {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current)
+      previewObjectUrlRef.current = ''
+    }
+
+    setPreviewImageUrl('')
+    setTicketPreviewBlob(null)
+  }
 
   function resetMessages() {
     setErrorMessage('')
@@ -379,63 +409,8 @@ export default function GuestInvitation() {
     return ''
   }
 
-  async function renderTicketWithTemplateUrl({
-    accessCode,
-    qrBox,
-    qrPayload,
-    templateBucket,
-    templatePath,
-    templateUrl,
-    templateUrlSource,
-  }: {
-    accessCode: string
-    qrBox: InvitationQrBox
-    qrPayload: string
-    templateBucket: string
-    templatePath: string
-    templateUrl: string
-    templateUrlSource: TemplateUrlSource
-  }) {
-    let templateSize: TemplateImageSize = {
-      height: 0,
-      naturalHeight: 0,
-      naturalWidth: 0,
-      width: 0,
-    }
-
-    try {
-      return await renderInvitationPng({
-        accessCode,
-        onTemplateLoaded: (size) => {
-          templateSize = size
-        },
-        qrBox,
-        qrPayload,
-        templateUrl,
-      })
-    } catch (error) {
-      warnGuestInvitationError('render invitation template', error, {
-        accessCode,
-        qrHeight: qrBox.height,
-        qrPayload,
-        qrWidth: qrBox.width,
-        qrX: qrBox.x,
-        qrY: qrBox.y,
-        templateBucket,
-        templateHeight: templateSize.height,
-        templateNaturalHeight: templateSize.naturalHeight,
-        templateNaturalWidth: templateSize.naturalWidth,
-        templatePath,
-        templateUrl,
-        templateUrlSource,
-        templateWidth: templateSize.width,
-      })
-      throw error
-    }
-  }
-
-  async function renderTicketBlob(record: GuestInvitationRecord) {
-    const qrToken = readString(record.qr_token)
+  async function renderGuestInvitationBlob(record: GuestInvitationRecord) {
+    const qrToken = readString(record.qr_token) || readString(record.invitation_token)
     const eventId = readString(record.event_id)
 
     if (!qrToken || !eventId) {
@@ -447,37 +422,26 @@ export default function GuestInvitation() {
     const templateBucket = readString(record.invitation_template_bucket) || INVITATION_TEMPLATE_BUCKET
     const qrBox = readQrBox(record)
     const accessCode = readString(record.access_code)
+    const templateUrls: Array<{ source: TemplateUrlSource; url: string }> = []
 
     if (!templatePath) {
       throw new Error('No encontramos la plantilla de esta entrada. Contacta a producción.')
     }
 
     const publicTemplateUrl = readString(supabase.storage.from(templateBucket).getPublicUrl(templatePath).data.publicUrl)
-    let publicTemplateError: unknown = null
 
     if (publicTemplateUrl) {
-      try {
-        return await renderTicketWithTemplateUrl({
-          accessCode,
-          qrBox,
-          qrPayload,
-          templateBucket,
-          templatePath,
-          templateUrl: publicTemplateUrl,
-          templateUrlSource: 'public',
-        })
-      } catch (error) {
-        publicTemplateError = error
-      }
+      templateUrls.push({ source: 'public', url: publicTemplateUrl })
     }
 
     const { data: signedTemplate, error: signedTemplateError } = await supabase.storage
       .from(templateBucket)
       .createSignedUrl(templatePath, 60)
 
-    if (signedTemplateError || !signedTemplate?.signedUrl) {
+    if (signedTemplateError) {
       warnGuestInvitationError('create signed template url', signedTemplateError ?? new Error('Signed URL vacía.'), {
         accessCode,
+        functionName: 'createSignedUrl',
         publicTemplateUrl,
         qrHeight: qrBox.height,
         qrPayload,
@@ -487,21 +451,56 @@ export default function GuestInvitation() {
         templateBucket,
         templatePath,
       })
-
-      throw publicTemplateError instanceof Error
-        ? publicTemplateError
-        : new Error('No pudimos cargar la plantilla de la entrada.')
     }
 
-    return renderTicketWithTemplateUrl({
-      accessCode,
-      qrBox,
-      qrPayload,
-      templateBucket,
-      templatePath,
-      templateUrl: signedTemplate.signedUrl,
-      templateUrlSource: 'signed',
-    })
+    if (signedTemplate?.signedUrl) {
+      templateUrls.push({ source: 'signed', url: signedTemplate.signedUrl })
+    }
+
+    let lastRenderError: unknown = signedTemplateError
+
+    for (const templateUrl of templateUrls) {
+      let templateSize: TemplateImageSize = {
+        height: 0,
+        naturalHeight: 0,
+        naturalWidth: 0,
+        width: 0,
+      }
+
+      try {
+        return await renderInvitationImage({
+          accessCode,
+          onTemplateLoaded: (size) => {
+            templateSize = size
+          },
+          qrBox,
+          qrPayload,
+          templateUrl: templateUrl.url,
+        })
+      } catch (error) {
+        lastRenderError = error
+        warnGuestInvitationError('renderInvitationImage failed', error, {
+          accessCode,
+          functionName: 'renderInvitationImage',
+          qrHeight: qrBox.height,
+          qrPayload,
+          qrToken,
+          qrWidth: qrBox.width,
+          qrX: qrBox.x,
+          qrY: qrBox.y,
+          templateBucket,
+          templateHeight: templateSize.height,
+          templateNaturalHeight: templateSize.naturalHeight,
+          templateNaturalWidth: templateSize.naturalWidth,
+          templatePath,
+          templateUrl: templateUrl.url,
+          templateUrlSource: templateUrl.source,
+          templateWidth: templateSize.width,
+        })
+      }
+    }
+
+    throw lastRenderError instanceof Error ? lastRenderError : new Error('No pudimos cargar la plantilla de la entrada.')
   }
 
   async function submitGuestInvitationForm() {
@@ -558,6 +557,8 @@ export default function GuestInvitation() {
   async function handleGenerateTicket(formEvent: FormEvent<HTMLFormElement>) {
     formEvent.preventDefault()
     resetMessages()
+    setPreviewError('')
+    clearTicketPreview()
 
     if (!invitation) return
 
@@ -572,11 +573,18 @@ export default function GuestInvitation() {
 
     try {
       const data = await submitGuestInvitationForm()
-      const result = Array.isArray(data) ? (data[0] as GenerateGuestInvitationResult | undefined) : null
+      const result = Array.isArray(data)
+        ? (data[0] as GenerateGuestInvitationResult | undefined)
+        : data && typeof data === 'object'
+          ? (data as GenerateGuestInvitationResult)
+          : null
 
       if (!result || (result.result !== 'generated' && result.result !== 'already_generated')) {
         throw new Error(readString(result?.message) || 'No pudimos guardar tus datos. Intenta nuevamente.')
       }
+
+      setErrorMessage('')
+      setPreviewError('')
 
       const nextRecord: GuestInvitationRecord = {
         ...invitation,
@@ -598,10 +606,8 @@ export default function GuestInvitation() {
         ticket_status: 'generated',
       }
 
-      // TODO: Persist public-generated tickets through an Edge Function with service_role, never from anon.
       setInvitation(nextRecord)
       setMessage(readString(result.message) || 'Entrada generada correctamente.')
-      await loadInvitation()
     } catch (error) {
       warnGuestInvitationError('submit invitation form', error)
       setErrorMessage(getSafeGuestErrorMessage(error, 'No pudimos guardar tus datos. Intenta nuevamente.'))
@@ -618,14 +624,14 @@ export default function GuestInvitation() {
     setIsDownloading(true)
 
     try {
-      const blob = ticketPreviewBlob ?? (await renderTicketBlob(invitation))
+      const blob = ticketPreviewBlob ?? (await renderGuestInvitationBlob(invitation))
       const fileName = buildGuestTicketFileName(invitation)
 
       downloadBlob(blob, fileName)
       setMessage('Entrada descargada.')
     } catch (error) {
       warnGuestInvitationError('download ticket', error)
-      setErrorMessage(getSafeGuestErrorMessage(error, 'No pudimos generar la entrada. Intenta nuevamente o contacta a producción.'))
+      setErrorMessage(getSafeGuestErrorMessage(error, 'No pudimos descargar la entrada. Intenta nuevamente o contacta a producción.'))
     } finally {
       setIsDownloading(false)
     }
@@ -767,8 +773,8 @@ export default function GuestInvitation() {
                     </span>
                   </div>
                 ) : (
-                  <div className="grid min-h-64 place-items-center text-sm font-semibold text-onda-muted">
-                    Preparando vista de entrada...
+                  <div className="grid min-h-64 place-items-center p-6 text-center text-sm font-semibold text-red-100">
+                    No pudimos preparar la vista de la entrada.
                   </div>
                 )}
               </div>
