@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bot, Send, Sparkles, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useTheme } from '../../lib/theme'
 import { cn } from '../../lib/utils'
 import { useI18n } from '../../hooks/useI18n'
@@ -69,6 +70,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
 }
 
 export default function FloatingAssistant() {
+  const { pathname } = useLocation()
   const { theme } = useTheme()
   const { t } = useI18n()
   const desiredSrc = theme === 'dark' ? robotNightSrc : robotDaySrc
@@ -81,6 +83,10 @@ export default function FloatingAssistant() {
   const src = failedSrcs.includes(desiredSrc) ? robotDaySrc : desiredSrc
   const useFallbackIcon = failedSrcs.includes(src)
   const handleImageError = () => setFailedSrcs((current) => (current.includes(src) ? current : [...current, src]))
+
+  if (pathname === '/admin/check-in') {
+    return null
+  }
 
   const handleQuickOption = (message: string) => {
     setDraftMessage(message)

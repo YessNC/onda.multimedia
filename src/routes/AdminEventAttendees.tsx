@@ -31,11 +31,13 @@ import {
   createQrBlob,
   createQrDataUrl,
   downloadBlob,
+  getAccessCodeText,
   normalizeQrBox,
   renderInvitationPng,
   sanitizeFileName,
 } from '../lib/invitations'
 import type { InvitationQrBox } from '../lib/invitations'
+import { createAccessCode, normalizeAccessCode } from '../lib/accessCodes'
 import { supabase } from '../lib/supabaseClient'
 import { cn } from '../lib/utils'
 
@@ -52,6 +54,9 @@ type AdminEvent = Record<string, unknown> & {
 }
 
 type EventAttendee = Record<string, unknown> & {
+  access_code?: string | null
+  check_in_status?: string | null
+  checked_in_at?: string | null
   email?: string | null
   event_id?: string | null
   first_name?: string | null
@@ -168,6 +173,62 @@ function createQrToken() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function getAttendeeAccessCode(attendee: EventAttendee | null | undefined) {
+  return normalizeAccessCode(readString(attendee?.access_code))
+}
+
+async function createUniqueAccessCodeForEvent(eventId: string, reservedCodes = new Set<string>()) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const accessCode = createAccessCode()
+
+    if (reservedCodes.has(accessCode)) continue
+
+    const { data, error } = await supabase
+      .from('event_attendees')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('access_code', accessCode)
+      .maybeSingle()
+
+    if (error) throw error
+
+    if (!data) {
+      reservedCodes.add(accessCode)
+      return accessCode
+    }
+  }
+
+  throw new Error('No pudimos generar un codigo unico para este evento.')
+}
+
+async function ensureAttendeesAccessCodes(eventId: string, attendeeRows: EventAttendee[]) {
+  const reservedCodes = new Set(attendeeRows.map(getAttendeeAccessCode).filter(Boolean))
+  const nextAttendees: EventAttendee[] = []
+
+  for (const attendee of attendeeRows) {
+    const currentCode = getAttendeeAccessCode(attendee)
+
+    if (currentCode) {
+      nextAttendees.push({ ...attendee, access_code: currentCode })
+      continue
+    }
+
+    const accessCode = await createUniqueAccessCodeForEvent(eventId, reservedCodes)
+    const { data, error } = await supabase
+      .from('event_attendees')
+      .update({ access_code: accessCode })
+      .eq('id', attendee.id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+
+    nextAttendees.push(data as EventAttendee)
+  }
+
+  return nextAttendees
+}
+
 function getEventTitle(eventRecord: AdminEvent | null) {
   if (!eventRecord) return 'Evento'
 
@@ -209,6 +270,28 @@ function formatFileSize(bytes?: number | null) {
 
 function formatUserId(value?: string | null) {
   return value ? value.slice(0, 8) : 'Sin registro'
+}
+
+function getCheckInStatusLabel(attendee: EventAttendee) {
+  const status = readString(attendee.check_in_status)
+
+  if (status === 'checked_in') return `Validado ${formatDateTime(attendee.checked_in_at)}`
+  if (status === 'cancelled') return 'Cancelada'
+  return 'Pendiente'
+}
+
+function getCheckInStatusClassName(attendee: EventAttendee) {
+  const status = readString(attendee.check_in_status)
+
+  if (status === 'checked_in') {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+  }
+
+  if (status === 'cancelled') {
+    return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200'
+  }
+
+  return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200'
 }
 
 function readEventQrBox(eventRecord: AdminEvent | null) {
@@ -272,10 +355,12 @@ export default function AdminEventAttendees() {
       if (invitationsResponse.error) throw invitationsResponse.error
 
       const nextEvent = eventResponse.data as AdminEvent
+      const attendeeRows = (attendeesResponse.data ?? []) as EventAttendee[]
+      const nextAttendees = await ensureAttendeesAccessCodes(eventId, attendeeRows)
 
       setEventRecord(nextEvent)
       setQrDraft(readEventQrBox(nextEvent))
-      setAttendees((attendeesResponse.data ?? []) as EventAttendee[])
+      setAttendees(nextAttendees)
       setInvitations((invitationsResponse.data ?? []) as GeneratedInvitation[])
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
@@ -509,10 +594,14 @@ export default function AdminEventAttendees() {
     try {
       if (editingAttendeeId) {
         const currentAttendee = attendees.find((attendee) => attendee.id === editingAttendeeId)
+        const reservedCodes = new Set(attendees.map(getAttendeeAccessCode).filter(Boolean))
+        const accessCode =
+          getAttendeeAccessCode(currentAttendee) || (await createUniqueAccessCodeForEvent(eventId, reservedCodes))
         const { error } = await supabase
           .from('event_attendees')
           .update({
             ...attendeePayload,
+            access_code: accessCode,
             qr_token: currentAttendee?.qr_token || createQrToken(),
           })
           .eq('id', editingAttendeeId)
@@ -520,8 +609,11 @@ export default function AdminEventAttendees() {
         if (error) throw error
         setMessage('Asistente actualizado.')
       } else {
+        const reservedCodes = new Set(attendees.map(getAttendeeAccessCode).filter(Boolean))
+        const accessCode = await createUniqueAccessCodeForEvent(eventId, reservedCodes)
         const { error } = await supabase.from('event_attendees').insert({
           ...attendeePayload,
+          access_code: accessCode,
           event_id: eventId,
           qr_token: createQrToken(),
         })
@@ -561,6 +653,33 @@ export default function AdminEventAttendees() {
     return nextToken
   }
 
+  async function ensureAttendeeAccessCode(attendee: EventAttendee) {
+    if (!eventId) throw new Error('Falta el ID del evento.')
+
+    const currentCode = getAttendeeAccessCode(attendee)
+
+    if (currentCode) return currentCode
+
+    const reservedCodes = new Set(attendees.map(getAttendeeAccessCode).filter(Boolean))
+    const accessCode = await createUniqueAccessCodeForEvent(eventId, reservedCodes)
+    const { data, error } = await supabase
+      .from('event_attendees')
+      .update({ access_code: accessCode })
+      .eq('id', attendee.id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+
+    setAttendees((currentAttendees) =>
+      currentAttendees.map((currentAttendee) =>
+        currentAttendee.id === attendee.id ? (data as EventAttendee) : currentAttendee,
+      ),
+    )
+
+    return accessCode
+  }
+
   async function handleGenerateInvitation(attendee: EventAttendee) {
     if (!eventId || !eventRecord) return
 
@@ -586,9 +705,11 @@ export default function AdminEventAttendees() {
       if (signedTemplateError) throw signedTemplateError
 
       const qrToken = await ensureAttendeeQrToken(attendee)
+      const accessCode = await ensureAttendeeAccessCode(attendee)
       const qrPayload = buildAdminCheckInUrl(qrToken, eventId)
       const qrBox = normalizeQrBox(qrDraft)
       const invitationBlob = await renderInvitationPng({
+        accessCode,
         qrBox,
         qrPayload,
         templateUrl: signedTemplate.signedUrl,
@@ -752,6 +873,24 @@ export default function AdminEventAttendees() {
 
       await navigator.clipboard.writeText(buildAdminCheckInUrl(qrToken, eventId))
       setMessage('Link QR copiado.')
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleCopyAccessCode(attendee: EventAttendee) {
+    resetMessages()
+    setBusyAction(`copy-code:${attendee.id}`)
+
+    try {
+      const accessCode = await ensureAttendeeAccessCode(attendee)
+
+      if (!navigator.clipboard) throw new Error('Clipboard no esta disponible en este navegador.')
+
+      await navigator.clipboard.writeText(accessCode)
+      setMessage('Codigo copiado.')
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
     } finally {
@@ -957,17 +1096,30 @@ export default function AdminEventAttendees() {
                         }
                       />
                       {canShowQrOverlay ? (
-                        <img
-                          src={qrPreviewDataUrl}
-                          alt="Preview QR"
-                          className="absolute border-2 border-onda-lavender shadow-[0_0_28px_rgba(192,132,252,0.7)]"
-                          style={{
-                            height: `${(previewQrBox.height / templateImageSize.height) * 100}%`,
-                            left: `${(previewQrBox.x / templateImageSize.width) * 100}%`,
-                            top: `${(previewQrBox.y / templateImageSize.height) * 100}%`,
-                            width: `${(previewQrBox.width / templateImageSize.width) * 100}%`,
-                          }}
-                        />
+                        <>
+                          <img
+                            src={qrPreviewDataUrl}
+                            alt="Preview QR"
+                            className="absolute border-2 border-onda-lavender shadow-[0_0_28px_rgba(192,132,252,0.7)]"
+                            style={{
+                              height: `${(previewQrBox.height / templateImageSize.height) * 100}%`,
+                              left: `${(previewQrBox.x / templateImageSize.width) * 100}%`,
+                              top: `${(previewQrBox.y / templateImageSize.height) * 100}%`,
+                              width: `${(previewQrBox.width / templateImageSize.width) * 100}%`,
+                            }}
+                          />
+                          <span
+                            className="absolute text-center font-sans font-black tracking-[0.08em] text-black"
+                            style={{
+                              fontSize: 'clamp(10px, 2vw, 18px)',
+                              left: `${(previewQrBox.x / templateImageSize.width) * 100}%`,
+                              top: `${((previewQrBox.y + previewQrBox.height + 18) / templateImageSize.height) * 100}%`,
+                              width: `${(previewQrBox.width / templateImageSize.width) * 100}%`,
+                            }}
+                          >
+                            {getAccessCodeText('DEMO123')}
+                          </span>
+                        </>
                       ) : null}
                     </div>
                   ) : (
@@ -1120,10 +1272,12 @@ export default function AdminEventAttendees() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[960px] text-left text-sm">
+                    <table className="w-full min-w-[1120px] text-left text-sm">
                       <thead className="bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
                         <tr>
                           <th className="px-4 py-3">Asistente</th>
+                          <th className="px-4 py-3">Check-in</th>
+                          <th className="px-4 py-3">Codigo</th>
                           <th className="px-4 py-3">Contacto</th>
                           <th className="px-4 py-3">Ultima invitacion</th>
                           <th className="px-4 py-3">Acciones</th>
@@ -1132,6 +1286,7 @@ export default function AdminEventAttendees() {
                       <tbody className="divide-y divide-onda-purple/10">
                         {attendees.map((attendee) => {
                           const latestInvitation = latestInvitationByAttendeeId.get(attendee.id)
+                          const accessCode = getAttendeeAccessCode(attendee)
 
                           return (
                             <tr key={attendee.id}>
@@ -1141,6 +1296,21 @@ export default function AdminEventAttendees() {
                                 </div>
                                 <div className="mt-1 text-xs text-zinc-500 dark:text-onda-muted">
                                   {attendee.guest_type || 'Sin tipo'} {attendee.notes ? `- ${attendee.notes}` : ''}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 align-top">
+                                <span
+                                  className={cn(
+                                    'inline-flex rounded-md border px-2.5 py-1.5 text-xs font-bold',
+                                    getCheckInStatusClassName(attendee),
+                                  )}
+                                >
+                                  {getCheckInStatusLabel(attendee)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 align-top">
+                                <div className="font-display text-base font-extrabold tracking-[0.12em] text-zinc-950 dark:text-white">
+                                  {accessCode || 'Pendiente'}
                                 </div>
                               </td>
                               <td className="px-4 py-4 align-top text-zinc-600 dark:text-onda-muted">
@@ -1184,6 +1354,13 @@ export default function AdminEventAttendees() {
                                     onClick={() => setHistoryAttendee(attendee)}
                                   >
                                     Ver historial
+                                  </ActionButton>
+                                  <ActionButton
+                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                                    onClick={() => void handleCopyAccessCode(attendee)}
+                                    disabled={Boolean(busyAction)}
+                                  >
+                                    Copiar codigo
                                   </ActionButton>
                                   <ActionButton
                                     icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}

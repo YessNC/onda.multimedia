@@ -11,6 +11,7 @@ export type InvitationQrBox = {
 }
 
 type InvitationRenderInput = {
+  accessCode?: string
   qrBox: InvitationQrBox
   qrPayload: string
   templateUrl: string
@@ -79,6 +80,10 @@ export async function createQrBlob(qrPayload: string, size = 1024) {
   return response.blob()
 }
 
+export function getAccessCodeText(accessCode: string) {
+  return `CÓDIGO: ${accessCode}`
+}
+
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
@@ -102,7 +107,34 @@ function canvasToPngBlob(canvas: HTMLCanvasElement) {
   })
 }
 
-export async function renderInvitationPng({ qrBox, qrPayload, templateUrl }: InvitationRenderInput) {
+function drawAccessCode(context: CanvasRenderingContext2D, qrBox: InvitationQrBox, accessCode: string) {
+  const code = accessCode.trim().toUpperCase()
+
+  if (!code) return
+
+  const fontSize = Math.max(18, Math.round(qrBox.width * 0.095))
+  const text = getAccessCodeText(code)
+  const x = qrBox.x + qrBox.width / 2
+  const y = qrBox.y + qrBox.height + 34
+
+  context.save()
+  context.font = `700 ${fontSize}px Arial, Helvetica, sans-serif`
+  context.fillStyle = '#050505'
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+
+  const maxWidth = qrBox.width
+  const measuredWidth = context.measureText(text).width
+
+  if (measuredWidth > maxWidth) {
+    context.font = `700 ${Math.max(14, Math.floor((fontSize * maxWidth) / measuredWidth))}px Arial, Helvetica, sans-serif`
+  }
+
+  context.fillText(text, x, y, maxWidth)
+  context.restore()
+}
+
+export async function renderInvitationPng({ accessCode = '', qrBox, qrPayload, templateUrl }: InvitationRenderInput) {
   const templateResponse = await fetch(templateUrl)
 
   if (!templateResponse.ok) {
@@ -129,6 +161,7 @@ export async function renderInvitationPng({ qrBox, qrPayload, templateUrl }: Inv
     canvas.height = height
     context.drawImage(templateImage, 0, 0, width, height)
     context.drawImage(qrImage, qrBox.x, qrBox.y, qrBox.width, qrBox.height)
+    drawAccessCode(context, qrBox, accessCode)
 
     return canvasToPngBlob(canvas)
   } finally {

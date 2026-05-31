@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, QrCode, XCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, ArrowLeft, CheckCircle2, Keyboard, Loader2, QrCode, XCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
+import QRScanner from '../components/admin/QRScanner'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
+import { isUuid, normalizeAccessCode } from '../lib/accessCodes'
+import { parseCheckInQrPayload } from '../lib/checkInQr'
 import { type EventRecord, getEventTitle, readString } from '../lib/events'
 import { supabase } from '../lib/supabaseClient'
 
 type EventAttendee = Record<string, unknown> & {
+  access_code?: string | null
   check_in_status?: string | null
   checked_in_at?: string | null
+  email?: string | null
   event_id?: string | null
   first_name?: string | null
   full_name?: string | null
@@ -18,20 +23,36 @@ type EventAttendee = Record<string, unknown> & {
   qr_token?: string | null
 }
 
+type CheckInResultKind = 'already_used' | 'cancelled' | 'checked_in' | 'error' | 'not_found' | 'wrong_event'
+
 type CheckInResult = {
   attendeeId?: string | null
+  attendeeName?: string | null
+  checkedInAt?: string | null
   eventId?: string | null
+  eventName?: string | null
   message: string
-  result: 'already_used' | 'cancelled' | 'checked_in' | 'error' | 'not_found' | 'wrong_event'
+  result: CheckInResultKind
+  token?: string | null
+  validatedAt?: string | null
 }
 
-const resultStyles: Record<CheckInResult['result'], string> = {
-  already_used: 'border-amber-400/35 bg-amber-500/10 text-amber-100',
-  cancelled: 'border-red-400/35 bg-red-500/10 text-red-100',
-  checked_in: 'border-emerald-400/35 bg-emerald-500/10 text-emerald-100',
-  error: 'border-red-400/35 bg-red-500/10 text-red-100',
-  not_found: 'border-red-400/35 bg-red-500/10 text-red-100',
-  wrong_event: 'border-red-400/35 bg-red-500/10 text-red-100',
+const resultStyles: Record<CheckInResultKind, string> = {
+  already_used: 'border-amber-400/40 bg-amber-500/12 text-amber-50 shadow-[0_0_42px_rgba(245,158,11,0.14)]',
+  cancelled: 'border-red-400/40 bg-red-500/12 text-red-50 shadow-[0_0_42px_rgba(239,68,68,0.13)]',
+  checked_in: 'border-emerald-400/40 bg-emerald-500/12 text-emerald-50 shadow-[0_0_42px_rgba(16,185,129,0.14)]',
+  error: 'border-red-400/40 bg-red-500/12 text-red-50 shadow-[0_0_42px_rgba(239,68,68,0.13)]',
+  not_found: 'border-red-400/40 bg-red-500/12 text-red-50 shadow-[0_0_42px_rgba(239,68,68,0.13)]',
+  wrong_event: 'border-red-400/40 bg-red-500/12 text-red-50 shadow-[0_0_42px_rgba(239,68,68,0.13)]',
+}
+
+const resultTitles: Record<CheckInResultKind, string> = {
+  already_used: 'Entrada ya utilizada',
+  cancelled: 'Entrada cancelada',
+  checked_in: 'Entrada valida',
+  error: 'No pudimos validar',
+  not_found: 'Entrada no encontrada',
+  wrong_event: 'Entrada pertenece a otro evento',
 }
 
 function getErrorMessage(error: unknown) {
@@ -45,26 +66,32 @@ function getAttendeeName(attendee: EventAttendee | null) {
   return (
     readString(attendee.full_name) ||
     `${readString(attendee.first_name)} ${readString(attendee.last_name)}`.trim() ||
+    readString(attendee.email) ||
     'Asistente'
   )
 }
 
-function normalizeScannedToken(value: string) {
-  const trimmed = value.trim()
+function getResultIcon(result: CheckInResultKind) {
+  if (result === 'checked_in') return CheckCircle2
+  if (result === 'already_used') return AlertTriangle
+  return XCircle
+}
 
-  if (!trimmed) return ''
-
-  try {
-    const url = new URL(trimmed, window.location.origin)
-    return (
-      url.searchParams.get('token')?.trim() ||
-      url.searchParams.get('qr_token')?.trim() ||
-      url.searchParams.get('qrToken')?.trim() ||
-      trimmed
-    )
-  } catch {
-    return trimmed
+function normalizeResultKind(value: string): CheckInResultKind | '' {
+  if (value === 'valid') return 'checked_in'
+  if (value === 'already_checked_in') return 'already_used'
+  if (
+    value === 'already_used' ||
+    value === 'cancelled' ||
+    value === 'checked_in' ||
+    value === 'error' ||
+    value === 'not_found' ||
+    value === 'wrong_event'
+  ) {
+    return value
   }
+
+  return ''
 }
 
 function normalizeRpcResult(data: unknown): CheckInResult | null {
@@ -73,17 +100,31 @@ function normalizeRpcResult(data: unknown): CheckInResult | null {
   if (!row || typeof row !== 'object') return null
 
   const record = row as Record<string, unknown>
-  const result = readString(record.result) as CheckInResult['result']
+  const result = normalizeResultKind(readString(record.result))
   const message = readString(record.message)
 
   if (!result || !message) return null
 
   return {
     attendeeId: readString(record.attendee_id) || null,
+    attendeeName: readString(record.attendee_name) || null,
+    checkedInAt: readString(record.checked_in_at) || null,
     eventId: readString(record.event_id) || null,
+    eventName: readString(record.event_name) || readString(record.event_title) || null,
     message,
     result,
   }
+}
+
+function formatDateTime(value?: string | null) {
+  const date = value ? new Date(value) : new Date()
+
+  if (Number.isNaN(date.getTime())) return value || ''
+
+  return new Intl.DateTimeFormat('es-CL', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 async function writeCheckInLog({
@@ -97,7 +138,7 @@ async function writeCheckInLog({
   attendeeId?: string | null
   eventId?: string | null
   message: string
-  result: CheckInResult['result']
+  result: CheckInResultKind
   scannedBy?: string | null
   token: string
 }) {
@@ -115,24 +156,92 @@ async function writeCheckInLog({
   }
 }
 
-async function validateLocally(token: string, targetEventId: string): Promise<CheckInResult> {
+async function getEventName(eventId: string) {
+  if (!eventId) return ''
+
+  const { data, error } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle()
+
+  if (error || !data) return ''
+
+  return getEventTitle(data as EventRecord)
+}
+
+async function enrichCheckInResult(result: CheckInResult): Promise<CheckInResult> {
+  const enriched: CheckInResult = {
+    ...result,
+    validatedAt: result.validatedAt || new Date().toISOString(),
+  }
+  let eventId = readString(enriched.eventId)
+
+  if (enriched.attendeeId) {
+    const { data, error } = await supabase
+      .from('event_attendees')
+      .select('id, event_id, first_name, last_name, full_name, email, checked_in_at')
+      .eq('id', enriched.attendeeId)
+      .maybeSingle()
+
+    if (!error && data) {
+      const attendee = data as EventAttendee
+      const attendeeEventId = readString(attendee.event_id)
+
+      enriched.attendeeName = enriched.attendeeName || getAttendeeName(attendee)
+      enriched.checkedInAt = enriched.checkedInAt || readString(attendee.checked_in_at) || null
+      eventId = enriched.result === 'wrong_event' ? attendeeEventId || eventId : eventId || attendeeEventId
+      enriched.eventId = eventId || enriched.eventId
+    }
+  }
+
+  if (eventId && !enriched.eventName) {
+    enriched.eventName = await getEventName(eventId)
+  }
+
+  return enriched
+}
+
+async function validateLocally(input: string, targetEventId: string): Promise<CheckInResult> {
+  const entryInput = input.trim()
+  const searchByToken = isUuid(entryInput)
+  const accessCode = normalizeAccessCode(entryInput)
+  const scannedValue = searchByToken ? entryInput : accessCode
   const { data: userData } = await supabase.auth.getUser()
   const scannedBy = userData.user?.id ?? null
-  const { data, error } = await supabase
-    .from('event_attendees')
-    .select('*')
-    .eq('qr_token', token)
-    .maybeSingle()
+  let attendeeQuery = supabase.from('event_attendees').select('*')
+
+  if (searchByToken) {
+    attendeeQuery = attendeeQuery.eq('qr_token', entryInput)
+  } else {
+    attendeeQuery = attendeeQuery.eq('access_code', accessCode)
+
+    if (targetEventId) {
+      attendeeQuery = attendeeQuery.eq('event_id', targetEventId)
+    }
+  }
+
+  const { data, error } = await attendeeQuery.maybeSingle()
 
   if (error) throw error
 
-  const attendee = data as EventAttendee | null
+  let attendee = data as EventAttendee | null
+
+  if (!attendee && !searchByToken && targetEventId) {
+    const { data: wrongEventData, error: wrongEventError } = await supabase
+      .from('event_attendees')
+      .select('*')
+      .eq('access_code', accessCode)
+      .limit(1)
+      .maybeSingle()
+
+    if (wrongEventError) throw wrongEventError
+
+    attendee = wrongEventData as EventAttendee | null
+  }
 
   if (!attendee) {
     const result: CheckInResult = {
       eventId: targetEventId || null,
       message: 'Entrada no encontrada.',
       result: 'not_found',
+      token: scannedValue,
     }
 
     await writeCheckInLog({
@@ -140,7 +249,7 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
       message: result.message,
       result: result.result,
       scannedBy,
-      token,
+      token: scannedValue,
     })
 
     return result
@@ -151,9 +260,11 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
   if (targetEventId && attendeeEventId !== targetEventId) {
     const result: CheckInResult = {
       attendeeId: attendee.id,
-      eventId: targetEventId,
+      attendeeName: getAttendeeName(attendee),
+      eventId: attendeeEventId || targetEventId,
       message: 'Esta entrada pertenece a otro evento.',
       result: 'wrong_event',
+      token: scannedValue,
     }
 
     await writeCheckInLog({
@@ -162,7 +273,7 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
       message: result.message,
       result: result.result,
       scannedBy,
-      token,
+      token: scannedValue,
     })
 
     return result
@@ -173,9 +284,11 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
   if (checkInStatus === 'cancelled') {
     const result: CheckInResult = {
       attendeeId: attendee.id,
+      attendeeName: getAttendeeName(attendee),
       eventId: attendeeEventId || targetEventId || null,
       message: 'Entrada cancelada.',
       result: 'cancelled',
+      token: scannedValue,
     }
 
     await writeCheckInLog({
@@ -184,7 +297,7 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
       message: result.message,
       result: result.result,
       scannedBy,
-      token,
+      token: scannedValue,
     })
 
     return result
@@ -193,9 +306,12 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
   if (checkInStatus === 'checked_in' || readString(attendee.checked_in_at)) {
     const result: CheckInResult = {
       attendeeId: attendee.id,
+      attendeeName: getAttendeeName(attendee),
+      checkedInAt: readString(attendee.checked_in_at) || null,
       eventId: attendeeEventId || targetEventId || null,
       message: 'Entrada ya utilizada.',
       result: 'already_used',
+      token: scannedValue,
     }
 
     await writeCheckInLog({
@@ -204,7 +320,7 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
       message: result.message,
       result: result.result,
       scannedBy,
-      token,
+      token: scannedValue,
     })
 
     return result
@@ -224,9 +340,12 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
 
   const result: CheckInResult = {
     attendeeId: attendee.id,
+    attendeeName: getAttendeeName(attendee),
+    checkedInAt,
     eventId: attendeeEventId || targetEventId || null,
     message: `${getAttendeeName(attendee)} validado correctamente.`,
     result: 'checked_in',
+    token: scannedValue,
   }
 
   await writeCheckInLog({
@@ -235,10 +354,80 @@ async function validateLocally(token: string, targetEventId: string): Promise<Ch
     message: result.message,
     result: result.result,
     scannedBy,
-    token,
+    token: scannedValue,
   })
 
   return result
+}
+
+function CheckInResultCard({
+  onManual,
+  onScanAnother,
+  result,
+}: {
+  onManual: () => void
+  onScanAnother: () => void
+  result: CheckInResult
+}) {
+  const Icon = getResultIcon(result.result)
+  const validatedAt = result.validatedAt || result.checkedInAt || new Date().toISOString()
+
+  return (
+    <section className={`rounded-lg border p-5 sm:p-7 ${resultStyles[result.result]}`} role="status">
+      <div className="grid gap-5">
+        <div className="flex items-start gap-4">
+          <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-white/20 bg-white/10">
+            <Icon className="h-8 w-8" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <p className="font-display text-xs font-bold uppercase tracking-[0.16em] opacity-80">Resultado</p>
+            <h2 className="mt-2 font-display text-2xl font-extrabold uppercase tracking-[0.08em] text-white sm:text-3xl">
+              {resultTitles[result.result]}
+            </h2>
+            <p className="mt-3 text-base font-semibold leading-7">{result.message}</p>
+          </div>
+        </div>
+
+        <dl className="grid gap-3 rounded-lg border border-white/12 bg-black/20 p-4 text-sm sm:grid-cols-3">
+          <div className="min-w-0">
+            <dt className="font-display text-[0.64rem] font-bold uppercase tracking-[0.14em] opacity-70">Asistente</dt>
+            <dd className="mt-2 break-words font-semibold text-white">{result.attendeeName || 'No disponible'}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="font-display text-[0.64rem] font-bold uppercase tracking-[0.14em] opacity-70">Evento</dt>
+            <dd className="mt-2 break-words font-semibold text-white">{result.eventName || result.eventId || 'No disponible'}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="font-display text-[0.64rem] font-bold uppercase tracking-[0.14em] opacity-70">
+              Hora de validacion
+            </dt>
+            <dd className="mt-2 break-words font-semibold text-white">{formatDateTime(validatedAt)}</dd>
+          </div>
+        </dl>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CTAButton
+            type="button"
+            variant="primary"
+            className="w-full min-h-14"
+            icon={<QrCode className="h-5 w-5" aria-hidden="true" />}
+            onClick={onScanAnother}
+          >
+            Escanear otra entrada
+          </CTAButton>
+          <CTAButton
+            type="button"
+            variant="secondary"
+            className="w-full min-h-14"
+            icon={<Keyboard className="h-5 w-5" aria-hidden="true" />}
+            onClick={onManual}
+          >
+            Validar manualmente
+          </CTAButton>
+        </div>
+      </div>
+    </section>
+  )
 }
 
 export default function AdminCheckIn() {
@@ -249,15 +438,17 @@ export default function AdminCheckIn() {
   const [eventErrorMessage, setEventErrorMessage] = useState('')
   const [isLoadingEvent, setIsLoadingEvent] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
-  const [qrInputState, setQrInputState] = useState({ sourceToken: tokenParam, value: tokenParam })
+  const [qrInput, setQrInput] = useState(tokenParam)
   const [result, setResult] = useState<CheckInResult | null>(null)
+  const [scannerStartSignal, setScannerStartSignal] = useState(0)
+  const activeValidationSignatureRef = useRef('')
+  const manualInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const eventTitle = useMemo(() => (eventRecord ? getEventTitle(eventRecord) : ''), [eventRecord])
-  const qrInput = qrInputState.sourceToken === tokenParam ? qrInputState.value : tokenParam
 
-  function updateQrInput(value: string) {
-    setQrInputState({ sourceToken: tokenParam, value })
-  }
+  useEffect(() => {
+    setQrInput(tokenParam)
+  }, [tokenParam])
 
   useEffect(() => {
     let isMounted = true
@@ -291,58 +482,138 @@ export default function AdminCheckIn() {
     }
   }, [eventId])
 
-  const validateToken = useCallback(
-    async (token: string) => {
-      if (eventId) {
-        const { data, error } = await supabase.rpc('validate_attendee_qr_for_event', {
-          p_event_id: eventId,
-          p_qr_token: token,
-        })
+  const validateEntry = useCallback(async (input: string, targetEventId: string) => {
+    if (targetEventId) {
+      const { data, error } = await supabase.rpc('validate_attendee_entry_for_event', {
+        p_event_id: targetEventId,
+        p_input: input,
+      })
 
-        if (!error) {
-          const rpcResult = normalizeRpcResult(data)
+      if (!error) {
+        const rpcResult = normalizeRpcResult(data)
 
-          if (rpcResult) return rpcResult
-        }
+        if (rpcResult) return rpcResult
+      } else {
+        console.warn('validate_attendee_entry_for_event no disponible o fallo:', error.message)
       }
 
-      return validateLocally(token, eventId)
+      if (isUuid(input)) {
+        const { data: qrData, error: qrError } = await supabase.rpc('validate_attendee_qr_for_event', {
+          p_event_id: targetEventId,
+          p_qr_token: input,
+        })
+
+        if (!qrError) {
+          const rpcResult = normalizeRpcResult(qrData)
+
+          if (rpcResult) return rpcResult
+        } else {
+          console.warn('validate_attendee_qr_for_event no disponible o fallo:', qrError.message)
+        }
+      }
+    }
+
+    // TODO: retirar este fallback cuando validate_attendee_entry_for_event este desplegada en produccion.
+    return validateLocally(input, targetEventId)
+  }, [])
+
+  const validateQrValue = useCallback(
+    async (rawValue: string, source: 'manual' | 'scanner') => {
+      const parsedQr = parseCheckInQrPayload(rawValue)
+      const entryInput = parsedQr.token || parsedQr.accessCode
+      const isAccessCodeInput = Boolean(parsedQr.accessCode && !parsedQr.token)
+      const qrEventId = parsedQr.eventId
+      const targetEventId = eventId || qrEventId
+      const validationSignature = `${targetEventId || 'general'}:${entryInput}`
+
+      if (source === 'scanner') {
+        setQrInput(rawValue.trim())
+      }
+
+      setResult(null)
+
+      if (!entryInput) {
+        setResult({
+          message: 'Ingresa o escanea un codigo QR.',
+          result: 'error',
+          validatedAt: new Date().toISOString(),
+        })
+        return
+      }
+
+      if (isAccessCodeInput && !targetEventId) {
+        setResult({
+          message: 'Para validar con codigo corto, abre el check-in desde un evento seleccionado.',
+          result: 'error',
+          token: entryInput,
+          validatedAt: new Date().toISOString(),
+        })
+        return
+      }
+
+      if (source === 'scanner' && activeValidationSignatureRef.current === validationSignature) return
+
+      if (qrEventId && eventId && qrEventId !== eventId) {
+        activeValidationSignatureRef.current = ''
+        setIsValidating(false)
+        setResult(
+          await enrichCheckInResult({
+            eventId: qrEventId,
+            message: 'Esta entrada pertenece a otro evento.',
+            result: 'wrong_event',
+            token: entryInput,
+            validatedAt: new Date().toISOString(),
+          }),
+        )
+        return
+      }
+
+      activeValidationSignatureRef.current = validationSignature
+      setIsValidating(true)
+
+      try {
+        const validationResult = await validateEntry(entryInput, targetEventId)
+        const enrichedResult = await enrichCheckInResult({
+          ...validationResult,
+          token: entryInput,
+          validatedAt: new Date().toISOString(),
+        })
+
+        setQrInput(entryInput)
+        setResult(enrichedResult)
+      } catch (error) {
+        setResult({
+          message: getErrorMessage(error),
+          result: 'error',
+          token: entryInput,
+          validatedAt: new Date().toISOString(),
+        })
+      } finally {
+        setIsValidating(false)
+        activeValidationSignatureRef.current = ''
+      }
     },
-    [eventId],
+    [eventId, validateEntry],
   )
 
-  async function handleValidate() {
-    const token = normalizeScannedToken(qrInput)
+  function handleManualValidate() {
+    void validateQrValue(qrInput, 'manual')
+  }
 
+  function handleScanAnother() {
     setResult(null)
+    setQrInput('')
+    activeValidationSignatureRef.current = ''
+    setScannerStartSignal((current) => current + 1)
+  }
 
-    if (!token) {
-      setResult({
-        message: 'Ingresa o escanea un codigo QR.',
-        result: 'error',
-      })
-      return
-    }
-
-    setIsValidating(true)
-
-    try {
-      const validationResult = await validateToken(token)
-
-      updateQrInput(token)
-      setResult(validationResult)
-    } catch (error) {
-      setResult({
-        message: getErrorMessage(error),
-        result: 'error',
-      })
-    } finally {
-      setIsValidating(false)
-    }
+  function handleManualFocus() {
+    setResult(null)
+    window.setTimeout(() => manualInputRef.current?.focus(), 0)
   }
 
   return (
-    <section className="dark min-h-[calc(100vh-5rem)] bg-onda-night py-16 text-onda-soft sm:py-20">
+    <section className="dark min-h-[calc(100vh-5rem)] bg-onda-night py-10 pb-28 text-onda-soft sm:py-16">
       <div className="onda-container">
         <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
           <SectionTitle
@@ -362,20 +633,23 @@ export default function AdminCheckIn() {
           </div>
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <div className="glass-panel grid content-start gap-4 rounded-lg bg-onda-black/72 p-6 shadow-[0_0_34px_rgba(123,44,255,0.18)]">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-md bg-onda-purple/16 text-onda-lavender">
-              <QrCode className="h-7 w-7" aria-hidden="true" />
-            </div>
-            <div>
-              <h3 className="font-display text-xl font-extrabold uppercase tracking-[0.14em] text-white">
-                {eventId ? 'Evento seleccionado' : 'Check-in general'}
-              </h3>
-              <p className="mt-3 text-sm leading-7 text-onda-muted">
-                {isLoadingEvent
-                  ? 'Cargando evento...'
-                  : eventTitle || 'Abre esta pantalla desde el boton Validar de un evento para fijar eventId.'}
-              </p>
+        <div className="mt-8 grid gap-6">
+          <section className="glass-panel grid gap-4 rounded-lg bg-onda-black/72 p-5 shadow-[0_0_34px_rgba(123,44,255,0.18)] sm:p-6">
+            <div className="flex items-start gap-4">
+              <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-onda-purple/16 text-onda-lavender">
+                <QrCode className="h-7 w-7" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-display text-xl font-extrabold uppercase tracking-[0.14em] text-white">
+                  {eventId ? 'Evento seleccionado' : 'Check-in general'}
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-onda-muted">
+                  {isLoadingEvent
+                    ? 'Cargando evento...'
+                    : eventTitle || 'Abre esta pantalla desde el boton Validar entradas de un evento para fijar eventId.'}
+                </p>
+                {eventId ? <p className="mt-2 break-all text-xs font-semibold text-onda-muted/80">ID: {eventId}</p> : null}
+              </div>
             </div>
 
             {eventErrorMessage ? (
@@ -389,58 +663,69 @@ export default function AdminCheckIn() {
                 No encontramos el evento seleccionado.
               </p>
             ) : null}
-          </div>
+          </section>
 
-          <div className="glass-panel grid gap-5 rounded-lg bg-onda-black/72 p-6 shadow-[0_0_34px_rgba(123,44,255,0.18)]">
-            <label className="grid gap-2 text-sm font-semibold text-onda-soft">
-              QR o token
-              <textarea
-                rows={4}
-                value={qrInput}
-                onChange={(inputEvent) => updateQrInput(inputEvent.target.value)}
-                className="rounded-md border border-onda-purple/25 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-onda-muted/70 focus:border-onda-purple"
-                placeholder="Pega el token o la URL del QR"
-                disabled={isValidating}
-              />
-            </label>
+          <div className="grid min-w-0 gap-6 xl:grid-cols-[1.04fr_0.96fr] xl:items-start">
+            <div className="grid min-w-0 gap-6">
+              <QRScanner disabled={isValidating} onScan={(value) => void validateQrValue(value, 'scanner')} startSignal={scannerStartSignal} />
 
-            <CTAButton
-              type="button"
-              variant="primary"
-              icon={
-                isValidating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <QrCode className="h-4 w-4" aria-hidden="true" />
-                )
-              }
-              onClick={() => void handleValidate()}
-              disabled={isValidating}
-            >
-              {isValidating ? 'Validando...' : 'Validar entrada'}
-            </CTAButton>
-
-            {result ? (
-              <div className={`rounded-lg border p-5 ${resultStyles[result.result]}`} role="status">
-                <div className="flex items-start gap-3">
-                  {result.result === 'checked_in' ? (
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-                  ) : result.result === 'already_used' ? (
-                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-                  ) : (
-                    <XCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-                  )}
-                  <div>
-                    <p className="font-display text-sm font-bold uppercase tracking-[0.12em]">
-                      {result.result === 'checked_in' ? 'Entrada valida' : 'Revision requerida'}
-                    </p>
-                    <p className="mt-2 text-sm leading-6">{result.message}</p>
-                    {result.attendeeId ? <p className="mt-2 text-xs opacity-80">Asistente: {result.attendeeId}</p> : null}
-                    {result.eventId ? <p className="mt-1 text-xs opacity-80">Evento: {result.eventId}</p> : null}
+              {isValidating ? (
+                <div className="rounded-lg border border-onda-purple/30 bg-onda-purple/12 p-5 text-sm font-semibold text-onda-soft">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-onda-lavender" aria-hidden="true" />
+                    Validando entrada...
                   </div>
                 </div>
+              ) : null}
+
+              {result ? <CheckInResultCard result={result} onManual={handleManualFocus} onScanAnother={handleScanAnother} /> : null}
+            </div>
+
+            <section className="glass-panel grid min-w-0 gap-5 rounded-lg bg-onda-black/72 p-5 shadow-[0_0_34px_rgba(123,44,255,0.18)] sm:p-6">
+              <div className="flex items-start gap-3">
+                <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-white/8 text-onda-lavender">
+                  <Keyboard className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-display text-lg font-extrabold uppercase tracking-[0.13em] text-white">
+                    QR, token o codigo
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-onda-muted">
+                    Respaldo manual para pegar un codigo corto, token puro o URL completa del QR.
+                  </p>
+                </div>
               </div>
-            ) : null}
+
+              <label className="grid gap-2 text-sm font-semibold text-onda-soft">
+                Codigo, token o URL
+                <textarea
+                  ref={manualInputRef}
+                  rows={5}
+                  value={qrInput}
+                  onChange={(inputEvent) => setQrInput(inputEvent.target.value)}
+                  className="min-h-36 w-full resize-y rounded-md border border-onda-purple/25 bg-white/5 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-onda-muted/70 focus:border-onda-purple"
+                  placeholder="Pega el codigo corto, token o la URL del QR"
+                  disabled={isValidating}
+                />
+              </label>
+
+              <CTAButton
+                type="button"
+                variant="primary"
+                className="w-full min-h-14"
+                icon={
+                  isValidating ? (
+                    <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <QrCode className="h-5 w-5" aria-hidden="true" />
+                  )
+                }
+                onClick={handleManualValidate}
+                disabled={isValidating}
+              >
+                {isValidating ? 'Validando...' : 'Validar entrada'}
+              </CTAButton>
+            </section>
           </div>
         </div>
       </div>
