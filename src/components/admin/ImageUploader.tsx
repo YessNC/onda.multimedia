@@ -27,7 +27,8 @@ type MetadataInput = {
 }
 
 const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'] as const
-const maxImageSizeBytes = 10 * 1024 * 1024
+const MAX_IMAGE_SIZE_MB = 25
+const maxImageSizeBytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
 
 const stateStyles: Record<UploadState, string> = {
   error: 'border-red-400/55 bg-red-500/10 text-red-700 dark:text-red-100',
@@ -74,7 +75,7 @@ function validateImageFile(file: File) {
   }
 
   if (file.size > maxImageSizeBytes) {
-    return 'La imagen supera el maximo permitido de 10 MB.'
+    return `La imagen supera el maximo permitido de ${MAX_IMAGE_SIZE_MB} MB.`
   }
 
   return ''
@@ -367,7 +368,7 @@ export default function ImageUploader({ event = null, onEventUpdated }: ImageUpl
               </p>
               <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-600 dark:text-onda-muted">
                 {eventId
-                  ? 'Haz click o arrastra una imagen JPG, PNG o WebP de hasta 10 MB.'
+                  ? `Haz click o arrastra una imagen JPG, PNG o WebP de hasta ${MAX_IMAGE_SIZE_MB} MB.`
                   : 'Guarda el evento como borrador antes de subir imagen.'}
               </p>
             </div>
