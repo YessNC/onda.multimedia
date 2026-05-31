@@ -15,6 +15,54 @@ function isLocalhost(hostname: string) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
 }
 
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve())
+  })
+}
+
+async function waitForVisibleElement(elementId: string) {
+  await nextFrame()
+  await nextFrame()
+
+  const element = document.getElementById(elementId)
+
+  if (!element) {
+    throw new Error('No encontramos el contenedor del lector QR.')
+  }
+
+  const rect = element.getBoundingClientRect()
+
+  if (rect.width < 80 || rect.height < 160) {
+    await nextFrame()
+  }
+
+  return element
+}
+
+function patchScannerVideo(elementId: string) {
+  const root = document.getElementById(elementId)
+  const video = root?.querySelector('video') as HTMLVideoElement | null
+
+  if (!video) return
+
+  video.setAttribute('playsinline', 'true')
+  video.setAttribute('webkit-playsinline', 'true')
+  video.autoplay = true
+  video.muted = true
+
+  video.style.width = '100%'
+  video.style.height = '100%'
+  video.style.minHeight = '320px'
+  video.style.objectFit = 'cover'
+  video.style.display = 'block'
+  video.style.background = '#000'
+
+  void video.play().catch(() => {
+    // En iOS a veces play() falla aunque el stream quede activo.
+  })
+}
+
 function getCameraErrorMessage(error: unknown) {
   if (!window.isSecureContext && !isLocalhost(window.location.hostname)) {
     return 'La camara requiere HTTPS para funcionar. Abre esta pagina desde el dominio seguro.'
@@ -48,7 +96,7 @@ function getCameraErrorMessage(error: unknown) {
   return 'No pudimos acceder a la camara. Revisa los permisos del navegador.'
 }
 
-async function getPreferredCamera(): Promise<string | MediaTrackConstraints> {
+async function getFallbackCamera(): Promise<string | MediaTrackConstraints> {
   try {
     const cameras = await Html5Qrcode.getCameras()
     const rearCamera = cameras.find((camera) =>
@@ -64,9 +112,11 @@ async function getPreferredCamera(): Promise<string | MediaTrackConstraints> {
 export default function QRScanner({ disabled = false, onScan, startSignal = 0 }: QRScannerProps) {
   const reactId = useId()
   const scannerElementId = useMemo(() => `onda-qr-scanner-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`, [reactId])
+
   const [status, setStatus] = useState<ScannerStatus>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [lastScannedText, setLastScannedText] = useState('')
+
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const stopPromiseRef = useRef<Promise<void> | null>(null)
   const hasDetectedRef = useRef(false)
@@ -136,7 +186,7 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
   }, [stopScanner])
 
   const startScanner = useCallback(async () => {
-    if (disabled || isStarting || isScanning) return
+    if (disabled || status === 'starting' || status === 'scanning') return
 
     setErrorMessage('')
     setLastScannedText('')
@@ -154,46 +204,69 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
       return
     }
 
-    setStatus('starting')
-
     try {
-      await stopScanner('starting')
+      await stopScanner('idle')
+
+      if (!isMountedRef.current) return
+
+      setStatus('starting')
+
+      await waitForVisibleElement(scannerElementId)
 
       const scanner = new Html5Qrcode(scannerElementId, {
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: false,
+        verbose: import.meta.env.DEV,
       })
-      const camera = await getPreferredCamera()
+
+      scannerRef.current = scanner
+
       const scanConfig: Html5QrcodeCameraScanConfig = {
-        fps: 10,
+        fps: 8,
         qrbox: (viewfinderWidth, viewfinderHeight) => {
           const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72)
 
           return {
-            height: Math.max(180, Math.min(size, 320)),
-            width: Math.max(180, Math.min(size, 320)),
+            height: Math.max(180, Math.min(size, 340)),
+            width: Math.max(180, Math.min(size, 340)),
           }
         },
       }
 
-      scannerRef.current = scanner
+      const handleDecoded = (decodedText: string) => {
+        const scannedText = decodedText.trim()
 
-      await scanner.start(
-        camera,
-        scanConfig,
-        (decodedText) => {
-          const scannedText = decodedText.trim()
+        if (!scannedText || hasDetectedRef.current) return
 
-          if (!scannedText || hasDetectedRef.current) return
+        hasDetectedRef.current = true
+        setLastScannedText(scannedText)
+        setErrorMessage('')
+        onScanRef.current(scannedText)
+        void stopScanner('detected')
+      }
 
-          hasDetectedRef.current = true
-          setLastScannedText(scannedText)
-          setErrorMessage('')
-          onScanRef.current(scannedText)
-          void stopScanner('detected')
-        },
-        () => undefined,
-      )
+      const handleDecodeError = () => undefined
+
+      try {
+        await scanner.start({ facingMode: { ideal: 'environment' } }, scanConfig, handleDecoded, handleDecodeError)
+      } catch (primaryError) {
+        if (import.meta.env.DEV) {
+          console.warn('No pudimos iniciar con facingMode environment. Intentando fallback:', primaryError)
+        }
+
+        try {
+          scanner.clear()
+        } catch {
+          // Continuar con fallback.
+        }
+
+        const fallbackCamera = await getFallbackCamera()
+        await scanner.start(fallbackCamera, scanConfig, handleDecoded, handleDecodeError)
+      }
+
+      patchScannerVideo(scannerElementId)
+
+      await nextFrame()
+      patchScannerVideo(scannerElementId)
 
       if (!hasDetectedRef.current && isMountedRef.current) {
         setStatus('scanning')
@@ -201,9 +274,17 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
     } catch (error) {
       if (scannerRef.current) {
         try {
+          if (scannerRef.current.isScanning) {
+            await scannerRef.current.stop()
+          }
+        } catch {
+          // Nada más que detener.
+        }
+
+        try {
           scannerRef.current.clear()
         } catch {
-          // Nothing else to clean here.
+          // Nada más que limpiar.
         }
 
         scannerRef.current = null
@@ -214,7 +295,7 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
         setErrorMessage(`${getCameraErrorMessage(error)} Tambien puedes pegar el token o URL manualmente.`)
       }
     }
-  }, [disabled, isScanning, isStarting, scannerElementId, stopScanner])
+  }, [disabled, scannerElementId, status, stopScanner])
 
   useEffect(() => {
     if (!startSignal || lastStartSignalRef.current === startSignal) return
@@ -244,18 +325,22 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
       </div>
 
       {status !== 'idle' ? (
-        <div className="overflow-hidden rounded-lg border border-onda-purple/24 bg-black/54">
+        <div className="relative overflow-hidden rounded-lg border border-onda-purple/24 bg-black">
           <div
             id={scannerElementId}
-            className="grid min-h-[18rem] w-full place-items-center overflow-hidden text-center text-sm text-onda-muted [&_canvas]:hidden [&_video]:h-full [&_video]:min-h-[18rem] [&_video]:w-full [&_video]:object-cover"
-          >
-            {isStarting ? (
-              <div className="grid justify-items-center gap-3 px-5 py-12">
+            className="relative grid aspect-[3/4] min-h-[20rem] w-full place-items-center overflow-hidden bg-black text-center text-sm text-onda-muted sm:aspect-video sm:min-h-[22rem]
+              [&_canvas]:!absolute [&_canvas]:!inset-0 [&_canvas]:!h-full [&_canvas]:!w-full
+              [&_video]:!absolute [&_video]:!inset-0 [&_video]:!block [&_video]:!h-full [&_video]:!min-h-[20rem] [&_video]:!w-full [&_video]:!bg-black [&_video]:!object-cover"
+          />
+
+          {isStarting ? (
+            <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/72 px-5 py-12 text-center text-sm font-semibold text-onda-soft">
+              <div className="grid justify-items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-onda-lavender" aria-hidden="true" />
-                Preparando camara...
+                Iniciando camara...
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -299,7 +384,13 @@ export default function QRScanner({ disabled = false, onScan, startSignal = 0 }:
           type="button"
           variant="primary"
           className="w-full min-h-14 sm:col-span-2"
-          icon={isStarting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <QrCode className="h-5 w-5" aria-hidden="true" />}
+          icon={
+            isStarting ? (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            ) : (
+              <QrCode className="h-5 w-5" aria-hidden="true" />
+            )
+          }
           onClick={handleRetry}
           disabled={disabled || isStarting || isScanning}
         >
