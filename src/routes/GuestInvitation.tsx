@@ -410,18 +410,23 @@ export default function GuestInvitation() {
   }
 
   async function renderGuestInvitationBlob(record: GuestInvitationRecord) {
-    const qrToken = readString(record.qr_token) || readString(record.invitation_token)
+    const qrToken = readString(record.qr_token)
+    const invitationTokenValue = readString(record.invitation_token)
     const eventId = readString(record.event_id)
+    const accessCode = readString(record.access_code).toUpperCase()
 
-    if (!qrToken || !eventId) {
-      throw new Error('La entrada no tiene token QR asociado.')
+    const qrPayload =
+      accessCode ||
+      (qrToken && eventId ? buildAdminCheckInUrl(qrToken, eventId) : '') ||
+      (invitationTokenValue && eventId ? buildAdminCheckInUrl(invitationTokenValue, eventId) : '')
+
+    if (!qrPayload) {
+      throw new Error('La entrada no tiene código o token QR asociado.')
     }
 
-    const qrPayload = buildAdminCheckInUrl(qrToken, eventId)
     const templatePath = readString(record.invitation_template_path)
     const templateBucket = readString(record.invitation_template_bucket) || INVITATION_TEMPLATE_BUCKET
     const qrBox = readQrBox(record)
-    const accessCode = readString(record.access_code)
     const templateUrls: Array<{ source: TemplateUrlSource; url: string }> = []
 
     if (!templatePath) {
@@ -579,8 +584,10 @@ export default function GuestInvitation() {
           ? (data as GenerateGuestInvitationResult)
           : null
 
-      if (!result || (result.result !== 'generated' && result.result !== 'already_generated')) {
-        throw new Error(readString(result?.message) || 'No pudimos guardar tus datos. Intenta nuevamente.')
+      const resultStatus = readString(result?.result)
+
+      if (!result || !['ok', 'generated', 'already_generated'].includes(resultStatus)) {
+      throw new Error(readString(result?.message) || 'No pudimos guardar tus datos. Intenta nuevamente.')
       }
 
       setErrorMessage('')
@@ -607,7 +614,7 @@ export default function GuestInvitation() {
       }
 
       setInvitation(nextRecord)
-      setMessage(readString(result.message) || 'Entrada generada correctamente.')
+      setMessage('Entrada generada correctamente.')
     } catch (error) {
       warnGuestInvitationError('submit invitation form', error)
       setErrorMessage(getSafeGuestErrorMessage(error, 'No pudimos guardar tus datos. Intenta nuevamente.'))
