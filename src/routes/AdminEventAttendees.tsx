@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  ChevronDown,
   Check,
   Clipboard,
   Clock3,
+  Ban,
   Download,
   Edit3,
   Eye,
   History,
   ImagePlus,
   Loader2,
+  MoreVertical,
   QrCode,
+  RotateCcw,
   Save,
   Trash2,
   Upload,
@@ -136,6 +141,10 @@ const actionButtonVariants = {
     'border-onda-purple/35 bg-white/65 text-onda-purple hover:border-onda-purple hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
 }
 
+const ACTIONS_MENU_ESTIMATED_HEIGHT = 392
+const ACTIONS_MENU_GUTTER = 12
+const ACTIONS_MENU_WIDTH = 288
+
 type ActionButtonProps = {
   children: string
   disabled?: boolean
@@ -157,8 +166,51 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border px-3.5 py-2.5 font-display text-[0.64rem] font-bold uppercase leading-tight tracking-[0.12em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-50',
         actionButtonVariants[variant],
+      )}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
+  )
+}
+
+type ActionsMenuPosition = {
+  attendeeId: string
+  left: number
+  maxHeight: number
+  placement: 'bottom' | 'top'
+  top: number
+  width: number
+}
+
+type ActionsMenuItemProps = {
+  children: string
+  danger?: boolean
+  disabled?: boolean
+  icon: ReactNode
+  onClick: () => void
+}
+
+function ActionsMenuItem({
+  children,
+  danger = false,
+  disabled = false,
+  icon,
+  onClick,
+}: ActionsMenuItemProps) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45',
+        danger
+          ? 'text-red-700 hover:bg-red-500/10 dark:text-red-200'
+          : 'text-zinc-700 hover:bg-onda-purple/10 dark:text-onda-soft',
       )}
     >
       {icon}
@@ -332,11 +384,13 @@ function getCheckInStatusLabel(attendee: EventAttendee) {
 
 function getTicketStatus(attendee: EventAttendee) {
   const checkInStatus = readString(attendee.check_in_status)
+  const ticketStatus = readString(attendee.ticket_status)
 
   if (checkInStatus === 'checked_in' || attendee.checked_in_at) return 'used'
-  if (checkInStatus === 'cancelled') return 'cancelled'
+  if (checkInStatus === 'cancelled' || ticketStatus === 'cancelled') return 'cancelled'
+  if (ticketStatus === 'used') return hasLegalConsent(attendee) ? 'generated' : 'pending'
 
-  return readString(attendee.ticket_status) || 'pending'
+  return ticketStatus || 'pending'
 }
 
 function getTicketStatusLabel(attendee: EventAttendee) {
@@ -404,6 +458,7 @@ function qrInputValue(value: number) {
 
 export default function AdminEventAttendees() {
   const { eventId } = useParams<{ eventId: string }>()
+  const [actionsMenu, setActionsMenu] = useState<ActionsMenuPosition | null>(null)
   const [attendeeForm, setAttendeeForm] = useState<AttendeeFormState>(emptyAttendeeForm)
   const [attendees, setAttendees] = useState<EventAttendee[]>([])
   const [busyAction, setBusyAction] = useState<string | null>(null)
@@ -462,6 +517,49 @@ export default function AdminEventAttendees() {
   useEffect(() => {
     void loadAdminData()
   }, [loadAdminData])
+
+  useEffect(() => {
+    if (!actionsMenu) return
+
+    function handlePointerDown(pointerEvent: PointerEvent) {
+      const target = pointerEvent.target
+
+      if (!(target instanceof Element)) return
+      if (target.closest('[data-attendee-actions-menu]') || target.closest('[data-attendee-actions-trigger]')) return
+
+      setActionsMenu(null)
+    }
+
+    function closeActionsMenu() {
+      setActionsMenu(null)
+    }
+
+    function handleScroll(scrollEvent: Event) {
+      const target = scrollEvent.target
+
+      if (target instanceof Element && target.closest('[data-attendee-actions-menu]')) return
+
+      setActionsMenu(null)
+    }
+
+    function handleKeyDown(keyboardEvent: KeyboardEvent) {
+      if (keyboardEvent.key === 'Escape') {
+        setActionsMenu(null)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', closeActionsMenu)
+    window.addEventListener('scroll', handleScroll, true)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', closeActionsMenu)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [actionsMenu])
 
   useEffect(() => {
     const templatePath = eventRecord?.invitation_template_path
@@ -525,6 +623,35 @@ export default function AdminEventAttendees() {
   function resetMessages() {
     setErrorMessage('')
     setMessage('')
+  }
+
+  function toggleActionsMenu(attendeeId: string, trigger: HTMLButtonElement) {
+    setActionsMenu((currentMenu) => {
+      if (currentMenu?.attendeeId === attendeeId) return null
+
+      const rect = trigger.getBoundingClientRect()
+      const menuWidth = Math.min(ACTIONS_MENU_WIDTH, window.innerWidth - ACTIONS_MENU_GUTTER * 2)
+      const maxLeft = Math.max(ACTIONS_MENU_GUTTER, window.innerWidth - menuWidth - ACTIONS_MENU_GUTTER)
+      const left = Math.min(Math.max(ACTIONS_MENU_GUTTER, rect.right - menuWidth), maxLeft)
+      const spaceAbove = Math.max(0, rect.top - ACTIONS_MENU_GUTTER * 2)
+      const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - ACTIONS_MENU_GUTTER * 2)
+      const shouldOpenUp = spaceBelow < ACTIONS_MENU_ESTIMATED_HEIGHT && spaceAbove > spaceBelow
+      const availableHeight = shouldOpenUp ? spaceAbove : spaceBelow
+
+      return {
+        attendeeId,
+        left,
+        maxHeight: Math.max(96, Math.min(ACTIONS_MENU_ESTIMATED_HEIGHT, availableHeight)),
+        placement: shouldOpenUp ? 'top' : 'bottom',
+        top: shouldOpenUp ? rect.top - ACTIONS_MENU_GUTTER : rect.bottom + ACTIONS_MENU_GUTTER,
+        width: menuWidth,
+      }
+    })
+  }
+
+  function runActionsMenuAction(action: () => void) {
+    setActionsMenu(null)
+    action()
   }
 
   function resetAttendeeForm() {
@@ -1094,8 +1221,58 @@ export default function AdminEventAttendees() {
     }
   }
 
-  async function handleCancelTicket(attendee: EventAttendee) {
-    const confirmed = window.confirm(`Cancelar la entrada de ${getAttendeeName(attendee)}?`)
+  async function handleInvalidateTicket(attendee: EventAttendee) {
+    const confirmed = window.confirm(
+      `Desvalidar entrada de ${getAttendeeName(attendee)}? Quedará pendiente y podrá volver a escanearse.`,
+    )
+
+    if (!confirmed) return
+
+    resetMessages()
+    setBusyAction(`invalidate:${attendee.id}`)
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError) throw sessionError
+
+      const { error } = await supabase
+        .from('event_attendees')
+        .update({
+          check_in_status: 'pending',
+          checked_in_at: null,
+          checked_in_by: null,
+        })
+        .eq('id', attendee.id)
+
+      if (error) throw error
+
+      const { error: logError } = await supabase.from('check_in_logs').insert({
+        attendee_id: attendee.id,
+        event_id: attendee.event_id || eventId,
+        message: 'Entrada desvalidada desde gestion de asistentes.',
+        result: 'pending',
+        scanned_by: sessionData.session?.user.id ?? null,
+        token_scanned: readString(attendee.qr_token) || getAttendeeAccessCode(attendee) || attendee.id,
+      })
+
+      if (logError && import.meta.env.DEV) {
+        console.warn('[AdminEventAttendees] could not audit invalidate action', logError)
+      }
+
+      setMessage('Entrada desvalidada. El QR puede volver a escanearse.')
+      await loadAdminData()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleCancelInvitation(attendee: EventAttendee) {
+    const confirmed = window.confirm(
+      `Cancelar invitación de ${getAttendeeName(attendee)}? El QR dejará de validar y el historial se conservará.`,
+    )
 
     if (!confirmed) return
 
@@ -1107,13 +1284,52 @@ export default function AdminEventAttendees() {
         .from('event_attendees')
         .update({
           check_in_status: 'cancelled',
+          checked_in_at: null,
+          checked_in_by: null,
           ticket_status: 'cancelled',
         })
         .eq('id', attendee.id)
 
       if (error) throw error
 
-      setMessage('Entrada cancelada.')
+      setMessage('Invitacion cancelada. El QR ya no valida.')
+      await loadAdminData()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleDeleteAttendee(attendee: EventAttendee) {
+    const attendeeInvitations = invitations.filter((invitation) => invitation.attendee_id === attendee.id)
+    const confirmation = window.prompt(
+      `Eliminar asistente ${getAttendeeName(attendee)}? Esto eliminará su registro y ${attendeeInvitations.length} invitación(es) del historial. Escribe ELIMINAR para confirmar.`,
+    )
+
+    if (confirmation !== 'ELIMINAR') return
+
+    resetMessages()
+    setBusyAction(`delete-attendee:${attendee.id}`)
+
+    try {
+      const paths = attendeeInvitations.map((invitation) => readString(invitation.path)).filter(Boolean)
+
+      if (paths.length > 0) {
+        const { error: storageError } = await supabase.storage.from(GENERATED_INVITATIONS_BUCKET).remove(paths)
+
+        if (storageError) throw storageError
+      }
+
+      const { error } = await supabase.from('event_attendees').delete().eq('id', attendee.id)
+
+      if (error) throw error
+
+      if (historyAttendee?.id === attendee.id) {
+        setHistoryAttendee(null)
+      }
+
+      setMessage('Asistente eliminado.')
       await loadAdminData()
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
@@ -1158,6 +1374,13 @@ export default function AdminEventAttendees() {
     }
   }
 
+  const actionsMenuAttendee = actionsMenu
+    ? attendees.find((attendee) => attendee.id === actionsMenu.attendeeId) ?? null
+    : null
+  const isActionsMenuAttendeeValidated = actionsMenuAttendee
+    ? readString(actionsMenuAttendee.check_in_status) === 'checked_in' || Boolean(actionsMenuAttendee.checked_in_at)
+    : false
+
   if (!eventId) {
     return (
       <section className="py-20">
@@ -1171,7 +1394,7 @@ export default function AdminEventAttendees() {
   }
 
   return (
-    <section className="py-20">
+    <section className="pb-40 pt-20 sm:pb-44">
       <div className="onda-container">
         <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
           <SectionTitle
@@ -1517,7 +1740,7 @@ export default function AdminEventAttendees() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1420px] text-left text-sm">
+                    <table className="w-full min-w-[1180px] text-left text-sm">
                       <thead className="bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
                         <tr>
                           <th className="px-4 py-3">Asistente</th>
@@ -1534,6 +1757,7 @@ export default function AdminEventAttendees() {
                         {attendees.map((attendee) => {
                           const latestInvitation = latestInvitationByAttendeeId.get(attendee.id)
                           const accessCode = getAttendeeAccessCode(attendee)
+                          const isActionsMenuOpen = actionsMenu?.attendeeId === attendee.id
 
                           return (
                             <tr key={attendee.id}>
@@ -1608,14 +1832,21 @@ export default function AdminEventAttendees() {
                                     disabled={Boolean(busyAction)}
                                     variant="primary"
                                   >
-                                    Generar invitacion
+                                    Generar invitación
                                   </ActionButton>
                                   <ActionButton
                                     icon={<Download className="h-4 w-4" aria-hidden="true" />}
                                     onClick={() => handleDownloadLatest(attendee)}
                                     disabled={!latestInvitation || Boolean(busyAction)}
                                   >
-                                    Descargar ultima
+                                    Descargar última
+                                  </ActionButton>
+                                  <ActionButton
+                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                                    onClick={() => void handleCopyGuestInvitationLink(attendee)}
+                                    disabled={Boolean(busyAction)}
+                                  >
+                                    Copiar link invitación
                                   </ActionButton>
                                   <ActionButton
                                     icon={<History className="h-4 w-4" aria-hidden="true" />}
@@ -1623,59 +1854,22 @@ export default function AdminEventAttendees() {
                                   >
                                     Ver historial
                                   </ActionButton>
-                                  <ActionButton
-                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => void handleCopyAccessCode(attendee)}
-                                    disabled={Boolean(busyAction)}
+                                  <button
+                                    type="button"
+                                    data-attendee-actions-trigger
+                                    onClick={(clickEvent) => toggleActionsMenu(attendee.id, clickEvent.currentTarget)}
+                                    className={cn(
+                                      'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border px-3.5 py-2.5 font-display text-[0.64rem] font-bold uppercase leading-tight tracking-[0.12em] transition duration-300',
+                                      actionButtonVariants.ghost,
+                                      isActionsMenuOpen && 'border-onda-purple/45 bg-onda-purple/10',
+                                    )}
+                                    aria-expanded={isActionsMenuOpen}
+                                    aria-haspopup="menu"
                                   >
-                                    Copiar codigo
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => void handleCopyGuestInvitationLink(attendee)}
-                                    disabled={Boolean(busyAction)}
-                                  >
-                                    Copiar link invitacion
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => void handleCopyQrLink(attendee)}
-                                    disabled={Boolean(busyAction)}
-                                  >
-                                    Copiar link QR
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => void handleDownloadQrOnly(attendee)}
-                                    disabled={Boolean(busyAction)}
-                                  >
-                                    Descargar QR solo
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={<Edit3 className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => handleEditAttendee(attendee)}
-                                    variant="ghost"
-                                  >
-                                    Editar
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={
-                                      isBusy('cancel', attendee.id) ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                                      ) : (
-                                        <X className="h-4 w-4" aria-hidden="true" />
-                                      )
-                                    }
-                                    onClick={() => void handleCancelTicket(attendee)}
-                                    disabled={
-                                      Boolean(busyAction) ||
-                                      getTicketStatus(attendee) === 'cancelled' ||
-                                      getTicketStatus(attendee) === 'used'
-                                    }
-                                    variant="danger"
-                                  >
-                                    Cancelar entrada
-                                  </ActionButton>
+                                    <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                                    <span>Más acciones</span>
+                                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1694,6 +1888,83 @@ export default function AdminEventAttendees() {
           </div>
         )}
       </div>
+
+      {actionsMenu && actionsMenuAttendee && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              data-attendee-actions-menu
+              role="menu"
+              className={cn(
+                'fixed z-[90] overflow-y-auto rounded-lg border border-onda-purple/18 bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.24)] dark:bg-onda-black',
+                actionsMenu.placement === 'top' && '-translate-y-full',
+              )}
+              style={{
+                left: actionsMenu.left,
+                maxHeight: actionsMenu.maxHeight,
+                top: actionsMenu.top,
+                width: actionsMenu.width,
+              }}
+            >
+              <ActionsMenuItem
+                icon={<Edit3 className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => handleEditAttendee(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Editar
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleCopyAccessCode(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Copiar código
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleCopyQrLink(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Copiar link QR
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleDownloadQrOnly(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Descargar QR solo
+              </ActionsMenuItem>
+              <div className="my-2 h-px bg-onda-purple/12" />
+              <ActionsMenuItem
+                icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleInvalidateTicket(actionsMenuAttendee))}
+                disabled={Boolean(busyAction) || !isActionsMenuAttendeeValidated}
+              >
+                Desvalidar entrada
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Ban className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleCancelInvitation(actionsMenuAttendee))}
+                disabled={
+                  Boolean(busyAction) ||
+                  getTicketStatus(actionsMenuAttendee) === 'cancelled' ||
+                  getTicketStatus(actionsMenuAttendee) === 'used'
+                }
+                danger
+              >
+                Cancelar invitación
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleDeleteAttendee(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+                danger
+              >
+                Eliminar asistente
+              </ActionsMenuItem>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {historyAttendee ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/72 px-4 py-6 backdrop-blur-sm">

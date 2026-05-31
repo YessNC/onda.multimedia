@@ -5,7 +5,6 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import CTAButton from '../components/shared/CTAButton'
 import {
   DEFAULT_QR_BOX,
-  GENERATED_INVITATIONS_BUCKET,
   INVITATION_TEMPLATE_BUCKET,
   buildAdminCheckInUrl,
   buildAttendeeFullName,
@@ -38,6 +37,7 @@ type GuestInvitationRecord = {
   first_name?: string | null
   full_name?: string | null
   guest_type?: string | null
+  instagram_handle?: string | null
   invitation_expires_at?: string | null
   invitation_qr_height?: number | string | null
   invitation_qr_width?: number | string | null
@@ -62,9 +62,16 @@ type GuestInvitationRecord = {
 type GenerateGuestInvitationResult = {
   access_code?: string | null
   attendee_id?: string | null
+  email?: string | null
   event_id?: string | null
+  first_name?: string | null
+  full_name?: string | null
+  guest_type?: string | null
+  instagram_handle?: string | null
   invitation_token?: string | null
+  last_name?: string | null
   message?: string | null
+  phone?: string | null
   qr_token?: string | null
   result?: string | null
   ticket_generated_at?: string | null
@@ -76,6 +83,7 @@ type GuestFormState = {
   email: string
   firstName: string
   guestType: string
+  instagramHandle: string
   lastName: string
   legalAccepted: boolean
   phone: string
@@ -86,6 +94,7 @@ const emptyForm: GuestFormState = {
   email: '',
   firstName: '',
   guestType: '',
+  instagramHandle: '',
   lastName: '',
   legalAccepted: false,
   phone: '',
@@ -113,7 +122,7 @@ const rawOccupationOptions = [
   'Influencer',
   'Sonidista',
   'Maquillaje',
-  'Prensa', 
+  'Prensa',
   'Producción de Eventos',
   'Iluminación',
   'Manager (Stage, Tour, otros)',
@@ -121,7 +130,7 @@ const rawOccupationOptions = [
   'Otro',
 ]
 
-const occupationOptions = [...rawOccupationOptions].sort((first, second) => first.localeCompare(second, 'es'))
+const occupationOptions = Array.from(new Set(rawOccupationOptions)).sort((first, second) => first.localeCompare(second, 'es'))
 
 const inputClassName =
   'min-h-12 rounded-md border border-onda-purple/25 bg-white/7 px-4 py-3 text-sm text-white outline-none transition placeholder:text-onda-muted/65 focus:border-onda-lavender'
@@ -130,6 +139,42 @@ const labelClassName = 'grid gap-2 text-sm font-semibold text-onda-soft'
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return 'Ocurrió un error inesperado.'
+}
+
+function warnGuestInvitationError(context: string, error: unknown) {
+  if (import.meta.env.DEV) {
+    console.warn(`[GuestInvitation] ${context}`, error)
+  }
+}
+
+function isRpcNotFoundError(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase()
+  const status = typeof error === 'object' && error && 'status' in error ? Number((error as { status?: unknown }).status) : 0
+
+  return status === 404 || message.includes('could not find the function') || message.includes('schema cache')
+}
+
+function getSafeGuestErrorMessage(error: unknown, fallbackMessage: string) {
+  const message = getErrorMessage(error)
+  const normalized = message.toLowerCase()
+
+  if (
+    normalized.startsWith('este link') ||
+    normalized.startsWith('debes aceptar') ||
+    normalized.startsWith('ingresa') ||
+    normalized.startsWith('completa') ||
+    normalized.startsWith('esta entrada') ||
+    normalized.startsWith('no pudimos')
+  ) {
+    return message
+  }
+
+  return fallbackMessage
+}
+
+function normalizeInstagramHandle(value: string) {
+  const handle = value.trim().replace(/^@+/, '')
+  return handle ? `@${handle}` : ''
 }
 
 function formatDateTime(value?: string | null) {
@@ -159,11 +204,13 @@ function getTicketStatus(record: GuestInvitationRecord | null) {
   if (!record) return 'invalid'
 
   const checkInStatus = readString(record.check_in_status)
+  const ticketStatus = readString(record.ticket_status)
 
   if (checkInStatus === 'checked_in' || record.checked_in_at) return 'used'
-  if (checkInStatus === 'cancelled') return 'cancelled'
+  if (checkInStatus === 'cancelled' || ticketStatus === 'cancelled') return 'cancelled'
+  if (ticketStatus === 'used') return record.accepted_privacy && record.accepted_terms ? 'generated' : 'pending'
 
-  return readString(record.ticket_status) || 'pending'
+  return ticketStatus || 'pending'
 }
 
 function getTicketStatusLabel(status: string) {
@@ -180,6 +227,7 @@ function getFormStateFromInvitation(record: GuestInvitationRecord): GuestFormSta
     email: readString(record.email),
     firstName: readString(record.first_name),
     guestType: readString(record.guest_type),
+    instagramHandle: readString(record.instagram_handle),
     lastName: readString(record.last_name),
     legalAccepted: Boolean(record.accepted_privacy && record.accepted_terms),
     phone: readString(record.phone),
@@ -319,6 +367,7 @@ export default function GuestInvitation() {
   const [message, setMessage] = useState('')
   const [previewImageUrl, setPreviewImageUrl] = useState('')
   const [qrPreviewDataUrl, setQrPreviewDataUrl] = useState('')
+  const [ticketPreviewBlob, setTicketPreviewBlob] = useState<Blob | null>(null)
 
   const ticketStatus = getTicketStatus(invitation)
   const attendeeName = getAttendeeName(invitation)
@@ -351,7 +400,8 @@ export default function GuestInvitation() {
         setForm(getFormStateFromInvitation(record))
       }
     } catch (error) {
-      setErrorMessage(getErrorMessage(error))
+      warnGuestInvitationError('load invitation', error)
+      setErrorMessage(getSafeGuestErrorMessage(error, 'Este link no está disponible o expiró.'))
       setInvitation(null)
     } finally {
       setIsLoading(false)
@@ -368,30 +418,36 @@ export default function GuestInvitation() {
 
   useEffect(() => {
     let isMounted = true
+    let objectUrl = ''
 
     async function loadPreview() {
       setPreviewImageUrl('')
       setQrPreviewDataUrl('')
+      setTicketPreviewBlob(null)
 
-      if (!invitation?.qr_token || !invitation.event_id) return
+      if (!invitation?.qr_token || !invitation.event_id || !hasDownloadableTicket) return
 
       const qrPayload = buildAdminCheckInUrl(invitation.qr_token, invitation.event_id)
-      const latestPath = readString(invitation.latest_invitation_path)
-      const latestBucket = readString(invitation.latest_invitation_bucket) || GENERATED_INVITATIONS_BUCKET
 
-      if (latestPath) {
-        const { data, error } = await supabase.storage.from(latestBucket).createSignedUrl(latestPath, 300)
+      try {
+        const blob = await renderTicketBlob(invitation)
+        const nextObjectUrl = URL.createObjectURL(blob)
 
-        if (isMounted && !error && data?.signedUrl) {
-          setPreviewImageUrl(data.signedUrl)
+        if (!isMounted) {
+          URL.revokeObjectURL(nextObjectUrl)
           return
         }
-      }
 
-      const dataUrl = await createQrDataUrl(qrPayload, 768)
+        objectUrl = nextObjectUrl
+        setTicketPreviewBlob(blob)
+        setPreviewImageUrl(nextObjectUrl)
+      } catch (error) {
+        warnGuestInvitationError('render local ticket preview', error)
+        const dataUrl = await createQrDataUrl(qrPayload, 768)
 
-      if (isMounted) {
-        setQrPreviewDataUrl(dataUrl)
+        if (isMounted) {
+          setQrPreviewDataUrl(dataUrl)
+        }
       }
     }
 
@@ -399,8 +455,11 @@ export default function GuestInvitation() {
 
     return () => {
       isMounted = false
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+      }
     }
-  }, [invitation?.event_id, invitation?.latest_invitation_bucket, invitation?.latest_invitation_path, invitation?.qr_token])
+  }, [hasDownloadableTicket, invitation])
 
   const guestTypeOptions = useMemo(() => {
     if (!form.guestType || occupationOptions.includes(form.guestType)) return occupationOptions
@@ -437,55 +496,71 @@ export default function GuestInvitation() {
       const { data, error } = await supabase.storage.from(templateBucket).createSignedUrl(templatePath, 60)
 
       if (!error && data?.signedUrl) {
-        return renderInvitationPng({
-          accessCode: readString(record.access_code),
-          qrBox: readQrBox(record),
-          qrPayload,
-          templateUrl: data.signedUrl,
-        })
+        try {
+          return await renderInvitationPng({
+            accessCode: readString(record.access_code),
+            qrBox: readQrBox(record),
+            qrPayload,
+            templateUrl: data.signedUrl,
+          })
+        } catch (error) {
+          warnGuestInvitationError('render invitation template', error)
+        }
       }
     }
 
     return renderFallbackTicketPng(record, qrPayload)
   }
 
-  async function storeGuestTicket(record: GuestInvitationRecord) {
-    const blob = await renderTicketBlob(record)
-    const fileName = buildInvitationFileName({
+  async function submitGuestInvitationForm() {
+    const submitPayload = {
+      p_community_consent: form.communityConsent,
+      p_email: form.email.trim(),
+      p_first_name: form.firstName.trim(),
+      p_instagram_handle: normalizeInstagramHandle(form.instagramHandle),
+      p_invitation_token: invitation?.invitation_token ?? invitationToken,
+      p_last_name: form.lastName.trim(),
+      p_occupation: form.guestType.trim(),
+      p_phone: form.phone.trim(),
+      p_privacy_accepted: form.legalAccepted,
+      p_terms_accepted: form.legalAccepted,
+      p_user_agent: navigator.userAgent,
+    }
+
+    const { data, error } = await supabase.rpc('submit_guest_invitation', submitPayload)
+
+    if (!error) return data
+
+    if (!isRpcNotFoundError(error)) throw error
+
+    warnGuestInvitationError('submit_guest_invitation not found, using legacy generate_guest_invitation', error)
+
+    const { data: legacyData, error: legacyError } = await supabase.rpc('generate_guest_invitation', {
+      p_accepted_privacy: form.legalAccepted,
+      p_accepted_terms: form.legalAccepted,
+      p_community_consent: form.communityConsent,
+      p_email: form.email.trim(),
+      p_first_name: form.firstName.trim(),
+      p_guest_type: form.guestType.trim(),
+      p_invitation_token: invitation?.invitation_token ?? invitationToken,
+      p_last_name: form.lastName.trim(),
+      p_phone: form.phone.trim(),
+      p_user_agent: navigator.userAgent,
+    })
+
+    if (legacyError) throw legacyError
+
+    return legacyData
+  }
+
+  function buildGuestTicketFileName(record: GuestInvitationRecord) {
+    return buildInvitationFileName({
       accessCode: record.access_code,
       firstName: record.first_name,
       fullName: getAttendeeName(record),
       lastName: record.last_name,
       qrToken: record.qr_token,
     })
-    const storagePath = `guest-links/${record.invitation_token}/entrada.png`
-    const qrPayload = buildAdminCheckInUrl(readString(record.qr_token), record.event_id)
-    const qrBox = readQrBox(record)
-
-    const { error: uploadError } = await supabase.storage.from(GENERATED_INVITATIONS_BUCKET).upload(storagePath, blob, {
-      contentType: 'image/png',
-      upsert: true,
-    })
-
-    if (uploadError) throw uploadError
-
-    const { error: recordError } = await supabase.rpc('record_guest_generated_invitation', {
-      p_file_name: fileName,
-      p_invitation_token: record.invitation_token,
-      p_path: storagePath,
-      p_qr_height: qrBox.height,
-      p_qr_payload: qrPayload,
-      p_qr_width: qrBox.width,
-      p_qr_x: qrBox.x,
-      p_qr_y: qrBox.y,
-      p_size_bytes: blob.size,
-      p_template_bucket: readString(record.invitation_template_bucket) || INVITATION_TEMPLATE_BUCKET,
-      p_template_path: readString(record.invitation_template_path),
-    })
-
-    if (recordError) throw recordError
-
-    return { blob, fileName, path: storagePath }
   }
 
   async function handleGenerateTicket(formEvent: FormEvent<HTMLFormElement>) {
@@ -504,25 +579,11 @@ export default function GuestInvitation() {
     setIsGenerating(true)
 
     try {
-      const { data, error } = await supabase.rpc('generate_guest_invitation', {
-        p_accepted_privacy: form.legalAccepted,
-        p_accepted_terms: form.legalAccepted,
-        p_community_consent: form.communityConsent,
-        p_email: form.email.trim(),
-        p_first_name: form.firstName.trim(),
-        p_guest_type: form.guestType.trim(),
-        p_invitation_token: invitation.invitation_token,
-        p_last_name: form.lastName.trim(),
-        p_phone: form.phone.trim(),
-        p_user_agent: navigator.userAgent,
-      })
-
-      if (error) throw error
-
+      const data = await submitGuestInvitationForm()
       const result = Array.isArray(data) ? (data[0] as GenerateGuestInvitationResult | undefined) : null
 
       if (!result || (result.result !== 'generated' && result.result !== 'already_generated')) {
-        throw new Error(readString(result?.message) || 'No pudimos generar la entrada.')
+        throw new Error(readString(result?.message) || 'No pudimos guardar tus datos. Intenta nuevamente.')
       }
 
       const nextRecord: GuestInvitationRecord = {
@@ -532,23 +593,26 @@ export default function GuestInvitation() {
         access_code: result.access_code ?? invitation.access_code,
         attendee_id: result.attendee_id ?? invitation.attendee_id,
         community_consent: form.communityConsent,
-        email: form.email.trim(),
+        email: result.email ?? form.email.trim(),
         event_id: result.event_id ?? invitation.event_id,
-        first_name: form.firstName.trim(),
-        full_name: buildAttendeeFullName(form.firstName.trim(), form.lastName.trim()),
-        guest_type: form.guestType.trim(),
-        last_name: form.lastName.trim(),
-        phone: form.phone.trim(),
+        first_name: result.first_name ?? form.firstName.trim(),
+        full_name: result.full_name ?? buildAttendeeFullName(form.firstName.trim(), form.lastName.trim()),
+        guest_type: result.guest_type ?? form.guestType.trim(),
+        instagram_handle: result.instagram_handle ?? normalizeInstagramHandle(form.instagramHandle),
+        last_name: result.last_name ?? form.lastName.trim(),
+        phone: result.phone ?? form.phone.trim(),
         qr_token: result.qr_token ?? invitation.qr_token,
         ticket_generated_at: result.ticket_generated_at ?? new Date().toISOString(),
         ticket_status: 'generated',
       }
 
-      await storeGuestTicket(nextRecord)
+      // TODO: Persist public-generated tickets through an Edge Function with service_role, never from anon.
+      setInvitation(nextRecord)
       setMessage(readString(result.message) || 'Entrada generada correctamente.')
       await loadInvitation()
     } catch (error) {
-      setErrorMessage(getErrorMessage(error))
+      warnGuestInvitationError('submit invitation form', error)
+      setErrorMessage(getSafeGuestErrorMessage(error, 'No pudimos guardar tus datos. Intenta nuevamente.'))
     } finally {
       setIsGenerating(false)
     }
@@ -562,37 +626,14 @@ export default function GuestInvitation() {
     setIsDownloading(true)
 
     try {
-      const latestPath = readString(invitation.latest_invitation_path)
-      const latestBucket = readString(invitation.latest_invitation_bucket) || GENERATED_INVITATIONS_BUCKET
-
-      if (latestPath) {
-        const { data, error } = await supabase.storage.from(latestBucket).download(latestPath)
-
-        if (!error && data) {
-          downloadBlob(data, readString(invitation.latest_invitation_file_name) || 'entrada-onda.png')
-          await supabase.rpc('mark_guest_invitation_downloaded', {
-            p_invitation_token: invitation.invitation_token,
-            p_path: latestPath,
-          })
-
-          setMessage('Entrada descargada.')
-          await loadInvitation()
-          return
-        }
-      }
-
-      const { blob, fileName, path } = await storeGuestTicket(invitation)
+      const blob = ticketPreviewBlob ?? (await renderTicketBlob(invitation))
+      const fileName = buildGuestTicketFileName(invitation)
 
       downloadBlob(blob, fileName)
-      await supabase.rpc('mark_guest_invitation_downloaded', {
-        p_invitation_token: invitation.invitation_token,
-        p_path: path,
-      })
-
       setMessage('Entrada descargada.')
-      await loadInvitation()
     } catch (error) {
-      setErrorMessage(getErrorMessage(error))
+      warnGuestInvitationError('download ticket', error)
+      setErrorMessage(getSafeGuestErrorMessage(error, 'No pudimos generar la entrada. Intenta nuevamente o contacta a producción.'))
     } finally {
       setIsDownloading(false)
     }
@@ -801,6 +842,18 @@ export default function GuestInvitation() {
                   className={inputClassName}
                   autoComplete="tel"
                   required
+                />
+              </label>
+
+              <label className={labelClassName}>
+                Instagram opcional
+                <input
+                  type="text"
+                  value={form.instagramHandle}
+                  onChange={(inputEvent) => setForm((current) => ({ ...current, instagramHandle: inputEvent.target.value }))}
+                  className={inputClassName}
+                  autoComplete="off"
+                  placeholder="@usuario"
                 />
               </label>
 
