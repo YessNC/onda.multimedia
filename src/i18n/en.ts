@@ -203,7 +203,7 @@ export default {
   'admin.login-title': 'Administrator access',
   'admin.login-description': 'Secure access for ONDA Multimedia administrators.',
   'admin.events-title': 'Visual event management',
-  'admin.events-description': 'Non-functional structure prepared for future CRUD, image upload and Supabase connection.',
+  'admin.events-description': 'Supabase-connected events with attendee, QR and invitation access.',
 
   // Admin Form
   'admin-form.email': 'Email',

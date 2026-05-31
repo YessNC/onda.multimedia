@@ -2,11 +2,11 @@ import { Pagination } from 'swiper/modules'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/css'
 import 'swiper/css/pagination'
-import { placeholderEvents, type PlaceholderEvent } from '../../data/placeholderEvents'
-import EventCard from './EventCard'
+import { placeholderEvents } from '../../data/placeholderEvents'
+import EventCard, { type EventCardData } from './EventCard'
 
 type EventsCarouselProps = {
-  events?: PlaceholderEvent[]
+  events?: EventCardData[]
 }
 
 export default function EventsCarousel({ events }: EventsCarouselProps) {

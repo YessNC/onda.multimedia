@@ -3,11 +3,11 @@ import { useI18n } from '../hooks/useI18n'
 import EventsCarousel from '../components/events/EventsCarousel'
 import GlowCard from '../components/shared/GlowCard'
 import SectionTitle from '../components/shared/SectionTitle'
-import { placeholderEvents } from '../data/placeholderEvents'
+import { usePublicEvents } from '../hooks/usePublicEvents'
 
 export default function Eventos() {
   const { t } = useI18n()
-  const publishedEvents = placeholderEvents.filter((event) => event.isPublished)
+  const { errorMessage, events: publishedEvents, isLoading } = usePublicEvents()
 
   return (
     <section className="py-20">
@@ -18,7 +18,11 @@ export default function Eventos() {
           subtitle={t('events.description')}
         />
 
-        {publishedEvents.length > 0 ? (
+        {isLoading ? (
+          <GlowCard className="mt-10 border-dashed border-onda-purple/35 text-center">
+            <p className="text-sm font-semibold text-zinc-600 dark:text-onda-muted">Cargando eventos...</p>
+          </GlowCard>
+        ) : publishedEvents.length > 0 ? (
           <div className="mt-10">
             <EventsCarousel events={publishedEvents} />
           </div>
@@ -31,6 +35,9 @@ export default function Eventos() {
               <h3 className="font-display text-lg font-bold uppercase tracking-[0.16em] text-zinc-950 dark:text-white">
                 {t('events.empty')}
               </h3>
+              {errorMessage ? (
+                <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-onda-muted">{errorMessage}</p>
+              ) : null}
             </div>
           </GlowCard>
         )}

@@ -1,15 +1,15 @@
 import { ArrowRight } from 'lucide-react'
-import { placeholderEvents } from '../../data/placeholderEvents'
 import EventsCarousel from '../events/EventsCarousel'
 import CTAButton from '../shared/CTAButton'
 import SectionTitle from '../shared/SectionTitle'
 import { useI18n } from '../../hooks/useI18n'
+import { usePublicEvents } from '../../hooks/usePublicEvents'
 
 export default function EventsPreviewSection() {
   const { t } = useI18n()
-  const publishedEvents = placeholderEvents.filter((event) => event.isPublished)
+  const { events: publishedEvents, isLoading } = usePublicEvents(6)
 
-  if (publishedEvents.length === 0) {
+  if (isLoading || publishedEvents.length === 0) {
     return null
   }
 

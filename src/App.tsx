@@ -7,6 +7,8 @@ import FloatingAssistant from './components/shared/FloatingAssistant'
 import PersistentSpotifyPlayer from './components/shared/PersistentSpotifyPlayer'
 import SpotifyPlayerProvider from './components/shared/SpotifyPlayerProvider'
 import ProtectedAdminRoute from './components/admin/ProtectedAdminRoute'
+import AdminCheckIn from './routes/AdminCheckIn'
+import AdminEventAttendees from './routes/AdminEventAttendees'
 import AdminPanel from './routes/AdminPanel'
 import AdminEventos from './routes/AdminEventos'
 import AdminLogin from './routes/AdminLogin'
@@ -56,6 +58,22 @@ function App() {
                 element={
                   <ProtectedAdminRoute>
                     <AdminEventos />
+                  </ProtectedAdminRoute>
+                }
+              />
+              <Route
+                path="/admin/eventos/:eventId/asistentes"
+                element={
+                  <ProtectedAdminRoute>
+                    <AdminEventAttendees />
+                  </ProtectedAdminRoute>
+                }
+              />
+              <Route
+                path="/admin/check-in"
+                element={
+                  <ProtectedAdminRoute>
+                    <AdminCheckIn />
                   </ProtectedAdminRoute>
                 }
               />

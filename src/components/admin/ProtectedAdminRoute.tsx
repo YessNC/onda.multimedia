@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 
 type ProtectedAdminRouteProps = {
   children: ReactNode
 }
 
+const adminInactivityLimitMs = 30 * 60 * 1000
+const adminActivityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'] as const
+
 export default function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
+  const navigate = useNavigate()
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const inactivityTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -35,6 +40,50 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
       subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined
+
+    let isMounted = true
+
+    function clearInactivityTimer() {
+      if (inactivityTimerRef.current) {
+        window.clearTimeout(inactivityTimerRef.current)
+        inactivityTimerRef.current = null
+      }
+    }
+
+    async function closeInactiveSession() {
+      clearInactivityTimer()
+      await supabase.auth.signOut()
+
+      if (isMounted) {
+        navigate('/admin/login?reason=inactive', { replace: true })
+      }
+    }
+
+    function resetInactivityTimer() {
+      clearInactivityTimer()
+      inactivityTimerRef.current = window.setTimeout(() => {
+        void closeInactiveSession()
+      }, adminInactivityLimitMs)
+    }
+
+    resetInactivityTimer()
+
+    for (const eventName of adminActivityEvents) {
+      window.addEventListener(eventName, resetInactivityTimer, { passive: true })
+    }
+
+    return () => {
+      isMounted = false
+      clearInactivityTimer()
+
+      for (const eventName of adminActivityEvents) {
+        window.removeEventListener(eventName, resetInactivityTimer)
+      }
+    }
+  }, [isAuthenticated, navigate])
 
   if (isCheckingSession) {
     return (

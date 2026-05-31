@@ -39,14 +39,14 @@ export default function CTAButton({
   variant = 'primary',
 }: CTAButtonProps) {
   const buttonClassName = cn(
-    'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 py-3 text-center font-display text-xs font-bold uppercase tracking-[0.18em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-60',
+    'inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-md px-5 py-3 text-center font-display text-xs font-bold uppercase tracking-[0.18em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-60',
     variants[variant],
     className,
   )
   const content = (
     <>
       {icon}
-      <span>{children}</span>
+      <span className="min-w-0 break-words">{children}</span>
     </>
   )
 
