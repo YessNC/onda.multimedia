@@ -4,6 +4,7 @@ export type EventStatus = 'draft' | 'upcoming' | 'archived' | 'cancelled'
 export type EventVisibility = 'public' | 'private'
 
 export type EventRecord = Record<string, unknown> & {
+  collaboration?: string | null
   cover_image_path?: string | null
   id: string
   deleted_at?: string | null
@@ -13,6 +14,8 @@ export type EventRecord = Record<string, unknown> & {
   is_published?: boolean | null
   location?: string | null
   published_at?: string | null
+  producer?: string | null
+  producer_name?: string | null
   qr_checkin_enabled?: boolean | null
   status?: string | null
   ticket_button_enabled?: boolean | null
@@ -23,6 +26,7 @@ export type EventRecord = Record<string, unknown> & {
 }
 
 export const DEFAULT_TICKET_LABEL = 'Comprar entradas'
+export const DEFAULT_EVENT_PRODUCER = 'ONDA Multimedia x Martes de Alika'
 export const EVENT_IMAGES_BUCKET = 'event-images'
 
 export const eventStatusOptions: Array<{ label: string; value: EventStatus }> = [
@@ -48,7 +52,7 @@ const publicEventStatusLabels: Record<EventStatus, string> = {
   archived: 'Archivo',
   cancelled: 'Cancelado',
   draft: 'Borrador',
-  upcoming: 'Proximo',
+  upcoming: 'Próximo',
 }
 
 export function readString(value: unknown) {
@@ -150,6 +154,33 @@ export function getEventVisibility(event: Record<string, unknown> | null | undef
 
 export function getEventVisibilityLabel(event: Record<string, unknown> | null | undefined) {
   return getEventVisibility(event) === 'public' ? 'Publico' : 'Privado'
+}
+
+export function getPublicEventVisibilityBadgeLabel(event: Record<string, unknown> | null | undefined) {
+  return getEventVisibility(event) === 'public' ? 'Evento público' : 'Solo con invitación directa'
+}
+
+export function getEventProducerName(event: Record<string, unknown> | null | undefined) {
+  if (!event) return DEFAULT_EVENT_PRODUCER
+
+  return (
+    readFirstText(event, [
+      'producer',
+      'producer_name',
+      'produced_by',
+      'collaboration',
+      'collaborator',
+      'partner',
+      'host',
+      'organizer',
+      'presented_by',
+    ]) || DEFAULT_EVENT_PRODUCER
+  )
+}
+
+export function getEventDetailPath(event: Record<string, unknown> | null | undefined) {
+  const id = readString(event?.id)
+  return id ? `/eventos/${encodeURIComponent(id)}` : '/eventos'
 }
 
 export function isEventDeleted(event: Record<string, unknown> | null | undefined) {

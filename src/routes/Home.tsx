@@ -8,8 +8,8 @@ export default function Home() {
     <>
       <HeroSlider />
       <CasaMatrizSection />
-      <ArtistSpotifySection />
       <EventsPreviewSection />
+      <ArtistSpotifySection />
     </>
   )
 }

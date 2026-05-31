@@ -16,6 +16,7 @@ import AdminResetPassword from './routes/AdminResetPassword'
 import Artistas from './routes/Artistas'
 import Contacto from './routes/Contacto'
 import Eventos from './routes/Eventos'
+import EventoDetalle from './routes/EventoDetalle'
 import Home from './routes/Home'
 import Servicios from './routes/Servicios'
 
@@ -42,6 +43,7 @@ function App() {
               <Route path="/artistas" element={<Artistas />} />
               <Route path="/servicios" element={<Servicios />} />
               <Route path="/eventos" element={<Eventos />} />
+              <Route path="/eventos/:eventId" element={<EventoDetalle />} />
               <Route path="/contacto" element={<Contacto />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/reset-password" element={<AdminResetPassword />} />

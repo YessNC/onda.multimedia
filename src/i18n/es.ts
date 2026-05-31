@@ -84,7 +84,7 @@ export default {
   // Events Preview Section
   'events-preview.eyebrow': 'Eventos',
   'events-preview.title': 'Cartelera preparada',
-  'events-preview.description': 'Una primera vista para futuros eventos, registros y llamados a cotizacion.',
+  'events-preview.description': 'Eventos, lanzamientos y experiencias producidas desde la casa ONDA.',
   'events-preview.cta': 'Ver cartelera',
 
   // Events Route
@@ -92,7 +92,7 @@ export default {
   'events.title': 'Cartelera ONDA',
   'events.description': 'Fechas y experiencias oficiales de ONDA MULTIMEDIA.',
   'events.empty': 'Pronto anunciaremos nuevas fechas.',
-  'events.upcoming': 'Proximo',
+  'events.upcoming': 'Próximo',
   'events.archive': 'Archivo',
 
   // Event Placeholders

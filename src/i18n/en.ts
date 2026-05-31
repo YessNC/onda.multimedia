@@ -84,7 +84,7 @@ export default {
   // Events Preview Section
   'events-preview.eyebrow': 'Events',
   'events-preview.title': 'Event Calendar Ready',
-  'events-preview.description': 'A first look at upcoming events, records and quotation calls.',
+  'events-preview.description': 'Events, launches and experiences produced from the ONDA house.',
   'events-preview.cta': 'View calendar',
 
   // Events Route

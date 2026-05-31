@@ -14,21 +14,23 @@ export default function EventsPreviewSection() {
   }
 
   return (
-    <section className="py-20">
+    <section className="relative overflow-hidden py-20 sm:py-24">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-onda-purple/45 to-transparent"
+      />
       <div className="onda-container">
-        <div className="rounded-[2rem] border border-white/20 bg-white/80 p-8 shadow-[0_30px_80px_rgba(123,44,255,0.08)] backdrop-blur-3xl dark:border-onda-purple/20 dark:bg-onda-black/70 dark:shadow-[0_30px_90px_rgba(123,44,255,0.2)]">
-          <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-            <SectionTitle
-              eyebrow={t('events-preview.eyebrow')}
-              title={t('events-preview.title')}
-              subtitle={t('events-preview.description')}
-            />
-            <CTAButton to="/eventos" variant="secondary" icon={<ArrowRight className="h-4 w-4" />} className="sm:mb-1">
-              {t('events-preview.cta')}
-            </CTAButton>
-          </div>
-          <EventsCarousel events={publishedEvents} />
+        <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <SectionTitle
+            eyebrow={t('events-preview.eyebrow')}
+            title={t('events-preview.title')}
+            subtitle={t('events-preview.description')}
+          />
+          <CTAButton to="/eventos" variant="secondary" icon={<ArrowRight className="h-4 w-4" />} className="sm:mb-1">
+            {t('events-preview.cta')}
+          </CTAButton>
         </div>
+        <EventsCarousel events={publishedEvents} />
       </div>
     </section>
   )
