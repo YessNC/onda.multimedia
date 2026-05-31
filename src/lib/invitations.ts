@@ -34,6 +34,7 @@ type InvitationStoragePathInput = InvitationFileNameInput & {
 
 type InvitationRenderInput = {
   accessCode?: string
+  onTemplateLoaded?: (size: { height: number; naturalHeight: number; naturalWidth: number; width: number }) => void
   qrBox: InvitationQrBox
   qrPayload: string
   templateUrl: string
@@ -156,26 +157,54 @@ export function getAccessCodePlacement(canvasWidth: number, canvasHeight: number
   }
 }
 
-function loadImage(src: string) {
+function loadImage(src: string, errorMessage: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
+    let settled = false
 
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('No pudimos cargar la imagen para la invitacion.'))
+    const rejectOnce = (error: unknown) => {
+      if (settled) return
+      settled = true
+
+      const nextError = new Error(errorMessage)
+      ;(nextError as Error & { cause?: unknown }).cause = error
+      reject(nextError)
+    }
+
+    const resolveOnce = () => {
+      if (settled) return
+      settled = true
+      resolve(image)
+    }
+
+    image.onload = () => {
+      if (typeof image.decode !== 'function') {
+        resolveOnce()
+        return
+      }
+
+      image.decode().then(resolveOnce).catch(rejectOnce)
+    }
+    image.onerror = rejectOnce
+    image.crossOrigin = 'anonymous'
     image.src = src
   })
 }
 
 function canvasToPngBlob(canvas: HTMLCanvasElement) {
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('No pudimos exportar la invitacion como PNG.'))
-        return
-      }
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('No pudimos exportar la invitacion como PNG.'))
+          return
+        }
 
-      resolve(blob)
-    }, 'image/png')
+        resolve(blob)
+      }, 'image/png')
+    } catch (error) {
+      reject(error)
+    }
   })
 }
 
@@ -212,39 +241,43 @@ function drawAccessCode(context: CanvasRenderingContext2D, canvas: HTMLCanvasEle
   context.restore()
 }
 
-export async function renderInvitationPng({ accessCode = '', qrBox, qrPayload, templateUrl }: InvitationRenderInput) {
-  const templateResponse = await fetch(templateUrl)
+export async function renderInvitationPng({
+  accessCode = '',
+  onTemplateLoaded,
+  qrBox,
+  qrPayload,
+  templateUrl,
+}: InvitationRenderInput) {
+  const templateImage = await loadImage(templateUrl, 'No pudimos cargar la plantilla de la entrada.')
+  const qrDataUrl = await createQrDataUrl(qrPayload, Math.max(qrBox.width, qrBox.height) * 2)
+  const qrImage = await loadImage(qrDataUrl, 'No pudimos cargar el QR para la entrada.')
+  const canvas = document.createElement('canvas')
+  const width = templateImage.naturalWidth || templateImage.width
+  const height = templateImage.naturalHeight || templateImage.height
+  const context = canvas.getContext('2d')
 
-  if (!templateResponse.ok) {
-    throw new Error('No pudimos descargar la plantilla de invitacion.')
+  if (!context) {
+    throw new Error('Canvas no esta disponible en este navegador.')
   }
 
-  const templateBlob = await templateResponse.blob()
-  const templateObjectUrl = URL.createObjectURL(templateBlob)
-
-  try {
-    const templateImage = await loadImage(templateObjectUrl)
-    const qrDataUrl = await createQrDataUrl(qrPayload, Math.max(qrBox.width, qrBox.height) * 2)
-    const qrImage = await loadImage(qrDataUrl)
-    const canvas = document.createElement('canvas')
-    const width = templateImage.naturalWidth || templateImage.width
-    const height = templateImage.naturalHeight || templateImage.height
-    const context = canvas.getContext('2d')
-
-    if (!context) {
-      throw new Error('Canvas no esta disponible en este navegador.')
-    }
-
-    canvas.width = width
-    canvas.height = height
-    context.drawImage(templateImage, 0, 0, width, height)
-    context.drawImage(qrImage, qrBox.x, qrBox.y, qrBox.width, qrBox.height)
-    drawAccessCode(context, canvas, accessCode)
-
-    return canvasToPngBlob(canvas)
-  } finally {
-    URL.revokeObjectURL(templateObjectUrl)
+  if (!width || !height) {
+    throw new Error('La plantilla de la entrada no tiene dimensiones validas.')
   }
+
+  onTemplateLoaded?.({
+    height: templateImage.height,
+    naturalHeight: templateImage.naturalHeight,
+    naturalWidth: templateImage.naturalWidth,
+    width: templateImage.width,
+  })
+
+  canvas.width = width
+  canvas.height = height
+  context.drawImage(templateImage, 0, 0, width, height)
+  context.drawImage(qrImage, qrBox.x, qrBox.y, qrBox.width, qrBox.height)
+  drawAccessCode(context, canvas, accessCode)
+
+  return canvasToPngBlob(canvas)
 }
 
 export function downloadBlob(blob: Blob, fileName: string) {
