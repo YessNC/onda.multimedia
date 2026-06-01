@@ -9,12 +9,13 @@ export type CommunityCsvAttendee = Record<string, unknown> & {
   email?: string | null
   first_name?: string | null
   full_name?: string | null
+  generated_at?: string | null
   guest_type?: string | null
   instagram_handle?: string | null
-  invitation_generated_at?: string | null
   last_name?: string | null
   phone?: string | null
   ticket_generated_at?: string | null
+  updated_at?: string | null
 }
 
 export type CommunityCsvContact = {
@@ -138,8 +139,8 @@ function getDateSubscribed(attendee: CommunityCsvAttendee) {
     attendee.community_consent_at ||
       attendee.created_at ||
       attendee.ticket_generated_at ||
-      attendee.invitation_generated_at ||
-      attendee.consent_at,
+      attendee.generated_at ||
+      attendee.updated_at,
   )
 }
 
