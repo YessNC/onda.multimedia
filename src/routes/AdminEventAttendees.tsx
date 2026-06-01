@@ -202,6 +202,11 @@ type ActionsMenuPosition = {
 
 type TicketStatusFilter = 'all' | 'generated' | 'used'
 
+const ALL_ATTENDEES_FILTER = 'all_attendees' as const
+const COMMUNITY_CSV_DEFAULT_FILTER: CommunityFilter = 'all'
+
+type AttendeeScopeFilter = typeof ALL_ATTENDEES_FILTER | CommunityFilter
+
 type ActionsMenuItemProps = {
   children: string
   danger?: boolean
@@ -484,7 +489,7 @@ export default function AdminEventAttendees() {
   const [eventRecord, setEventRecord] = useState<AdminEvent | null>(null)
   const [historyAttendee, setHistoryAttendee] = useState<EventAttendee | null>(null)
   const [invitations, setInvitations] = useState<GeneratedInvitation[]>([])
-  const [communityFilter, setCommunityFilter] = useState<CommunityFilter>('all')
+  const [communityFilter, setCommunityFilter] = useState<AttendeeScopeFilter>(ALL_ATTENDEES_FILTER)
   const [isExportingCommunityCsv, setIsExportingCommunityCsv] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingAttendee, setIsSavingAttendee] = useState(false)
@@ -682,7 +687,10 @@ export default function AdminEventAttendees() {
     [attendees],
   )
   const communityFilteredAttendees = useMemo(
-    () => attendees.filter((attendee) => matchesCommunityFilter(attendee, communityFilter)),
+    () =>
+      communityFilter === ALL_ATTENDEES_FILTER
+        ? attendees
+        : attendees.filter((attendee) => matchesCommunityFilter(attendee, communityFilter)),
     [attendees, communityFilter],
   )
   const ticketStats = useMemo(
@@ -767,7 +775,7 @@ export default function AdminEventAttendees() {
         .eq('community_consent', true)
 
       if (filter === 'pending') {
-        attendeeQuery = attendeeQuery.eq('community_welcome_sent', false)
+        attendeeQuery = attendeeQuery.or('community_welcome_sent.eq.false,community_welcome_sent.is.null')
       }
 
       if (filter === 'sent') {
@@ -798,17 +806,21 @@ export default function AdminEventAttendees() {
     setIsExportingCommunityCsv(true)
 
     try {
-      const communityAttendees = await fetchCommunityAttendeesForCsv(communityFilter)
+      const csvFilter: CommunityFilter =
+        communityFilter === ALL_ATTENDEES_FILTER ? COMMUNITY_CSV_DEFAULT_FILTER : communityFilter
+      const communityAttendees = await fetchCommunityAttendeesForCsv(csvFilter)
       const { contactCount, csv } = buildCommunityCsv(communityAttendees)
+      const csvLabel =
+        communityFilterOptions.find((option) => option.value === csvFilter)?.label ?? 'Comunidad'
 
       if (contactCount === 0) {
-        setMessage(`No hay contactos para exportar en "${communityFilterOptions.find((option) => option.value === communityFilter)?.label ?? 'Comunidad'}"`)
+        setMessage(`No hay contactos para exportar en "${csvLabel}"`)
         return
       }
 
       const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
 
-      downloadBlob(csvBlob, buildCommunityCsvFileName(new Date(), communityFilterFileLabels[communityFilter]))
+      downloadBlob(csvBlob, buildCommunityCsvFileName(new Date(), communityFilterFileLabels[csvFilter]))
       setMessage(`${contactCount} contactos de comunidad exportados.`)
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
@@ -1963,7 +1975,7 @@ export default function AdminEventAttendees() {
                         Gestion de asistentes
                       </h3>
                       <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
-                        {attendees.length} asistentes registrados - {communityFilteredAttendees.length} visibles en comunidad
+                        {attendees.length} asistentes registrados - {communityStats.all} en comunidad - {communityFilteredAttendees.length} visibles
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
@@ -1974,13 +1986,19 @@ export default function AdminEventAttendees() {
                         id="community-csv-scope"
                         value={communityFilter}
                         onChange={(selectEvent) => {
-                          setCommunityFilter(selectEvent.target.value as CommunityFilter)
+                          setCommunityFilter(selectEvent.target.value as AttendeeScopeFilter)
                           setActionsMenu(null)
                         }}
                         disabled={isExportingCommunityCsv}
                         className="min-h-10 max-w-full rounded-md border border-onda-lavender/40 bg-[#10051f] px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
                         style={{ backgroundColor: '#10051f', color: '#ffffff' }}
                       >
+                        <option
+                          value={ALL_ATTENDEES_FILTER}
+                          style={{ backgroundColor: '#10051f', color: '#ffffff' }}
+                        >
+                          Todas las entradas ({attendees.length})
+                        </option>
                         {communityFilterOptions.map((option) => (
                           <option
                             key={option.value}
@@ -2005,7 +2023,7 @@ export default function AdminEventAttendees() {
                         onClick={() => void handleDownloadCommunityCsv()}
                         disabled={isExportingCommunityCsv}
                       >
-                        Exportar CSV
+                        Exportar CSV comunidad
                       </CTAButton>
                       <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
                     </div>
