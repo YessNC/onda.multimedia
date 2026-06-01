@@ -677,6 +677,18 @@ export default function AdminEventAttendees() {
     setMessage('')
   }
 
+  function getCommunityAttendeeSortTime(attendee: CommunityCsvAttendee) {
+    const dateValue =
+      attendee.community_consent_at ||
+      attendee.created_at ||
+      attendee.ticket_generated_at ||
+      attendee.generated_at ||
+      attendee.updated_at
+    const timestamp = new Date(readString(dateValue)).getTime()
+
+    return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER
+  }
+
   async function fetchCommunityAttendeesForCsv() {
     if (!eventId) return []
 
@@ -690,7 +702,6 @@ export default function AdminEventAttendees() {
         .select('*')
         .eq('event_id', eventId)
         .eq('community_consent', true)
-        .order('community_consent_at', { ascending: true, nullsFirst: false })
         .range(from, to)
 
       if (error) throw error
@@ -701,7 +712,10 @@ export default function AdminEventAttendees() {
       if (pageRows.length < COMMUNITY_CSV_PAGE_SIZE) break
     }
 
-    return communityAttendees
+    return [...communityAttendees].sort(
+      (firstAttendee, secondAttendee) =>
+        getCommunityAttendeeSortTime(firstAttendee) - getCommunityAttendeeSortTime(secondAttendee),
+    )
   }
 
   async function handleDownloadCommunityCsv() {
@@ -1828,67 +1842,70 @@ export default function AdminEventAttendees() {
               </form>
 
               <div className="glass-panel flex max-h-[min(44rem,calc(100vh-8rem))] min-h-[24rem] flex-col overflow-hidden rounded-lg">
-                <div className="flex shrink-0 flex-col gap-4 border-b border-onda-purple/10 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
-                      Gestion de asistentes
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
-                      {attendees.length} asistentes registrados
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrar entradas por estado">
-                      {ticketFilterOptions.map((option) => {
-                        const isActive = ticketStatusFilter === option.value
-
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => {
-                              setTicketStatusFilter(option.value)
-                              setActionsMenu(null)
-                            }}
-                            className={cn(
-                              'inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-xs font-bold transition',
-                              isActive
-                                ? 'border-onda-purple bg-onda-purple text-white shadow-[0_0_18px_rgba(123,44,255,0.28)] dark:border-onda-lavender dark:bg-onda-lavender dark:text-onda-black'
-                                : 'border-onda-purple/20 bg-white/65 text-zinc-700 hover:border-onda-purple/45 hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
-                            )}
-                            aria-pressed={isActive}
-                          >
-                            {option.icon}
-                            <span>{option.label}</span>
-                            <span
-                              className={cn(
-                                'inline-flex min-w-7 justify-center rounded-md px-2 py-0.5 font-display text-[0.66rem] leading-5',
-                                isActive ? 'bg-white/20' : 'bg-onda-purple/10 text-onda-purple dark:text-onda-lavender',
-                              )}
-                            >
-                              {option.count}
-                            </span>
-                          </button>
-                        )
-                      })}
+                <div className="grid shrink-0 gap-4 border-b border-onda-purple/10 px-5 py-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
+                        Gestion de asistentes
+                      </h3>
+                      <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
+                        {attendees.length} asistentes registrados
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                      <CTAButton
+                        type="button"
+                        variant="secondary"
+                        className="min-h-10 px-3 py-2 text-[0.64rem] tracking-[0.12em]"
+                        icon={
+                          isExportingCommunityCsv ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Download className="h-4 w-4" aria-hidden="true" />
+                          )
+                        }
+                        onClick={() => void handleDownloadCommunityCsv()}
+                        disabled={isExportingCommunityCsv}
+                      >
+                        Descargar CSV comunidad
+                      </CTAButton>
+                      <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                    <CTAButton
-                      type="button"
-                      variant="secondary"
-                      className="min-h-10 px-3 py-2 text-[0.64rem] tracking-[0.12em]"
-                      icon={
-                        isExportingCommunityCsv ? (
-                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <Download className="h-4 w-4" aria-hidden="true" />
-                        )
-                      }
-                      onClick={() => void handleDownloadCommunityCsv()}
-                      disabled={isExportingCommunityCsv}
-                    >
-                      Descargar CSV comunidad
-                    </CTAButton>
-                    <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
+
+                  <div className="flex flex-wrap gap-2 md:flex-nowrap" role="group" aria-label="Filtrar entradas por estado">
+                    {ticketFilterOptions.map((option) => {
+                      const isActive = ticketStatusFilter === option.value
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setTicketStatusFilter(option.value)
+                            setActionsMenu(null)
+                          }}
+                          className={cn(
+                            'inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-xs font-bold transition',
+                            isActive
+                              ? 'border-onda-purple bg-onda-purple text-white shadow-[0_0_18px_rgba(123,44,255,0.28)] dark:border-onda-lavender dark:bg-onda-lavender dark:text-onda-black'
+                              : 'border-onda-purple/20 bg-white/65 text-zinc-700 hover:border-onda-purple/45 hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
+                          )}
+                          aria-pressed={isActive}
+                        >
+                          {option.icon}
+                          <span>{option.label}</span>
+                          <span
+                            className={cn(
+                              'inline-flex min-w-7 justify-center rounded-md px-2 py-0.5 font-display text-[0.66rem] leading-5',
+                              isActive ? 'bg-white/20' : 'bg-onda-purple/10 text-onda-purple dark:text-onda-lavender',
+                            )}
+                          >
+                            {option.count}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
