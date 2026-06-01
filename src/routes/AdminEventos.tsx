@@ -3,7 +3,6 @@ import { Plus, QrCode } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
 import AdminEventTable from '../components/admin/AdminEventTable'
-import AdminWelcomeNotifications from '../components/admin/AdminWelcomeNotifications'
 import EventForm, { type EventFormSaveAction } from '../components/admin/EventForm'
 import ImageUploader from '../components/admin/ImageUploader'
 import CTAButton from '../components/shared/CTAButton'
@@ -217,16 +216,17 @@ export default function AdminEventos() {
   return (
     <section className="dark min-h-[calc(100vh-5rem)] w-full max-w-full overflow-x-hidden bg-onda-night py-16 text-onda-soft sm:py-20">
       <div className="onda-container min-w-0 max-w-full">
-        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="grid min-w-0 gap-6">
           <SectionTitle
             eyebrow={t('admin.eyebrow')}
             title={t('admin.events-title')}
             subtitle={t('admin.events-description')}
           />
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap lg:justify-end">
+          <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-onda-purple/22 bg-onda-black/58 p-3 shadow-[0_0_28px_rgba(123,44,255,0.16)] sm:flex-row sm:flex-wrap sm:items-center">
             <CTAButton
               type="button"
               variant="secondary"
+              className="w-full justify-center sm:w-auto sm:min-w-40"
               icon={<Plus className="h-4 w-4" aria-hidden="true" />}
               onClick={handleNewEvent}
             >
@@ -235,12 +235,12 @@ export default function AdminEventos() {
             <CTAButton
               to="/admin/check-in"
               variant="secondary"
+              className="w-full justify-center sm:w-auto sm:min-w-52"
               icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
             >
               Registro de entrada
             </CTAButton>
-            <AdminWelcomeNotifications />
-            <AdminSignOutButton />
+            <AdminSignOutButton className="w-full justify-center sm:ml-auto sm:w-auto sm:min-w-48" />
           </div>
         </div>
 
