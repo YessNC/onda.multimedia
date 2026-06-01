@@ -25,7 +25,6 @@ import {
 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
-import AdminWelcomeNotifications from '../components/admin/AdminWelcomeNotifications'
 import ImageUploader from '../components/admin/ImageUploader'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
@@ -1639,17 +1638,17 @@ export default function AdminEventAttendees() {
   return (
     <section className="pb-40 pt-20 sm:pb-44">
       <div className="onda-container">
-        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div className="grid gap-6">
           <SectionTitle
             eyebrow="Admin"
             title="Asistentes e invitaciones"
             subtitle={isLoading ? 'Cargando evento...' : eventTitle}
           />
-          <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-onda-purple/22 bg-onda-black/72 p-2 shadow-[0_0_28px_rgba(123,44,255,0.16)] sm:w-auto lg:justify-end">
+          <div className="flex w-full flex-col gap-3 rounded-lg border border-onda-purple/22 bg-onda-black/72 p-3 shadow-[0_0_28px_rgba(123,44,255,0.16)] sm:flex-row sm:flex-wrap sm:items-center">
             <CTAButton
               to="/admin/eventos"
               variant="secondary"
-              className="min-h-11 px-4 py-2 text-[0.66rem] tracking-[0.13em]"
+              className="min-h-11 w-full justify-center px-4 py-2 text-[0.66rem] tracking-[0.13em] sm:w-auto sm:min-w-36"
               icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
             >
               Eventos
@@ -1657,13 +1656,12 @@ export default function AdminEventAttendees() {
             <CTAButton
               to="/admin/check-in"
               variant="secondary"
-              className="min-h-11 px-4 py-2 text-[0.66rem] tracking-[0.13em]"
+              className="min-h-11 w-full justify-center px-4 py-2 text-[0.66rem] tracking-[0.13em] sm:w-auto sm:min-w-40"
               icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
             >
               Check-in
             </CTAButton>
-            <AdminWelcomeNotifications />
-            <AdminSignOutButton />
+            <AdminSignOutButton className="min-h-11 w-full justify-center px-4 py-2 text-[0.66rem] tracking-[0.13em] sm:ml-auto sm:w-auto sm:min-w-48" />
           </div>
         </div>
 

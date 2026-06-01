@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowLeft, CheckCircle2, Keyboard, Loader2, QrCode, XCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
-import AdminWelcomeNotifications from '../components/admin/AdminWelcomeNotifications'
 import QRScanner from '../components/admin/QRScanner'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
@@ -647,22 +646,22 @@ export default function AdminCheckIn() {
   return (
     <section className="dark min-h-[calc(100vh-5rem)] bg-onda-night py-10 pb-28 text-onda-soft sm:py-16">
       <div className="onda-container">
-        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div className="grid gap-6">
           <SectionTitle
             eyebrow="Admin"
             title="Registro de entrada"
             subtitle="Validacion de entradas por QR asociada al evento seleccionado."
           />
-          <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+          <div className="flex flex-col gap-3 rounded-lg border border-onda-purple/22 bg-onda-black/58 p-3 shadow-[0_0_28px_rgba(123,44,255,0.16)] sm:flex-row sm:flex-wrap sm:items-center">
             <CTAButton
               to="/admin/eventos"
               variant="secondary"
+              className="w-full justify-center sm:w-auto sm:min-w-48"
               icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
             >
               Volver a eventos
             </CTAButton>
-            <AdminWelcomeNotifications />
-            <AdminSignOutButton />
+            <AdminSignOutButton className="w-full justify-center sm:ml-auto sm:w-auto sm:min-w-48" />
           </div>
         </div>
 
