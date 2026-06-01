@@ -185,6 +185,8 @@ type ActionsMenuPosition = {
   width: number
 }
 
+type TicketStatusFilter = 'all' | 'generated' | 'used'
+
 type ActionsMenuItemProps = {
   children: string
   danger?: boolean
@@ -477,6 +479,7 @@ export default function AdminEventAttendees() {
   const [showQrPreview, setShowQrPreview] = useState(false)
   const [templateImageSize, setTemplateImageSize] = useState({ height: 0, width: 0 })
   const [templatePreviewUrl, setTemplatePreviewUrl] = useState('')
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<TicketStatusFilter>('all')
 
   const loadAdminData = useCallback(async () => {
     if (!eventId) return
@@ -615,6 +618,51 @@ export default function AdminEventAttendees() {
   const historyItems = historyAttendee
     ? invitations.filter((invitation) => invitation.attendee_id === historyAttendee.id)
     : []
+  const ticketStats = useMemo(
+    () =>
+      attendees.reduce(
+        (stats, attendee) => {
+          const status = getTicketStatus(attendee)
+
+          if (status === 'generated') stats.generated += 1
+          if (status === 'used') stats.used += 1
+
+          return stats
+        },
+        { generated: 0, used: 0 },
+      ),
+    [attendees],
+  )
+  const filteredAttendees = useMemo(() => {
+    if (ticketStatusFilter === 'all') return attendees
+
+    return attendees.filter((attendee) => getTicketStatus(attendee) === ticketStatusFilter)
+  }, [attendees, ticketStatusFilter])
+  const ticketFilterOptions: Array<{
+    count: number
+    icon: ReactNode
+    label: string
+    value: TicketStatusFilter
+  }> = [
+    {
+      count: attendees.length,
+      icon: <Users className="h-4 w-4" aria-hidden="true" />,
+      label: 'Todas',
+      value: 'all',
+    },
+    {
+      count: ticketStats.generated,
+      icon: <QrCode className="h-4 w-4" aria-hidden="true" />,
+      label: 'Generadas',
+      value: 'generated',
+    },
+    {
+      count: ticketStats.used,
+      icon: <Check className="h-4 w-4" aria-hidden="true" />,
+      label: 'Utilizadas',
+      value: 'used',
+    },
+  ]
 
   function isBusy(action: string, id: string) {
     return busyAction === `${action}:${id}`
@@ -1722,21 +1770,59 @@ export default function AdminEventAttendees() {
               </form>
 
               <div className="glass-panel flex max-h-[min(44rem,calc(100vh-8rem))] min-h-[24rem] flex-col overflow-hidden rounded-lg">
-                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-onda-purple/10 px-5 py-4">
-                  <div>
+                <div className="flex shrink-0 flex-col gap-4 border-b border-onda-purple/10 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
                     <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
                       Gestion de asistentes
                     </h3>
                     <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
                       {attendees.length} asistentes registrados
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrar entradas por estado">
+                      {ticketFilterOptions.map((option) => {
+                        const isActive = ticketStatusFilter === option.value
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                              setTicketStatusFilter(option.value)
+                              setActionsMenu(null)
+                            }}
+                            className={cn(
+                              'inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-xs font-bold transition',
+                              isActive
+                                ? 'border-onda-purple bg-onda-purple text-white shadow-[0_0_18px_rgba(123,44,255,0.28)] dark:border-onda-lavender dark:bg-onda-lavender dark:text-onda-black'
+                                : 'border-onda-purple/20 bg-white/65 text-zinc-700 hover:border-onda-purple/45 hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
+                            )}
+                            aria-pressed={isActive}
+                          >
+                            {option.icon}
+                            <span>{option.label}</span>
+                            <span
+                              className={cn(
+                                'inline-flex min-w-7 justify-center rounded-md px-2 py-0.5 font-display text-[0.66rem] leading-5',
+                                isActive ? 'bg-white/20' : 'bg-onda-purple/10 text-onda-purple dark:text-onda-lavender',
+                              )}
+                            >
+                              {option.count}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
+                  <Clock3 className="h-5 w-5 shrink-0 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
                 </div>
 
                 {attendees.length === 0 ? (
                   <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
                     Todavia no hay asistentes para este evento.
+                  </div>
+                ) : filteredAttendees.length === 0 ? (
+                  <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
+                    No hay entradas {ticketStatusFilter === 'generated' ? 'generadas' : 'utilizadas'}.
                   </div>
                 ) : (
                   <div className="min-h-0 flex-1 overflow-auto">
@@ -1754,7 +1840,7 @@ export default function AdminEventAttendees() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-onda-purple/10">
-                        {attendees.map((attendee) => {
+                        {filteredAttendees.map((attendee) => {
                           const latestInvitation = latestInvitationByAttendeeId.get(attendee.id)
                           const accessCode = getAttendeeAccessCode(attendee)
                           const isActionsMenuOpen = actionsMenu?.attendeeId === attendee.id
