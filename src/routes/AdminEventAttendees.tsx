@@ -1599,7 +1599,7 @@ export default function AdminEventAttendees() {
               </div>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+            <div className="grid items-start gap-6 xl:grid-cols-[0.8fr_1.2fr]">
               <form className="glass-panel grid gap-4 rounded-lg p-5" onSubmit={handleAttendeeSubmit}>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-onda-purple/10 text-onda-purple dark:bg-onda-purple/20 dark:text-onda-lavender">
@@ -1721,8 +1721,8 @@ export default function AdminEventAttendees() {
                 </div>
               </form>
 
-              <div className="glass-panel overflow-hidden rounded-lg">
-                <div className="flex items-center justify-between gap-3 border-b border-onda-purple/10 px-5 py-4">
+              <div className="glass-panel flex max-h-[min(44rem,calc(100vh-8rem))] min-h-[24rem] flex-col overflow-hidden rounded-lg">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-onda-purple/10 px-5 py-4">
                   <div>
                     <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
                       Gestion de asistentes
@@ -1739,9 +1739,9 @@ export default function AdminEventAttendees() {
                     Todavia no hay asistentes para este evento.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="min-h-0 flex-1 overflow-auto">
                     <table className="w-full min-w-[1180px] text-left text-sm">
-                      <thead className="bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
+                      <thead className="sticky top-0 z-10 bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
                         <tr>
                           <th className="px-4 py-3">Asistente</th>
                           <th className="px-4 py-3">Entrada</th>
