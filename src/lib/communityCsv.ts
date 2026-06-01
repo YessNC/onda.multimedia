@@ -4,6 +4,9 @@ export type CommunityCsvAttendee = Record<string, unknown> & {
   access_code?: string | null
   community_consent?: boolean | string | null
   community_consent_at?: string | null
+  community_welcome_sent?: boolean | null
+  community_welcome_sent_at?: string | null
+  community_welcome_sent_by?: string | null
   consent_at?: string | null
   created_at?: string | null
   email?: string | null
@@ -197,6 +200,14 @@ export function buildCommunityCsv(attendees: CommunityCsvAttendee[]) {
   }
 }
 
-export function buildCommunityCsvFileName(date = new Date()) {
-  return `onda-comunidad-${formatLocalDatePart(date)}.csv`
+export function buildCommunityCsvFileName(date = new Date(), scope = '') {
+  const normalizedScope = readString(scope)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const scopePart = normalizedScope ? `-${normalizedScope}` : ''
+
+  return `onda-comunidad${scopePart}-${formatLocalDatePart(date)}.csv`
 }

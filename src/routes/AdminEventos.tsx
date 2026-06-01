@@ -3,6 +3,7 @@ import { Plus, QrCode } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
 import AdminEventTable from '../components/admin/AdminEventTable'
+import AdminWelcomeNotifications from '../components/admin/AdminWelcomeNotifications'
 import EventForm, { type EventFormSaveAction } from '../components/admin/EventForm'
 import ImageUploader from '../components/admin/ImageUploader'
 import CTAButton from '../components/shared/CTAButton'
@@ -238,6 +239,7 @@ export default function AdminEventos() {
             >
               Registro de entrada
             </CTAButton>
+            <AdminWelcomeNotifications />
             <AdminSignOutButton />
           </div>
         </div>
