@@ -47,6 +47,8 @@ import {
 } from '../lib/invitations'
 import type { InvitationQrBox } from '../lib/invitations'
 import { createAccessCode, normalizeAccessCode } from '../lib/accessCodes'
+import { buildCommunityCsv, buildCommunityCsvFileName } from '../lib/communityCsv'
+import type { CommunityCsvAttendee } from '../lib/communityCsv'
 import { supabase } from '../lib/supabaseClient'
 import { cn } from '../lib/utils'
 
@@ -144,6 +146,7 @@ const actionButtonVariants = {
 const ACTIONS_MENU_ESTIMATED_HEIGHT = 392
 const ACTIONS_MENU_GUTTER = 12
 const ACTIONS_MENU_WIDTH = 288
+const COMMUNITY_CSV_PAGE_SIZE = 1000
 
 type ActionButtonProps = {
   children: string
@@ -469,6 +472,7 @@ export default function AdminEventAttendees() {
   const [eventRecord, setEventRecord] = useState<AdminEvent | null>(null)
   const [historyAttendee, setHistoryAttendee] = useState<EventAttendee | null>(null)
   const [invitations, setInvitations] = useState<GeneratedInvitation[]>([])
+  const [isExportingCommunityCsv, setIsExportingCommunityCsv] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingAttendee, setIsSavingAttendee] = useState(false)
   const [isSavingQrBox, setIsSavingQrBox] = useState(false)
@@ -671,6 +675,60 @@ export default function AdminEventAttendees() {
   function resetMessages() {
     setErrorMessage('')
     setMessage('')
+  }
+
+  async function fetchCommunityAttendeesForCsv() {
+    if (!eventId) return []
+
+    const communityAttendees: CommunityCsvAttendee[] = []
+
+    for (let page = 0; ; page += 1) {
+      const from = page * COMMUNITY_CSV_PAGE_SIZE
+      const to = from + COMMUNITY_CSV_PAGE_SIZE - 1
+      const { data, error } = await supabase
+        .from('event_attendees')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('community_consent', true)
+        .order('community_consent_at', { ascending: true, nullsFirst: false })
+        .range(from, to)
+
+      if (error) throw error
+
+      const pageRows = (data ?? []) as CommunityCsvAttendee[]
+      communityAttendees.push(...pageRows)
+
+      if (pageRows.length < COMMUNITY_CSV_PAGE_SIZE) break
+    }
+
+    return communityAttendees
+  }
+
+  async function handleDownloadCommunityCsv() {
+    if (!eventId) return
+
+    resetMessages()
+    setActionsMenu(null)
+    setIsExportingCommunityCsv(true)
+
+    try {
+      const communityAttendees = await fetchCommunityAttendeesForCsv()
+      const { contactCount, csv } = buildCommunityCsv(communityAttendees)
+
+      if (contactCount === 0) {
+        setMessage('No hay contactos de comunidad para exportar')
+        return
+      }
+
+      const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+
+      downloadBlob(csvBlob, buildCommunityCsvFileName())
+      setMessage(`${contactCount} contactos de comunidad exportados.`)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setIsExportingCommunityCsv(false)
+    }
   }
 
   function toggleActionsMenu(attendeeId: string, trigger: HTMLButtonElement) {
@@ -1813,7 +1871,25 @@ export default function AdminEventAttendees() {
                       })}
                     </div>
                   </div>
-                  <Clock3 className="h-5 w-5 shrink-0 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                    <CTAButton
+                      type="button"
+                      variant="secondary"
+                      className="min-h-10 px-3 py-2 text-[0.64rem] tracking-[0.12em]"
+                      icon={
+                        isExportingCommunityCsv ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Download className="h-4 w-4" aria-hidden="true" />
+                        )
+                      }
+                      onClick={() => void handleDownloadCommunityCsv()}
+                      disabled={isExportingCommunityCsv}
+                    >
+                      Descargar CSV comunidad
+                    </CTAButton>
+                    <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
+                  </div>
                 </div>
 
                 {attendees.length === 0 ? (
