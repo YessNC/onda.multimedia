@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
+import AdminWelcomeNotifications from '../components/admin/AdminWelcomeNotifications'
 import ImageUploader from '../components/admin/ImageUploader'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
@@ -72,7 +73,11 @@ type EventAttendee = Record<string, unknown> & {
   checked_in_at?: string | null
   community_consent?: boolean | null
   community_consent_at?: string | null
+  community_welcome_sent?: boolean | null
+  community_welcome_sent_at?: string | null
+  community_welcome_sent_by?: string | null
   consent_at?: string | null
+  created_at?: string | null
   email?: string | null
   event_id?: string | null
   first_name?: string | null
@@ -147,6 +152,16 @@ const ACTIONS_MENU_ESTIMATED_HEIGHT = 392
 const ACTIONS_MENU_GUTTER = 12
 const ACTIONS_MENU_WIDTH = 288
 const COMMUNITY_CSV_PAGE_SIZE = 1000
+const communityCsvScopeOptions: Array<{ label: string; value: CommunityCsvScope }> = [
+  { label: 'Todos comunidad', value: 'all' },
+  { label: 'Pendientes de bienvenida', value: 'pending' },
+  { label: 'Ya enviados', value: 'sent' },
+]
+const communityCsvScopeFileLabels: Record<CommunityCsvScope, string> = {
+  all: 'todos',
+  pending: 'pendientes-bienvenida',
+  sent: 'enviados',
+}
 
 type ActionButtonProps = {
   children: string
@@ -189,6 +204,7 @@ type ActionsMenuPosition = {
 }
 
 type TicketStatusFilter = 'all' | 'generated' | 'used'
+type CommunityCsvScope = 'all' | 'pending' | 'sent'
 
 type ActionsMenuItemProps = {
   children: string
@@ -472,6 +488,7 @@ export default function AdminEventAttendees() {
   const [eventRecord, setEventRecord] = useState<AdminEvent | null>(null)
   const [historyAttendee, setHistoryAttendee] = useState<EventAttendee | null>(null)
   const [invitations, setInvitations] = useState<GeneratedInvitation[]>([])
+  const [communityCsvScope, setCommunityCsvScope] = useState<CommunityCsvScope>('all')
   const [isExportingCommunityCsv, setIsExportingCommunityCsv] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingAttendee, setIsSavingAttendee] = useState(false)
@@ -689,7 +706,7 @@ export default function AdminEventAttendees() {
     return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER
   }
 
-  async function fetchCommunityAttendeesForCsv() {
+  async function fetchCommunityAttendeesForCsv(scope: CommunityCsvScope) {
     if (!eventId) return []
 
     const communityAttendees: CommunityCsvAttendee[] = []
@@ -697,12 +714,21 @@ export default function AdminEventAttendees() {
     for (let page = 0; ; page += 1) {
       const from = page * COMMUNITY_CSV_PAGE_SIZE
       const to = from + COMMUNITY_CSV_PAGE_SIZE - 1
-      const { data, error } = await supabase
+      let attendeeQuery = supabase
         .from('event_attendees')
         .select('*')
         .eq('event_id', eventId)
         .eq('community_consent', true)
-        .range(from, to)
+
+      if (scope === 'pending') {
+        attendeeQuery = attendeeQuery.eq('community_welcome_sent', false)
+      }
+
+      if (scope === 'sent') {
+        attendeeQuery = attendeeQuery.eq('community_welcome_sent', true)
+      }
+
+      const { data, error } = await attendeeQuery.range(from, to)
 
       if (error) throw error
 
@@ -726,17 +752,17 @@ export default function AdminEventAttendees() {
     setIsExportingCommunityCsv(true)
 
     try {
-      const communityAttendees = await fetchCommunityAttendeesForCsv()
+      const communityAttendees = await fetchCommunityAttendeesForCsv(communityCsvScope)
       const { contactCount, csv } = buildCommunityCsv(communityAttendees)
 
       if (contactCount === 0) {
-        setMessage('No hay contactos de comunidad para exportar')
+        setMessage(`No hay contactos para exportar en "${communityCsvScopeOptions.find((option) => option.value === communityCsvScope)?.label ?? 'Comunidad'}"`)
         return
       }
 
       const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
 
-      downloadBlob(csvBlob, buildCommunityCsvFileName())
+      downloadBlob(csvBlob, buildCommunityCsvFileName(new Date(), communityCsvScopeFileLabels[communityCsvScope]))
       setMessage(`${contactCount} contactos de comunidad exportados.`)
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
@@ -1537,6 +1563,7 @@ export default function AdminEventAttendees() {
             >
               Check-in
             </CTAButton>
+            <AdminWelcomeNotifications />
             <AdminSignOutButton />
           </div>
         </div>
@@ -1853,6 +1880,22 @@ export default function AdminEventAttendees() {
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                      <label className="sr-only" htmlFor="community-csv-scope">
+                        Tipo de CSV comunidad
+                      </label>
+                      <select
+                        id="community-csv-scope"
+                        value={communityCsvScope}
+                        onChange={(selectEvent) => setCommunityCsvScope(selectEvent.target.value as CommunityCsvScope)}
+                        disabled={isExportingCommunityCsv}
+                        className="min-h-10 max-w-full rounded-md border border-onda-purple/25 bg-white/70 px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] text-onda-purple outline-none transition focus:border-onda-purple disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/5 dark:text-onda-soft"
+                      >
+                        {communityCsvScopeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                       <CTAButton
                         type="button"
                         variant="secondary"
@@ -1867,7 +1910,7 @@ export default function AdminEventAttendees() {
                         onClick={() => void handleDownloadCommunityCsv()}
                         disabled={isExportingCommunityCsv}
                       >
-                        Descargar CSV comunidad
+                        Exportar CSV
                       </CTAButton>
                       <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
                     </div>

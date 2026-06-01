@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowLeft, CheckCircle2, Keyboard, Loader2, QrCode, XCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
+import AdminWelcomeNotifications from '../components/admin/AdminWelcomeNotifications'
 import QRScanner from '../components/admin/QRScanner'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
@@ -660,6 +661,7 @@ export default function AdminCheckIn() {
             >
               Volver a eventos
             </CTAButton>
+            <AdminWelcomeNotifications />
             <AdminSignOutButton />
           </div>
         </div>

@@ -1,4 +1,5 @@
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
+import AdminWelcomeNotifications from '../components/admin/AdminWelcomeNotifications'
 import SectionTitle from '../components/shared/SectionTitle'
 
 export default function AdminPanel() {
@@ -12,6 +13,7 @@ export default function AdminPanel() {
           subtitle="Acceso temporal preparado para la administracion del sitio."
         />
         <div className="glass-panel mx-auto mt-10 grid max-w-md gap-5 rounded-lg p-6 text-center">
+          <AdminWelcomeNotifications />
           <AdminSignOutButton variant="primary" />
         </div>
       </div>
