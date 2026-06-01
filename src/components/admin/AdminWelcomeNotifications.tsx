@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellRing, Check, Loader2, RefreshCw, Volume2, X } from 'lucide-react'
+import { COMMUNITY_WELCOME_UPDATED_EVENT, readCommunityBoolean } from '../../lib/communityWelcome'
 import { supabase } from '../../lib/supabaseClient'
 import { cn } from '../../lib/utils'
 
@@ -24,18 +25,12 @@ type AdminToast = {
 
 type BrowserNotificationStatus = NotificationPermission | 'unsupported'
 
-const pendingListLimit = 8
+const pendingListLimit = 500
 
 function readString(value: unknown) {
   if (typeof value === 'string') return value.trim()
   if (typeof value === 'number') return String(value)
   return ''
-}
-
-function readBoolean(value: unknown) {
-  if (value === true) return true
-  if (typeof value !== 'string') return false
-  return value.trim().toLowerCase() === 'true'
 }
 
 function getBrowserNotificationStatus(): BrowserNotificationStatus {
@@ -103,25 +98,36 @@ export default function AdminWelcomeNotifications() {
     return 'El sonido se desbloquea con este boton. El permiso de escritorio depende del navegador.'
   }, [audioEnabled, notificationStatus])
 
+  const fetchPendingRows = useCallback(async () => {
+    const unifiedResponse = await supabase.rpc('get_community_welcome_pending', { p_limit: pendingListLimit })
+
+    if (!unifiedResponse.error) {
+      return ((unifiedResponse.data ?? []) as CommunityWelcomePending[]).filter((row) => readString(row.attendee_id))
+    }
+
+    const isMissingUnifiedRpc =
+      unifiedResponse.error.code === 'PGRST202' ||
+      unifiedResponse.error.message.toLowerCase().includes('get_community_welcome_pending')
+
+    if (!isMissingUnifiedRpc) throw unifiedResponse.error
+
+    const { data, error } = await supabase.rpc('list_community_welcome_pending', { p_limit: pendingListLimit })
+
+    if (error) throw error
+
+    return ((data ?? []) as CommunityWelcomePending[]).filter((row) => readString(row.attendee_id))
+  }, [])
+
   const loadPending = useCallback(async (showLoader = false) => {
     if (showLoader) setIsLoading(true)
     setErrorMessage('')
 
     try {
-      const [countResponse, listResponse] = await Promise.all([
-        supabase.rpc('get_community_welcome_pending_count'),
-        supabase.rpc('list_community_welcome_pending', { p_limit: pendingListLimit }),
-      ])
+      const nextRows = await fetchPendingRows()
 
-      if (countResponse.error) throw countResponse.error
-      if (listResponse.error) throw listResponse.error
       if (!isMountedRef.current) return
 
-      const nextRows = ((listResponse.data ?? []) as CommunityWelcomePending[]).filter((row) =>
-        readString(row.attendee_id),
-      )
-
-      setPendingCount(Number(countResponse.data ?? 0))
+      setPendingCount(nextRows.length)
       setPendingRows(nextRows)
 
       if (!hasLoadedInitialRowsRef.current) {
@@ -134,7 +140,7 @@ export default function AdminWelcomeNotifications() {
     } finally {
       if (isMountedRef.current) setIsLoading(false)
     }
-  }, [])
+  }, [fetchPendingRows])
 
   const playAlertSound = useCallback((volume = 0.08) => {
     const audioContext = audioContextRef.current
@@ -311,11 +317,11 @@ export default function AdminWelcomeNotifications() {
       const nextRecord = payload.new ?? {}
       const attendeeId = readString(nextRecord.id)
 
-      if (!readBoolean(nextRecord.community_consent)) return
+      if (!readCommunityBoolean(nextRecord.community_consent)) return
 
       void loadPending(false)
 
-      if (!attendeeId || readBoolean(nextRecord.community_welcome_sent)) return
+      if (!attendeeId || readCommunityBoolean(nextRecord.community_welcome_sent)) return
       if (notifiedAttendeeIdsRef.current.has(attendeeId)) return
 
       const pending: CommunityWelcomePending = {
@@ -362,6 +368,18 @@ export default function AdminWelcomeNotifications() {
     }
   }, [loadPending, notifyPending])
 
+  useEffect(() => {
+    function handleCommunityWelcomeUpdated() {
+      void loadPending(false)
+    }
+
+    window.addEventListener(COMMUNITY_WELCOME_UPDATED_EVENT, handleCommunityWelcomeUpdated)
+
+    return () => {
+      window.removeEventListener(COMMUNITY_WELCOME_UPDATED_EVENT, handleCommunityWelcomeUpdated)
+    }
+  }, [loadPending])
+
   async function handleEnableNotifications() {
     setIsPreparingNotifications(true)
     setErrorMessage('')
@@ -401,6 +419,11 @@ export default function AdminWelcomeNotifications() {
 
       setPendingRows((currentRows) => currentRows.filter((row) => row.attendee_id !== attendeeId))
       setPendingCount((currentCount) => Math.max(0, currentCount - 1))
+      window.dispatchEvent(
+        new CustomEvent(COMMUNITY_WELCOME_UPDATED_EVENT, {
+          detail: { attendeeId, communityWelcomeSent: true },
+        }),
+      )
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'No pudimos marcar el correo como enviado.')
     } finally {
@@ -409,16 +432,16 @@ export default function AdminWelcomeNotifications() {
   }
 
   return (
-    <div className="relative flex flex-wrap items-center gap-2" data-community-welcome-notifications>
+    <div className="relative flex min-w-0 flex-wrap items-center gap-2" data-community-welcome-notifications>
       <button
         type="button"
         onClick={() => void handleEnableNotifications()}
         disabled={isPreparingNotifications}
         className={cn(
-          'inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-md border border-onda-purple/35 bg-white/65 px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] text-onda-purple transition duration-300 hover:border-onda-purple hover:bg-onda-purple/10 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/5 dark:text-onda-soft',
+          'inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-md border border-onda-purple/35 bg-[#10051f] px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] text-onda-soft transition duration-300 hover:border-onda-lavender hover:bg-onda-purple/25 disabled:cursor-not-allowed disabled:opacity-60',
           notificationStatus === 'granted' &&
             audioEnabled &&
-            'border-emerald-400/45 bg-emerald-500/10 text-emerald-700 dark:text-emerald-100',
+            'border-emerald-400/45 bg-emerald-500/14 text-emerald-100',
         )}
         aria-label={notificationButtonLabel}
       >
@@ -434,7 +457,7 @@ export default function AdminWelcomeNotifications() {
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
         className={cn(
-          'relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-onda-purple/35 bg-white/65 text-onda-purple transition duration-300 hover:border-onda-purple hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
+          'relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-onda-purple/35 bg-[#10051f] text-onda-soft transition duration-300 hover:border-onda-lavender hover:bg-onda-purple/25',
           pendingCount > 0 && 'border-onda-lavender bg-onda-purple text-white shadow-[0_0_22px_rgba(123,44,255,0.32)]',
         )}
         aria-expanded={isOpen}
@@ -453,13 +476,13 @@ export default function AdminWelcomeNotifications() {
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-[calc(100%+0.75rem)] z-[90] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-onda-purple/20 bg-white text-zinc-800 shadow-[0_24px_70px_rgba(15,23,42,0.24)] dark:border-onda-lavender/24 dark:bg-onda-black dark:text-onda-soft">
+        <div className="absolute right-0 top-[calc(100%+0.75rem)] z-[90] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-onda-lavender/24 bg-onda-black text-onda-soft shadow-[0_24px_70px_rgba(15,23,42,0.34)]">
           <div className="flex items-start justify-between gap-3 border-b border-onda-purple/12 px-4 py-3">
             <div className="min-w-0">
-              <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.18em] text-onda-purple dark:text-onda-lavender">
+              <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.18em] text-onda-lavender">
                 Comunidad
               </p>
-              <h2 className="mt-1 font-display text-sm font-extrabold uppercase tracking-[0.12em] text-zinc-950 dark:text-white">
+              <h2 className="mt-1 font-display text-sm font-extrabold uppercase tracking-[0.12em] text-white">
                 Pendientes de bienvenida
               </h2>
             </div>
@@ -467,7 +490,7 @@ export default function AdminWelcomeNotifications() {
               type="button"
               onClick={() => void loadPending(true)}
               disabled={isLoading}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-onda-purple/20 bg-onda-purple/8 text-onda-purple transition hover:bg-onda-purple hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:text-onda-lavender"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-onda-purple/30 bg-white/5 text-onda-lavender transition hover:bg-onda-purple hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               aria-label="Actualizar pendientes"
             >
               {isLoading ? (
@@ -480,18 +503,18 @@ export default function AdminWelcomeNotifications() {
 
           <div className="max-h-[28rem] overflow-y-auto p-3">
             {errorMessage ? (
-              <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-700 dark:text-red-100">
+              <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100">
                 {errorMessage}
               </p>
             ) : null}
 
             {isLoading ? (
-              <div className="flex min-h-28 items-center justify-center rounded-md border border-onda-purple/12 bg-onda-purple/5 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
+              <div className="flex min-h-28 items-center justify-center rounded-md border border-onda-purple/18 bg-white/[0.04] text-sm font-semibold text-onda-muted">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin text-onda-purple" aria-hidden="true" />
                 Cargando pendientes...
               </div>
             ) : pendingRows.length === 0 ? (
-              <div className="rounded-md border border-dashed border-onda-purple/24 px-4 py-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
+              <div className="rounded-md border border-dashed border-onda-purple/24 px-4 py-6 text-sm font-semibold text-onda-muted">
                 No hay correos de bienvenida pendientes.
               </div>
             ) : (
@@ -503,14 +526,14 @@ export default function AdminWelcomeNotifications() {
                   return (
                     <div
                       key={attendeeId}
-                      className="rounded-md border border-onda-purple/14 bg-onda-purple/[0.04] p-3 dark:bg-white/[0.04]"
+                      className="rounded-md border border-onda-purple/18 bg-white/[0.04] p-3"
                     >
                       <div className="min-w-0">
-                        <div className="font-semibold text-zinc-950 dark:text-white">{getPendingName(pending)}</div>
-                        <div className="mt-1 break-all text-xs font-semibold text-zinc-600 dark:text-onda-muted">
+                        <div className="font-semibold text-white">{getPendingName(pending)}</div>
+                        <div className="mt-1 break-all text-xs font-semibold text-onda-muted">
                           {readString(pending.email) || 'Sin correo'}
                         </div>
-                        <div className="mt-2 text-xs leading-5 text-zinc-500 dark:text-onda-muted">
+                        <div className="mt-2 text-xs leading-5 text-onda-muted">
                           {readString(pending.event_title) || 'Evento'} -{' '}
                           {formatDateTime(pending.community_consent_at || pending.created_at)}
                         </div>
@@ -520,7 +543,7 @@ export default function AdminWelcomeNotifications() {
                         type="button"
                         onClick={() => void handleMarkSent(pending)}
                         disabled={Boolean(markingAttendeeId)}
-                        className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 font-display text-[0.62rem] font-bold uppercase tracking-[0.12em] text-emerald-700 transition hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-100"
+                        className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 font-display text-[0.62rem] font-bold uppercase tracking-[0.12em] text-emerald-100 transition hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isMarking ? (
                           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -536,7 +559,7 @@ export default function AdminWelcomeNotifications() {
             )}
           </div>
 
-          <div className="border-t border-onda-purple/12 px-4 py-3 text-xs font-semibold leading-5 text-zinc-500 dark:text-onda-muted">
+          <div className="border-t border-onda-purple/12 px-4 py-3 text-xs font-semibold leading-5 text-onda-muted">
             {notificationHint}
           </div>
         </div>

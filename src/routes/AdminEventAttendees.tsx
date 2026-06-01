@@ -50,6 +50,13 @@ import type { InvitationQrBox } from '../lib/invitations'
 import { createAccessCode, normalizeAccessCode } from '../lib/accessCodes'
 import { buildCommunityCsv, buildCommunityCsvFileName } from '../lib/communityCsv'
 import type { CommunityCsvAttendee } from '../lib/communityCsv'
+import {
+  COMMUNITY_WELCOME_UPDATED_EVENT,
+  type CommunityFilter,
+  communityFilterFileLabels,
+  communityFilterOptions,
+  matchesCommunityFilter,
+} from '../lib/communityWelcome'
 import { supabase } from '../lib/supabaseClient'
 import { cn } from '../lib/utils'
 
@@ -152,16 +159,6 @@ const ACTIONS_MENU_ESTIMATED_HEIGHT = 392
 const ACTIONS_MENU_GUTTER = 12
 const ACTIONS_MENU_WIDTH = 288
 const COMMUNITY_CSV_PAGE_SIZE = 1000
-const communityCsvScopeOptions: Array<{ label: string; value: CommunityCsvScope }> = [
-  { label: 'Todos comunidad', value: 'all' },
-  { label: 'Pendientes de bienvenida', value: 'pending' },
-  { label: 'Ya enviados', value: 'sent' },
-]
-const communityCsvScopeFileLabels: Record<CommunityCsvScope, string> = {
-  all: 'todos',
-  pending: 'pendientes-bienvenida',
-  sent: 'enviados',
-}
 
 type ActionButtonProps = {
   children: string
@@ -204,7 +201,6 @@ type ActionsMenuPosition = {
 }
 
 type TicketStatusFilter = 'all' | 'generated' | 'used'
-type CommunityCsvScope = 'all' | 'pending' | 'sent'
 
 type ActionsMenuItemProps = {
   children: string
@@ -488,7 +484,7 @@ export default function AdminEventAttendees() {
   const [eventRecord, setEventRecord] = useState<AdminEvent | null>(null)
   const [historyAttendee, setHistoryAttendee] = useState<EventAttendee | null>(null)
   const [invitations, setInvitations] = useState<GeneratedInvitation[]>([])
-  const [communityCsvScope, setCommunityCsvScope] = useState<CommunityCsvScope>('all')
+  const [communityFilter, setCommunityFilter] = useState<CommunityFilter>('all')
   const [isExportingCommunityCsv, setIsExportingCommunityCsv] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingAttendee, setIsSavingAttendee] = useState(false)
@@ -540,6 +536,35 @@ export default function AdminEventAttendees() {
 
   useEffect(() => {
     void loadAdminData()
+  }, [loadAdminData])
+
+  useEffect(() => {
+    function handleCommunityWelcomeUpdated(customEvent: Event) {
+      const attendeeId = readString((customEvent as CustomEvent).detail?.attendeeId)
+
+      if (!attendeeId) {
+        void loadAdminData()
+        return
+      }
+
+      setAttendees((currentAttendees) =>
+        currentAttendees.map((attendee) =>
+          attendee.id === attendeeId
+            ? {
+                ...attendee,
+                community_welcome_sent: true,
+                community_welcome_sent_at: new Date().toISOString(),
+              }
+            : attendee,
+        ),
+      )
+    }
+
+    window.addEventListener(COMMUNITY_WELCOME_UPDATED_EVENT, handleCommunityWelcomeUpdated)
+
+    return () => {
+      window.removeEventListener(COMMUNITY_WELCOME_UPDATED_EVENT, handleCommunityWelcomeUpdated)
+    }
   }, [loadAdminData])
 
   useEffect(() => {
@@ -639,9 +664,30 @@ export default function AdminEventAttendees() {
   const historyItems = historyAttendee
     ? invitations.filter((invitation) => invitation.attendee_id === historyAttendee.id)
     : []
-  const ticketStats = useMemo(
+  const communityStats = useMemo(
     () =>
       attendees.reduce(
+        (stats, attendee) => {
+          if (!matchesCommunityFilter(attendee, 'all')) return stats
+
+          stats.all += 1
+
+          if (matchesCommunityFilter(attendee, 'pending')) stats.pending += 1
+          if (matchesCommunityFilter(attendee, 'sent')) stats.sent += 1
+
+          return stats
+        },
+        { all: 0, pending: 0, sent: 0 },
+      ),
+    [attendees],
+  )
+  const communityFilteredAttendees = useMemo(
+    () => attendees.filter((attendee) => matchesCommunityFilter(attendee, communityFilter)),
+    [attendees, communityFilter],
+  )
+  const ticketStats = useMemo(
+    () =>
+      communityFilteredAttendees.reduce(
         (stats, attendee) => {
           const status = getTicketStatus(attendee)
 
@@ -652,13 +698,13 @@ export default function AdminEventAttendees() {
         },
         { generated: 0, used: 0 },
       ),
-    [attendees],
+    [communityFilteredAttendees],
   )
   const filteredAttendees = useMemo(() => {
-    if (ticketStatusFilter === 'all') return attendees
+    if (ticketStatusFilter === 'all') return communityFilteredAttendees
 
-    return attendees.filter((attendee) => getTicketStatus(attendee) === ticketStatusFilter)
-  }, [attendees, ticketStatusFilter])
+    return communityFilteredAttendees.filter((attendee) => getTicketStatus(attendee) === ticketStatusFilter)
+  }, [communityFilteredAttendees, ticketStatusFilter])
   const ticketFilterOptions: Array<{
     count: number
     icon: ReactNode
@@ -666,7 +712,7 @@ export default function AdminEventAttendees() {
     value: TicketStatusFilter
   }> = [
     {
-      count: attendees.length,
+      count: communityFilteredAttendees.length,
       icon: <Users className="h-4 w-4" aria-hidden="true" />,
       label: 'Todas',
       value: 'all',
@@ -706,7 +752,7 @@ export default function AdminEventAttendees() {
     return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER
   }
 
-  async function fetchCommunityAttendeesForCsv(scope: CommunityCsvScope) {
+  async function fetchCommunityAttendeesForCsv(filter: CommunityFilter) {
     if (!eventId) return []
 
     const communityAttendees: CommunityCsvAttendee[] = []
@@ -720,11 +766,11 @@ export default function AdminEventAttendees() {
         .eq('event_id', eventId)
         .eq('community_consent', true)
 
-      if (scope === 'pending') {
+      if (filter === 'pending') {
         attendeeQuery = attendeeQuery.eq('community_welcome_sent', false)
       }
 
-      if (scope === 'sent') {
+      if (filter === 'sent') {
         attendeeQuery = attendeeQuery.eq('community_welcome_sent', true)
       }
 
@@ -752,22 +798,61 @@ export default function AdminEventAttendees() {
     setIsExportingCommunityCsv(true)
 
     try {
-      const communityAttendees = await fetchCommunityAttendeesForCsv(communityCsvScope)
+      const communityAttendees = await fetchCommunityAttendeesForCsv(communityFilter)
       const { contactCount, csv } = buildCommunityCsv(communityAttendees)
 
       if (contactCount === 0) {
-        setMessage(`No hay contactos para exportar en "${communityCsvScopeOptions.find((option) => option.value === communityCsvScope)?.label ?? 'Comunidad'}"`)
+        setMessage(`No hay contactos para exportar en "${communityFilterOptions.find((option) => option.value === communityFilter)?.label ?? 'Comunidad'}"`)
         return
       }
 
       const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
 
-      downloadBlob(csvBlob, buildCommunityCsvFileName(new Date(), communityCsvScopeFileLabels[communityCsvScope]))
+      downloadBlob(csvBlob, buildCommunityCsvFileName(new Date(), communityFilterFileLabels[communityFilter]))
       setMessage(`${contactCount} contactos de comunidad exportados.`)
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
     } finally {
       setIsExportingCommunityCsv(false)
+    }
+  }
+
+  async function handleMarkCommunityWelcomeSent(attendee: EventAttendee) {
+    resetMessages()
+    setActionsMenu(null)
+    setBusyAction(`community-welcome:${attendee.id}`)
+
+    try {
+      const { data, error } = await supabase.rpc('mark_community_welcome_sent', {
+        p_attendee_id: attendee.id,
+      })
+
+      if (error) throw error
+
+      const result = Array.isArray(data) ? data[0] : data
+      const sentAt = readString(result?.community_welcome_sent_at) || new Date().toISOString()
+
+      setAttendees((currentAttendees) =>
+        currentAttendees.map((currentAttendee) =>
+          currentAttendee.id === attendee.id
+            ? {
+                ...currentAttendee,
+                community_welcome_sent: true,
+                community_welcome_sent_at: sentAt,
+              }
+            : currentAttendee,
+        ),
+      )
+      window.dispatchEvent(
+        new CustomEvent(COMMUNITY_WELCOME_UPDATED_EVENT, {
+          detail: { attendeeId: attendee.id, communityWelcomeSent: true },
+        }),
+      )
+      setMessage(`${getAttendeeName(attendee)} marcado con correo de bienvenida enviado.`)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
     }
   }
 
@@ -1548,10 +1633,11 @@ export default function AdminEventAttendees() {
             title="Asistentes e invitaciones"
             subtitle={isLoading ? 'Cargando evento...' : eventTitle}
           />
-          <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+          <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-onda-purple/22 bg-onda-black/72 p-2 shadow-[0_0_28px_rgba(123,44,255,0.16)] sm:w-auto lg:justify-end">
             <CTAButton
               to="/admin/eventos"
               variant="secondary"
+              className="min-h-11 px-4 py-2 text-[0.66rem] tracking-[0.13em]"
               icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
             >
               Eventos
@@ -1559,6 +1645,7 @@ export default function AdminEventAttendees() {
             <CTAButton
               to="/admin/check-in"
               variant="secondary"
+              className="min-h-11 px-4 py-2 text-[0.66rem] tracking-[0.13em]"
               icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
             >
               Check-in
@@ -1876,23 +1963,31 @@ export default function AdminEventAttendees() {
                         Gestion de asistentes
                       </h3>
                       <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
-                        {attendees.length} asistentes registrados
+                        {attendees.length} asistentes registrados - {communityFilteredAttendees.length} visibles en comunidad
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                       <label className="sr-only" htmlFor="community-csv-scope">
-                        Tipo de CSV comunidad
+                        Filtro comunidad
                       </label>
                       <select
                         id="community-csv-scope"
-                        value={communityCsvScope}
-                        onChange={(selectEvent) => setCommunityCsvScope(selectEvent.target.value as CommunityCsvScope)}
+                        value={communityFilter}
+                        onChange={(selectEvent) => {
+                          setCommunityFilter(selectEvent.target.value as CommunityFilter)
+                          setActionsMenu(null)
+                        }}
                         disabled={isExportingCommunityCsv}
-                        className="min-h-10 max-w-full rounded-md border border-onda-purple/25 bg-white/70 px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] text-onda-purple outline-none transition focus:border-onda-purple disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/5 dark:text-onda-soft"
+                        className="min-h-10 max-w-full rounded-md border border-onda-lavender/40 bg-[#10051f] px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{ backgroundColor: '#10051f', color: '#ffffff' }}
                       >
-                        {communityCsvScopeOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
+                        {communityFilterOptions.map((option) => (
+                          <option
+                            key={option.value}
+                            value={option.value}
+                            style={{ backgroundColor: '#10051f', color: '#ffffff' }}
+                          >
+                            {option.label} ({communityStats[option.value]})
                           </option>
                         ))}
                       </select>
@@ -1955,6 +2050,14 @@ export default function AdminEventAttendees() {
                 {attendees.length === 0 ? (
                   <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
                     Todavia no hay asistentes para este evento.
+                  </div>
+                ) : communityFilteredAttendees.length === 0 ? (
+                  <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
+                    {communityFilter === 'pending'
+                      ? 'No hay correos de bienvenida pendientes.'
+                      : communityFilter === 'sent'
+                        ? 'No hay correos de bienvenida marcados como enviados.'
+                        : 'No hay asistentes con consentimiento de comunidad.'}
                   </div>
                 ) : filteredAttendees.length === 0 ? (
                   <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
@@ -2021,6 +2124,41 @@ export default function AdminEventAttendees() {
                                 <div className="mt-1 text-xs">
                                   {attendee.community_consent_at ? formatDateTime(attendee.community_consent_at) : 'Sin fecha'}
                                 </div>
+                                {attendee.community_consent ? (
+                                  <div className="mt-3 grid gap-2">
+                                    <span
+                                      className={cn(
+                                        'inline-flex w-fit rounded-md border px-2.5 py-1.5 text-xs font-bold',
+                                        attendee.community_welcome_sent
+                                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+                                          : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200',
+                                      )}
+                                    >
+                                      {attendee.community_welcome_sent ? 'Correo enviado' : 'Bienvenida pendiente'}
+                                    </span>
+                                    {attendee.community_welcome_sent ? (
+                                      <div className="text-xs">
+                                        {attendee.community_welcome_sent_at
+                                          ? formatDateTime(attendee.community_welcome_sent_at)
+                                          : 'Sin fecha de envio'}
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleMarkCommunityWelcomeSent(attendee)}
+                                        disabled={Boolean(busyAction)}
+                                        className="inline-flex min-h-9 w-fit items-center justify-center gap-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 font-display text-[0.6rem] font-bold uppercase tracking-[0.11em] text-emerald-700 transition hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-100"
+                                      >
+                                        {isBusy('community-welcome', attendee.id) ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                                        ) : (
+                                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                        )}
+                                        <span>{isBusy('community-welcome', attendee.id) ? 'Marcando...' : 'Marcar enviado'}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : null}
                               </td>
                               <td className="px-4 py-4 align-top">
                                 <div className="font-display text-base font-extrabold tracking-[0.12em] text-zinc-950 dark:text-white">
