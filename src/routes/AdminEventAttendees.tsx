@@ -1969,16 +1969,39 @@ export default function AdminEventAttendees() {
 
               <div className="glass-panel flex max-h-[min(44rem,calc(100vh-8rem))] min-h-[24rem] flex-col overflow-hidden rounded-lg">
                 <div className="grid shrink-0 gap-4 border-b border-onda-purple/10 px-5 py-4">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
                     <div className="min-w-0">
                       <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
                         Gestion de asistentes
                       </h3>
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
-                        {attendees.length} asistentes registrados - {communityStats.all} en comunidad - {communityFilteredAttendees.length} visibles
-                      </p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
+                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                            {attendees.length}
+                          </div>
+                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                            Registrados
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
+                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                            {communityStats.all}
+                          </div>
+                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                            Comunidad
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
+                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                            {communityFilteredAttendees.length}
+                          </div>
+                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                            Visibles
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                    <div className="grid w-full gap-2 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] 2xl:w-auto 2xl:min-w-[31rem]">
                       <label className="sr-only" htmlFor="community-csv-scope">
                         Filtro comunidad
                       </label>
@@ -1990,7 +2013,7 @@ export default function AdminEventAttendees() {
                           setActionsMenu(null)
                         }}
                         disabled={isExportingCommunityCsv}
-                        className="min-h-10 max-w-full rounded-md border border-onda-lavender/40 bg-[#10051f] px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="h-11 min-w-0 rounded-md border border-onda-lavender/40 bg-[#10051f] px-4 py-2 font-display text-[0.66rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
                         style={{ backgroundColor: '#10051f', color: '#ffffff' }}
                       >
                         <option
@@ -2012,7 +2035,7 @@ export default function AdminEventAttendees() {
                       <CTAButton
                         type="button"
                         variant="secondary"
-                        className="min-h-10 px-3 py-2 text-[0.64rem] tracking-[0.12em]"
+                        className="h-11 justify-center px-4 py-2 text-[0.64rem] tracking-[0.12em]"
                         icon={
                           isExportingCommunityCsv ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -2023,13 +2046,15 @@ export default function AdminEventAttendees() {
                         onClick={() => void handleDownloadCommunityCsv()}
                         disabled={isExportingCommunityCsv}
                       >
-                        Exportar CSV comunidad
+                        CSV comunidad
                       </CTAButton>
-                      <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
+                      <div className="hidden h-11 w-11 items-center justify-center rounded-md border border-onda-purple/18 bg-white/55 text-onda-purple dark:bg-white/5 dark:text-onda-lavender sm:flex">
+                        <Clock3 className="h-5 w-5" aria-hidden="true" />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 md:flex-nowrap" role="group" aria-label="Filtrar entradas por estado">
+                  <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="Filtrar entradas por estado">
                     {ticketFilterOptions.map((option) => {
                       const isActive = ticketStatusFilter === option.value
 
@@ -2042,7 +2067,7 @@ export default function AdminEventAttendees() {
                             setActionsMenu(null)
                           }}
                           className={cn(
-                            'inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-xs font-bold transition',
+                            'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-bold transition',
                             isActive
                               ? 'border-onda-purple bg-onda-purple text-white shadow-[0_0_18px_rgba(123,44,255,0.28)] dark:border-onda-lavender dark:bg-onda-lavender dark:text-onda-black'
                               : 'border-onda-purple/20 bg-white/65 text-zinc-700 hover:border-onda-purple/45 hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
