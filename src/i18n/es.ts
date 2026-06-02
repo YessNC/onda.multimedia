@@ -245,6 +245,7 @@ export default {
   'hero.open-instagram': 'Abrir Instagram de',
   'hero.open-apple-music': 'Abrir Apple Music de',
   'hero.open-amazon-music': 'Abrir Amazon Music de',
+  'hero.open-youtube': 'Abrir YouTube de',
 
   // Tracks / cards
   'track.play': 'Reproducir',

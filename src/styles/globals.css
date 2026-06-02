@@ -318,9 +318,65 @@ img {
     .onda-hero-swiper .swiper-pagination {
       bottom: 0.8rem;
     }
+
+    .vektorben-hero-image {
+      object-position: center 20%;
+    }
+
+    .vektorben-hero-content.vektorben-hero-content {
+      bottom: clamp(3.35rem, 6.5svh, 4.2rem);
+      left: 0.85rem;
+      width: calc(100% - 1.7rem);
+    }
+
+    .vektorben-hero-content .vektorben-hero-card {
+      max-width: 21.5rem;
+      padding: 0.85rem;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 14px 46px rgba(123, 44, 255, 0.13);
+    }
+
+    .dark .vektorben-hero-content .vektorben-hero-card {
+      border-color: rgba(255, 255, 255, 0.16);
+      background: rgba(5, 5, 5, 0.16);
+      box-shadow: 0 14px 48px rgba(123, 44, 255, 0.16);
+    }
+
+    .vektorben-hero-card .vektorben-hero-title {
+      font-size: clamp(1.55rem, 7.2vw, 1.85rem);
+      line-height: 0.96;
+    }
+
+    .vektorben-hero-card .vektorben-hero-actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+
+    .vektorben-hero-actions .vektorben-hero-primary {
+      grid-column: 1 / -1;
+      width: 100%;
+      min-width: 0;
+      height: 2.35rem;
+      padding-inline: 0.8rem;
+      font-size: 0.56rem;
+      letter-spacing: 0.12em;
+    }
+
+    .vektorben-hero-actions .vektorben-social-link {
+      width: 100%;
+      height: 2.15rem;
+      padding: 0.45rem;
+    }
+
+    .vektorben-hero-actions .vektorben-social-link > svg {
+      width: 0.95rem;
+      height: 0.95rem;
+    }
   }
 
-  @media (min-width: 640px) {
+  @media (min-width: 641px) {
     .vektorben-hero-image {
       object-position: center top;
     }

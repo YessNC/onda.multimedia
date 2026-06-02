@@ -9,11 +9,55 @@ import { useI18n } from '../../hooks/useI18n'
 
 const robotDaySrc = '/assets/brand/robot-day.png'
 const robotNightSrc = '/assets/brand/robot-night.png'
+
+type FeaturedArtistPlatform = 'tiktok' | 'instagram' | 'appleMusic' | 'amazonMusic' | 'youtube'
+
+type FeaturedArtistSocialLinkData = {
+  href: string
+  labelKey: string
+  platform: FeaturedArtistPlatform
+}
+
+type FeaturedArtistProfile = {
+  socials: FeaturedArtistSocialLinkData[]
+  spotifyUrl: string
+}
+
 const vektorbenSpotifyUrl = 'https://open.spotify.com/intl-es/artist/60f1mSGeUUhevHXVgZpAii?si=7rjKhyVfQ4Onh3NSoFW45w'
 const vektorbenTikTokUrl = 'https://www.tiktok.com/@vektorbenlavision'
 const vektorbenInstagramUrl = 'https://www.instagram.com/vektorbenlavision/'
 const vektorbenAppleMusicUrl = 'https://music.apple.com/us/artist/vektorben/1518007114'
 const vektorbenAmazonMusicUrl = 'https://music.amazon.com/artists/B08B2RHY69/vektorben'
+const vektorbenYouTubeUrl = 'https://www.youtube.com/@Vektorben'
+const giovanESpotifyUrl = 'https://open.spotify.com/intl-es/artist/41BsWiQu4cfQoSSiohNba6?si=JI0DucjbSJWWIYgrvKMXdQ'
+const giovanETikTokUrl = 'https://www.tiktok.com/@giovan.e'
+const giovanEInstagramUrl = 'https://www.instagram.com/il.giovan.e/'
+const giovanEAppleMusicUrl = 'https://music.apple.com/us/artist/giovan-e/1474278863'
+const giovanEAmazonMusicUrl = 'https://music.amazon.com/artists/B07VMQLBR8/giovan-e'
+const giovanEYouTubeUrl = 'https://www.youtube.com/channel/UChU4UU2EPwutpxHD9EUmPYg'
+
+const featuredArtistProfiles: Record<string, FeaturedArtistProfile> = {
+  vektorben: {
+    spotifyUrl: vektorbenSpotifyUrl,
+    socials: [
+      { platform: 'tiktok', href: vektorbenTikTokUrl, labelKey: 'hero.open-tiktok' },
+      { platform: 'instagram', href: vektorbenInstagramUrl, labelKey: 'hero.open-instagram' },
+      { platform: 'appleMusic', href: vektorbenAppleMusicUrl, labelKey: 'hero.open-apple-music' },
+      { platform: 'amazonMusic', href: vektorbenAmazonMusicUrl, labelKey: 'hero.open-amazon-music' },
+      { platform: 'youtube', href: vektorbenYouTubeUrl, labelKey: 'hero.open-youtube' },
+    ],
+  },
+  'giovan-e': {
+    spotifyUrl: giovanESpotifyUrl,
+    socials: [
+      { platform: 'tiktok', href: giovanETikTokUrl, labelKey: 'hero.open-tiktok' },
+      { platform: 'instagram', href: giovanEInstagramUrl, labelKey: 'hero.open-instagram' },
+      { platform: 'appleMusic', href: giovanEAppleMusicUrl, labelKey: 'hero.open-apple-music' },
+      { platform: 'amazonMusic', href: giovanEAmazonMusicUrl, labelKey: 'hero.open-amazon-music' },
+      { platform: 'youtube', href: giovanEYouTubeUrl, labelKey: 'hero.open-youtube' },
+    ],
+  },
+}
 
 type BrandHeroSlide = {
   kind: 'brand'
@@ -151,6 +195,28 @@ function AmazonMusicIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
   )
 }
 
+function YouTubeIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+      <path
+        d="M21.1 7.2a3.03 3.03 0 0 0-2.13-2.14C17.1 4.56 12 4.56 12 4.56s-5.1 0-6.97.5A3.03 3.03 0 0 0 2.9 7.2C2.5 8.7 2.5 12 2.5 12s0 3.3.4 4.8a3.03 3.03 0 0 0 2.13 2.14c1.87.5 6.97.5 6.97.5s5.1 0 6.97-.5a3.03 3.03 0 0 0 2.13-2.14c.4-1.5.4-4.8.4-4.8s0-3.3-.4-4.8Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <path d="m10.05 14.95 4.95-2.95-4.95-2.95v5.9Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function FeaturedArtistSocialIcon({ platform }: { platform: FeaturedArtistPlatform }) {
+  if (platform === 'tiktok') return <TikTokIcon />
+  if (platform === 'instagram') return <InstagramIcon />
+  if (platform === 'appleMusic') return <AppleMusicIcon />
+  if (platform === 'amazonMusic') return <AmazonMusicIcon />
+
+  return <YouTubeIcon />
+}
+
 function VektorbenSocialLink({ children, href, label }: { children: ReactNode; href: string; label: string }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -162,7 +228,7 @@ function VektorbenSocialLink({ children, href, label }: { children: ReactNode; h
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border p-2 transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender',
+        'vektorben-social-link inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border p-2 transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender',
         isDark
           ? 'border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
           : 'border-zinc-800/60 bg-zinc-900/15 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
@@ -268,7 +334,10 @@ function BrandSlide() {
   const { t } = useI18n()
   const robot = useRobotAsset()
   const logo = useBrandLogoAsset()
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -276,7 +345,6 @@ function BrandSlide() {
     const mediaQuery = window.matchMedia('(max-width: 767px)')
     const updateIsMobile = (event: MediaQueryListEvent) => setIsMobile(event.matches)
 
-    setIsMobile(mediaQuery.matches)
     mediaQuery.addEventListener('change', updateIsMobile)
 
     return () => mediaQuery.removeEventListener('change', updateIsMobile)
@@ -360,7 +428,8 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
   const { theme } = useTheme()
   const displayName = slide.nameKey ? t(slide.nameKey) : slide.name ?? ''
   const displayTagline = slide.taglineKey ? t(slide.taglineKey) : slide.tagline
-  const isVektorben = displayName.toLowerCase() === 'vektorben'
+  const featuredArtistProfile = featuredArtistProfiles[displayName.toLowerCase()]
+  const hasFeaturedArtistCard = Boolean(featuredArtistProfile)
   const isDark = theme === 'dark'
   const fallbackBackground =
     slide.accent ??
@@ -381,9 +450,9 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
             aria-hidden="true"
             className={cn(
               'h-full min-h-full w-full scale-[1.01] object-cover',
-              isVektorben && 'vektorben-hero-image',
+              hasFeaturedArtistCard && 'vektorben-hero-image',
             )}
-            style={isVektorben ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
+            style={hasFeaturedArtistCard ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
           />
         </picture>
       ) : hasImage ? (
@@ -393,9 +462,9 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
           aria-hidden="true"
           className={cn(
             'absolute inset-0 h-full min-h-full w-full scale-[1.01] object-cover',
-            isVektorben && 'vektorben-hero-image',
+            hasFeaturedArtistCard && 'vektorben-hero-image',
           )}
-          style={isVektorben ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
+          style={hasFeaturedArtistCard ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
         />
       ) : (
         <div className="absolute inset-0" style={{ background: fallbackBackground }} />
@@ -403,7 +472,7 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
       <div
         className={cn(
           'absolute inset-0',
-          isVektorben
+          hasFeaturedArtistCard
             ? 'bg-[linear-gradient(90deg,rgba(5,5,5,0.58)_0%,rgba(5,5,5,0.28)_38%,rgba(5,5,5,0.1)_68%,rgba(5,5,5,0.34)_100%)]'
             : 'bg-[linear-gradient(90deg,rgba(5,5,5,0.82)_0%,rgba(5,5,5,0.42)_42%,rgba(5,5,5,0.68)_100%)]',
         )}
@@ -411,27 +480,27 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
       <div
         className={cn(
           'absolute inset-0',
-          isVektorben
+          hasFeaturedArtistCard
             ? 'bg-[linear-gradient(180deg,rgba(5,5,5,0.04)_0%,rgba(123,44,255,0.08)_52%,rgba(5,5,5,0.2)_100%)]'
             : 'bg-[radial-gradient(circle_at_48%_50%,rgba(168,85,247,0.18),transparent_34%),linear-gradient(180deg,rgba(5,5,5,0.16)_0%,rgba(5,5,5,0.66)_100%)]',
         )}
       />
-      {!isVektorben ? <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/45 to-transparent" /> : null}
+      {!hasFeaturedArtistCard ? <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/45 to-transparent" /> : null}
 
       <div
         className={cn(
-          isVektorben
-            ? 'absolute bottom-[clamp(4.75rem,10vh,8rem)] left-[clamp(1rem,5vw,6rem)] z-10 w-[calc(100%_-_2rem)] sm:w-auto'
+          hasFeaturedArtistCard
+            ? 'vektorben-hero-content absolute bottom-[clamp(4.75rem,10vh,8rem)] left-[clamp(1rem,5vw,6rem)] z-10 w-[calc(100%_-_2rem)] sm:w-auto'
             : 'onda-container relative z-10 flex h-full min-h-full items-end py-16 sm:items-center',
         )}
       >
         <motion.div
           className={cn(
             'rounded-lg border backdrop-blur-2xl',
-            isVektorben
+            hasFeaturedArtistCard
               ? isDark
-                ? 'w-full max-w-[24rem] border-white/18 bg-black/24 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[26rem] sm:p-5'
-                : 'w-full max-w-[24rem] border-onda-purple/35 bg-white/95 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.16)] sm:max-w-[26rem] sm:p-5'
+                ? 'vektorben-hero-card w-full max-w-[24rem] border-white/18 bg-black/24 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[26rem] sm:p-5'
+                : 'vektorben-hero-card w-full max-w-[24rem] border-onda-purple/35 bg-white/95 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.16)] sm:max-w-[26rem] sm:p-5'
               : 'max-w-xl border-white/18 bg-black/28 p-5 shadow-[0_26px_100px_rgba(123,44,255,0.22)] sm:p-6',
           )}
           initial={{ opacity: 0, y: 26 }}
@@ -441,28 +510,28 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
           <h2
             className={cn(
               'font-display font-black uppercase leading-none',
-              isVektorben
+              hasFeaturedArtistCard
                 ? isDark
-                  ? 'text-3xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-4xl lg:text-5xl'
-                  : 'text-3xl text-zinc-900 sm:text-4xl lg:text-5xl'
+                  ? 'vektorben-hero-title text-3xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-4xl lg:text-5xl'
+                  : 'vektorben-hero-title text-3xl text-zinc-900 sm:text-4xl lg:text-5xl'
                 : 'text-4xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-5xl lg:text-6xl',
             )}
           >
             {displayName}
           </h2>
-          {!isVektorben && displayTagline ? (
+          {!hasFeaturedArtistCard && displayTagline ? (
             <p className="mt-3 max-w-md text-sm font-medium text-white/78 sm:text-base">{displayTagline}</p>
           ) : null}
 
-          {isVektorben ? (
-            <div className="mt-5 flex flex-wrap items-center gap-2">
+          {featuredArtistProfile ? (
+            <div className="vektorben-hero-actions mt-5 flex flex-wrap items-center gap-2">
               <a
-                href={vektorbenSpotifyUrl}
+                href={featuredArtistProfile.spotifyUrl}
                 aria-label={`${t('hero.open-spotify')} ${displayName}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  'inline-flex h-10 min-w-[9.75rem] shrink-0 items-center justify-center gap-2 rounded-md border px-4 font-display text-[0.62rem] font-bold uppercase tracking-[0.14em] transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender',
+                  'vektorben-hero-primary inline-flex h-10 min-w-[9.75rem] shrink-0 items-center justify-center gap-2 rounded-md border px-4 font-display text-[0.62rem] font-bold uppercase tracking-[0.14em] transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender',
                   isDark
                     ? 'border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
                     : 'border-zinc-800/60 bg-zinc-900/15 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
@@ -471,18 +540,11 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
                 <SpotifyIcon className="h-3.5 w-3.5" />
                 {t('hero.view-artist')}
               </a>
-              <VektorbenSocialLink href={vektorbenTikTokUrl} label={`${t('hero.open-tiktok')} ${displayName}`}>
-                <TikTokIcon />
-              </VektorbenSocialLink>
-              <VektorbenSocialLink href={vektorbenInstagramUrl} label={`${t('hero.open-instagram')} ${displayName}`}>
-                <InstagramIcon />
-              </VektorbenSocialLink>
-              <VektorbenSocialLink href={vektorbenAppleMusicUrl} label={`${t('hero.open-apple-music')} ${displayName}`}>
-                <AppleMusicIcon />
-              </VektorbenSocialLink>
-              <VektorbenSocialLink href={vektorbenAmazonMusicUrl} label={`${t('hero.open-amazon-music')} ${displayName}`}>
-                <AmazonMusicIcon />
-              </VektorbenSocialLink>
+              {featuredArtistProfile.socials.map((social) => (
+                <VektorbenSocialLink key={social.platform} href={social.href} label={`${t(social.labelKey)} ${displayName}`}>
+                  <FeaturedArtistSocialIcon platform={social.platform} />
+                </VektorbenSocialLink>
+              ))}
             </div>
           ) : (
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
