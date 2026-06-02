@@ -228,7 +228,7 @@ function VektorbenSocialLink({ children, href, label }: { children: ReactNode; h
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'vektorben-social-link inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border p-2 transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender',
+        'vektorben-social-link inline-flex h-[2.15rem] w-[2.15rem] shrink-0 items-center justify-center rounded-md border p-[0.48rem] transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender sm:h-9 sm:w-9 sm:p-2 lg:h-[2.35rem] lg:w-[2.35rem] lg:p-[0.55rem]',
         isDark
           ? 'border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
           : 'border-zinc-800/60 bg-zinc-900/15 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
@@ -428,8 +428,10 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
   const { theme } = useTheme()
   const displayName = slide.nameKey ? t(slide.nameKey) : slide.name ?? ''
   const displayTagline = slide.taglineKey ? t(slide.taglineKey) : slide.tagline
-  const featuredArtistProfile = featuredArtistProfiles[displayName.toLowerCase()]
+  const featuredArtistKey = displayName.toLowerCase()
+  const featuredArtistProfile = featuredArtistProfiles[featuredArtistKey]
   const hasFeaturedArtistCard = Boolean(featuredArtistProfile)
+  const isVektorbenSlide = featuredArtistKey === 'vektorben'
   const isDark = theme === 'dark'
   const fallbackBackground =
     slide.accent ??
@@ -451,6 +453,7 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
             className={cn(
               'h-full min-h-full w-full scale-[1.01] object-cover',
               hasFeaturedArtistCard && 'vektorben-hero-image',
+              isVektorbenSlide && 'vektorben-hero-image--mobile-balanced',
             )}
             style={hasFeaturedArtistCard ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
           />
@@ -463,6 +466,7 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
           className={cn(
             'absolute inset-0 h-full min-h-full w-full scale-[1.01] object-cover',
             hasFeaturedArtistCard && 'vektorben-hero-image',
+            isVektorbenSlide && 'vektorben-hero-image--mobile-balanced',
           )}
           style={hasFeaturedArtistCard ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
         />
@@ -490,8 +494,9 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
       <div
         className={cn(
           hasFeaturedArtistCard
-            ? 'vektorben-hero-content absolute bottom-[clamp(4.75rem,10vh,8rem)] left-[clamp(1rem,5vw,6rem)] z-10 w-[calc(100%_-_2rem)] sm:w-auto'
+            ? 'vektorben-hero-content absolute bottom-[clamp(2.5rem,4.8svh,3.25rem)] left-[clamp(1rem,5vw,6rem)] z-10 w-[calc(100%_-_2rem)] sm:bottom-[clamp(3rem,5.2vh,4.25rem)] sm:w-auto lg:bottom-[clamp(2.8rem,5.5vh,4.6rem)]'
             : 'onda-container relative z-10 flex h-full min-h-full items-end py-16 sm:items-center',
+          isVektorbenSlide && 'vektorben-hero-content--mobile-balanced',
         )}
       >
         <motion.div
@@ -499,8 +504,8 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
             'rounded-lg border backdrop-blur-2xl',
             hasFeaturedArtistCard
               ? isDark
-                ? 'vektorben-hero-card w-full max-w-[24rem] border-white/18 bg-black/24 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[26rem] sm:p-5'
-                : 'vektorben-hero-card w-full max-w-[24rem] border-onda-purple/35 bg-white/95 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.16)] sm:max-w-[26rem] sm:p-5'
+                ? 'vektorben-hero-card w-full max-w-full border-white/18 bg-black/24 p-3 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[30rem] sm:p-5 lg:max-w-[32rem]'
+                : 'vektorben-hero-card w-full max-w-full border-onda-purple/35 bg-white/95 p-3 shadow-[0_18px_70px_rgba(123,44,255,0.16)] sm:max-w-[30rem] sm:p-5 lg:max-w-[32rem]'
               : 'max-w-xl border-white/18 bg-black/28 p-5 shadow-[0_26px_100px_rgba(123,44,255,0.22)] sm:p-6',
           )}
           initial={{ opacity: 0, y: 26 }}
@@ -524,14 +529,14 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
           ) : null}
 
           {featuredArtistProfile ? (
-            <div className="vektorben-hero-actions mt-5 flex flex-wrap items-center gap-2">
+            <div className="vektorben-hero-actions mt-3 flex flex-nowrap items-center gap-[0.35rem] overflow-x-auto pb-0.5 sm:mt-5 sm:gap-2 sm:overflow-visible sm:pb-0">
               <a
                 href={featuredArtistProfile.spotifyUrl}
                 aria-label={`${t('hero.open-spotify')} ${displayName}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  'vektorben-hero-primary inline-flex h-10 min-w-[9.75rem] shrink-0 items-center justify-center gap-2 rounded-md border px-4 font-display text-[0.62rem] font-bold uppercase tracking-[0.14em] transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender',
+                  'vektorben-hero-primary inline-flex h-[2.15rem] min-w-[7.85rem] shrink-0 items-center justify-center gap-1.5 rounded-md border px-2 font-display text-[0.5rem] font-bold uppercase tracking-[0.1em] transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender sm:h-9 sm:min-w-[8.9rem] sm:gap-2 sm:px-3 sm:text-[0.56rem] sm:tracking-[0.12em] lg:h-[2.35rem] lg:min-w-[9.35rem] lg:px-[0.9rem] lg:text-[0.6rem] lg:tracking-[0.14em]',
                   isDark
                     ? 'border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
                     : 'border-zinc-800/60 bg-zinc-900/15 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
