@@ -15,6 +15,8 @@ const slides: HeroSlideData[] = [
     kind: 'artist',
     nameKey: 'hero.vektorben',
     backgroundImage: '/assets/artists/vektorben-web.webp',
+    backgroundImageMobile: '/assets/artists/vektorben-web-movil.webp',
+    backgroundImageTablet: '/assets/artists/vektorben-web-tablet.webp',
     backgroundPosition: 'center top',
   },
   {
