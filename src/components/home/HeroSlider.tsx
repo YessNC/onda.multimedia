@@ -21,10 +21,11 @@ const slides: HeroSlideData[] = [
   },
   {
     kind: 'artist',
-    nameKey: 'hero.nueva-frecuencia',
-    taglineKey: 'hero.next-cover',
-    accent:
-      'radial-gradient(circle at 22% 28%, rgba(168,85,247,0.34), transparent 24%), radial-gradient(circle at 78% 70%, rgba(36,36,48,0.9), transparent 34%), linear-gradient(135deg, #050505 0%, #17101f 58%, #050505 100%)',
+    name: 'GIOVAN-E',
+    backgroundImage: '/assets/artists/giovan-e-web.png',
+    backgroundImageMobile: '/assets/artists/giovan-e-web-movil.webp',
+    backgroundImageTablet: '/assets/artists/giovan-e-web-tablet.png',
+    backgroundPosition: 'center top',
   },
   {
     kind: 'artist',
@@ -97,14 +98,14 @@ export default function HeroSlider() {
                 autoplayResumeRef.current = window.setTimeout(() => {
                   try {
                     swiper.autoplay.start()
-                  } catch (e) {
+                  } catch {
                     // ignore
                   }
                   autoplayResumeRef.current = null
                 }, 900)
               }
             }
-          } catch (e) {
+          } catch {
             // ignore
           }
         }}
