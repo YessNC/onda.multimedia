@@ -241,7 +241,10 @@ export default {
   'hero.listen-youtube': 'Listen on YouTube',
   'hero.listen-spotify': 'Listen on Spotify',
   'hero.open-spotify': 'Open Spotify profile for',
+  'hero.open-tiktok': 'Open TikTok profile for',
   'hero.open-instagram': 'Open Instagram profile for',
+  'hero.open-apple-music': 'Open Apple Music profile for',
+  'hero.open-amazon-music': 'Open Amazon Music profile for',
 
   // Tracks / cards
   'track.play': 'Play',
