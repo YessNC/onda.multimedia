@@ -22,9 +22,9 @@ const slides: HeroSlideData[] = [
   {
     kind: 'artist',
     name: 'GIOVAN-E',
-    backgroundImage: '/assets/artists/giovan-e-web.png',
+    backgroundImage: '/assets/artists/giovan-e-web.webp',
     backgroundImageMobile: '/assets/artists/giovan-e-web-movil.webp',
-    backgroundImageTablet: '/assets/artists/giovan-e-web-tablet.png',
+    backgroundImageTablet: '/assets/artists/giovan-e-web-tablet.webp',
     backgroundPosition: 'center top',
   },
   {
