@@ -1,9 +1,11 @@
-import { ExternalLink, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { useState } from 'react'
+import { getArtistPlatformLinks, getArtistProfileLabelKey } from '../../data/artistPlatforms'
 import { artists } from '../../data/artists'
 import { cn } from '../../lib/utils'
 import { useI18n } from '../../hooks/useI18n'
 import AssetFrame from '../shared/AssetFrame'
+import ArtistPlatformIcon from '../shared/ArtistPlatformIcon'
 import CTAButton from '../shared/CTAButton'
 import SpotifyTrackCarousel from './SpotifyTrackCarousel'
 
@@ -19,6 +21,13 @@ export default function ArtistTabs() {
   }
 
   const featuredTracks = (activeArtist.tracks ?? []).filter((track) => track.isFeatured)
+  const sharedProfileLinks = getArtistPlatformLinks(activeArtist.id)
+  const profileLinks =
+    sharedProfileLinks.length > 0
+      ? sharedProfileLinks
+      : activeArtist.spotifyProfileUrl
+        ? [{ platform: 'spotify' as const, href: activeArtist.spotifyProfileUrl }]
+        : []
 
   return (
     <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
@@ -77,17 +86,23 @@ export default function ArtistTabs() {
             <p className="mt-4 max-w-xl text-base leading-8 text-zinc-600 dark:text-onda-muted">
               {t(activeArtist.descriptionKey)}
             </p>
-            <div className="mt-7">
-              <CTAButton
-                href={activeArtist.spotifyProfileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="secondary"
-                icon={<ExternalLink className="h-4 w-4" aria-hidden="true" />}
-              >
-                {t('artists.profile-link')}
-              </CTAButton>
-            </div>
+            {profileLinks.length > 0 ? (
+              <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 min-[1180px]:grid-cols-3">
+                {profileLinks.map((profileLink) => (
+                  <CTAButton
+                    key={profileLink.platform}
+                    href={profileLink.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="secondary"
+                    icon={<ArtistPlatformIcon platform={profileLink.platform} className="h-4 w-4 shrink-0" />}
+                    className="h-14 w-full min-w-0 px-3 text-[0.56rem] tracking-[0.12em] sm:px-4 sm:text-[0.6rem]"
+                  >
+                    {t(getArtistProfileLabelKey(profileLink.platform))}
+                  </CTAButton>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 

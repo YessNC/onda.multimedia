@@ -35,6 +35,13 @@ export default function Footer() {
         { label: 'Astes', to: '/artistas' },
       ],
     },
+    {
+      title: 'Legal',
+      links: [
+        { label: 'Política de Privacidad', to: '/politicas-de-privacidad' },
+        { label: 'Términos y Condiciones', to: '/terminos-y-condiciones' },
+      ],
+    },
   ]
   return (
     <footer className="border-t border-onda-purple/15 bg-white/80 py-14 backdrop-blur-xl dark:bg-onda-black/80">
@@ -53,7 +60,7 @@ export default function Footer() {
             </Link>
           </div>
 
-          <div className="grid gap-8 sm:grid-cols-3">
+          <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
             {footerGroups.map((group) => (
               <div key={group.title}>
                 <h3 className="font-display text-xs font-bold uppercase tracking-[0.22em] text-zinc-950 dark:text-white">

@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  ChevronDown,
   Check,
   Clipboard,
   Clock3,
+  Ban,
   Download,
   Edit3,
   Eye,
   History,
   ImagePlus,
   Loader2,
+  MoreVertical,
   QrCode,
+  RotateCcw,
   Save,
   Trash2,
   Upload,
@@ -37,11 +42,20 @@ import {
   getAccessCodePlacement,
   getAccessCodeText,
   normalizeQrBox,
-  renderInvitationPng,
+  renderInvitationImage,
   sanitizeFileName,
 } from '../lib/invitations'
 import type { InvitationQrBox } from '../lib/invitations'
 import { createAccessCode, normalizeAccessCode } from '../lib/accessCodes'
+import { buildCommunityCsv, buildCommunityCsvFileName } from '../lib/communityCsv'
+import type { CommunityCsvAttendee } from '../lib/communityCsv'
+import {
+  COMMUNITY_WELCOME_UPDATED_EVENT,
+  type CommunityFilter,
+  communityFilterFileLabels,
+  communityFilterOptions,
+  matchesCommunityFilter,
+} from '../lib/communityWelcome'
 import { supabase } from '../lib/supabaseClient'
 import { cn } from '../lib/utils'
 
@@ -59,8 +73,17 @@ type AdminEvent = Record<string, unknown> & {
 
 type EventAttendee = Record<string, unknown> & {
   access_code?: string | null
+  accepted_privacy?: boolean | null
+  accepted_terms?: boolean | null
   check_in_status?: string | null
   checked_in_at?: string | null
+  community_consent?: boolean | null
+  community_consent_at?: string | null
+  community_welcome_sent?: boolean | null
+  community_welcome_sent_at?: string | null
+  community_welcome_sent_by?: string | null
+  consent_at?: string | null
+  created_at?: string | null
   email?: string | null
   event_id?: string | null
   first_name?: string | null
@@ -68,11 +91,16 @@ type EventAttendee = Record<string, unknown> & {
   guest_type?: string | null
   id: string
   instagram_handle?: string | null
+  invitation_expires_at?: string | null
   invitation_generated_at?: string | null
+  invitation_token?: string | null
   last_name?: string | null
   notes?: string | null
   phone?: string | null
   qr_token?: string | null
+  ticket_downloaded_at?: string | null
+  ticket_generated_at?: string | null
+  ticket_status?: string | null
 }
 
 type GeneratedInvitation = Record<string, unknown> & {
@@ -126,6 +154,11 @@ const actionButtonVariants = {
     'border-onda-purple/35 bg-white/65 text-onda-purple hover:border-onda-purple hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
 }
 
+const ACTIONS_MENU_ESTIMATED_HEIGHT = 392
+const ACTIONS_MENU_GUTTER = 12
+const ACTIONS_MENU_WIDTH = 288
+const COMMUNITY_CSV_PAGE_SIZE = 1000
+
 type ActionButtonProps = {
   children: string
   disabled?: boolean
@@ -147,8 +180,58 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 py-2 font-display text-[0.64rem] font-bold uppercase tracking-[0.12em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border px-3.5 py-2.5 font-display text-[0.64rem] font-bold uppercase leading-tight tracking-[0.12em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-50',
         actionButtonVariants[variant],
+      )}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
+  )
+}
+
+type ActionsMenuPosition = {
+  attendeeId: string
+  left: number
+  maxHeight: number
+  placement: 'bottom' | 'top'
+  top: number
+  width: number
+}
+
+type TicketStatusFilter = 'all' | 'generated' | 'used'
+
+const ALL_ATTENDEES_FILTER = 'all_attendees' as const
+const COMMUNITY_CSV_DEFAULT_FILTER: CommunityFilter = 'all'
+
+type AttendeeScopeFilter = typeof ALL_ATTENDEES_FILTER | CommunityFilter
+
+type ActionsMenuItemProps = {
+  children: string
+  danger?: boolean
+  disabled?: boolean
+  icon: ReactNode
+  onClick: () => void
+}
+
+function ActionsMenuItem({
+  children,
+  danger = false,
+  disabled = false,
+  icon,
+  onClick,
+}: ActionsMenuItemProps) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45',
+        danger
+          ? 'text-red-700 hover:bg-red-500/10 dark:text-red-200'
+          : 'text-zinc-700 hover:bg-onda-purple/10 dark:text-onda-soft',
       )}
     >
       {icon}
@@ -179,6 +262,10 @@ function createQrToken() {
   }
 
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function buildGuestInvitationUrl(invitationToken: string) {
+  return `${window.location.origin}/entrada/${encodeURIComponent(invitationToken)}`
 }
 
 function getAttendeeAccessCode(attendee: EventAttendee | null | undefined) {
@@ -235,19 +322,27 @@ async function ensureAttendeesAccessCodes(eventId: string, attendeeRows: EventAt
 
   for (const attendee of attendeeRows) {
     const currentCode = getAttendeeAccessCode(attendee)
+    const currentInvitationToken = readString(attendee.invitation_token)
+    const attendeePatch: Partial<EventAttendee> = {}
 
     if (currentCode) {
-      nextAttendees.push({ ...attendee, access_code: currentCode })
+      attendeePatch.access_code = currentCode
+    } else {
+      attendeePatch.access_code = await createUniqueAccessCodeForEvent(eventId, reservedCodes)
+    }
+
+    if (currentInvitationToken) {
+      attendeePatch.invitation_token = currentInvitationToken
+    } else {
+      attendeePatch.invitation_token = createQrToken()
+    }
+
+    if (currentCode && currentInvitationToken) {
+      nextAttendees.push({ ...attendee, access_code: currentCode, invitation_token: currentInvitationToken })
       continue
     }
 
-    const accessCode = await createUniqueAccessCodeForEvent(eventId, reservedCodes)
-    const { data, error } = await supabase
-      .from('event_attendees')
-      .update({ access_code: accessCode })
-      .eq('id', attendee.id)
-      .select('*')
-      .single()
+    const { data, error } = await supabase.from('event_attendees').update(attendeePatch).eq('id', attendee.id).select('*').single()
 
     if (error) throw error
 
@@ -308,15 +403,57 @@ function getCheckInStatusLabel(attendee: EventAttendee) {
   return 'Pendiente'
 }
 
-function getCheckInStatusClassName(attendee: EventAttendee) {
-  const status = readString(attendee.check_in_status)
+function getTicketStatus(attendee: EventAttendee) {
+  const checkInStatus = readString(attendee.check_in_status)
+  const ticketStatus = readString(attendee.ticket_status)
 
-  if (status === 'checked_in') {
+  if (checkInStatus === 'checked_in' || attendee.checked_in_at) return 'used'
+  if (checkInStatus === 'cancelled' || ticketStatus === 'cancelled') return 'cancelled'
+  if (ticketStatus === 'used') return hasLegalConsent(attendee) ? 'generated' : 'pending'
+
+  return ticketStatus || 'pending'
+}
+
+function getTicketStatusLabel(attendee: EventAttendee) {
+  const status = getTicketStatus(attendee)
+
+  if (status === 'generated') return 'Generada'
+  if (status === 'used') return `Utilizada ${formatDateTime(attendee.checked_in_at)}`
+  if (status === 'cancelled') return 'Cancelada'
+  if (status === 'expired') return 'Vencida'
+  return 'Pendiente'
+}
+
+function getTicketStatusClassName(attendee: EventAttendee) {
+  const status = getTicketStatus(attendee)
+
+  if (status === 'generated') {
     return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
   }
 
-  if (status === 'cancelled') {
+  if (status === 'used') {
+    return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
+  }
+
+  if (status === 'cancelled' || status === 'expired') {
     return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200'
+  }
+
+  return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200'
+}
+
+function hasLegalConsent(attendee: EventAttendee) {
+  return Boolean(attendee.accepted_privacy && attendee.accepted_terms)
+}
+
+function getConsentStatusLabel(attendee: EventAttendee) {
+  if (!hasLegalConsent(attendee)) return 'Pendiente'
+  return attendee.consent_at ? `Aceptado ${formatDateTime(attendee.consent_at)}` : 'Aceptado'
+}
+
+function getConsentStatusClassName(attendee: EventAttendee) {
+  if (hasLegalConsent(attendee)) {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
   }
 
   return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200'
@@ -342,6 +479,7 @@ function qrInputValue(value: number) {
 
 export default function AdminEventAttendees() {
   const { eventId } = useParams<{ eventId: string }>()
+  const [actionsMenu, setActionsMenu] = useState<ActionsMenuPosition | null>(null)
   const [attendeeForm, setAttendeeForm] = useState<AttendeeFormState>(emptyAttendeeForm)
   const [attendees, setAttendees] = useState<EventAttendee[]>([])
   const [busyAction, setBusyAction] = useState<string | null>(null)
@@ -350,6 +488,8 @@ export default function AdminEventAttendees() {
   const [eventRecord, setEventRecord] = useState<AdminEvent | null>(null)
   const [historyAttendee, setHistoryAttendee] = useState<EventAttendee | null>(null)
   const [invitations, setInvitations] = useState<GeneratedInvitation[]>([])
+  const [communityFilter, setCommunityFilter] = useState<AttendeeScopeFilter>(ALL_ATTENDEES_FILTER)
+  const [isExportingCommunityCsv, setIsExportingCommunityCsv] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingAttendee, setIsSavingAttendee] = useState(false)
   const [isSavingQrBox, setIsSavingQrBox] = useState(false)
@@ -360,6 +500,7 @@ export default function AdminEventAttendees() {
   const [showQrPreview, setShowQrPreview] = useState(false)
   const [templateImageSize, setTemplateImageSize] = useState({ height: 0, width: 0 })
   const [templatePreviewUrl, setTemplatePreviewUrl] = useState('')
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<TicketStatusFilter>('all')
 
   const loadAdminData = useCallback(async () => {
     if (!eventId) return
@@ -400,6 +541,78 @@ export default function AdminEventAttendees() {
   useEffect(() => {
     void loadAdminData()
   }, [loadAdminData])
+
+  useEffect(() => {
+    function handleCommunityWelcomeUpdated(customEvent: Event) {
+      const attendeeId = readString((customEvent as CustomEvent).detail?.attendeeId)
+
+      if (!attendeeId) {
+        void loadAdminData()
+        return
+      }
+
+      setAttendees((currentAttendees) =>
+        currentAttendees.map((attendee) =>
+          attendee.id === attendeeId
+            ? {
+                ...attendee,
+                community_welcome_sent: true,
+                community_welcome_sent_at: new Date().toISOString(),
+              }
+            : attendee,
+        ),
+      )
+    }
+
+    window.addEventListener(COMMUNITY_WELCOME_UPDATED_EVENT, handleCommunityWelcomeUpdated)
+
+    return () => {
+      window.removeEventListener(COMMUNITY_WELCOME_UPDATED_EVENT, handleCommunityWelcomeUpdated)
+    }
+  }, [loadAdminData])
+
+  useEffect(() => {
+    if (!actionsMenu) return
+
+    function handlePointerDown(pointerEvent: PointerEvent) {
+      const target = pointerEvent.target
+
+      if (!(target instanceof Element)) return
+      if (target.closest('[data-attendee-actions-menu]') || target.closest('[data-attendee-actions-trigger]')) return
+
+      setActionsMenu(null)
+    }
+
+    function closeActionsMenu() {
+      setActionsMenu(null)
+    }
+
+    function handleScroll(scrollEvent: Event) {
+      const target = scrollEvent.target
+
+      if (target instanceof Element && target.closest('[data-attendee-actions-menu]')) return
+
+      setActionsMenu(null)
+    }
+
+    function handleKeyDown(keyboardEvent: KeyboardEvent) {
+      if (keyboardEvent.key === 'Escape') {
+        setActionsMenu(null)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', closeActionsMenu)
+    window.addEventListener('scroll', handleScroll, true)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', closeActionsMenu)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [actionsMenu])
 
   useEffect(() => {
     const templatePath = eventRecord?.invitation_template_path
@@ -455,6 +668,75 @@ export default function AdminEventAttendees() {
   const historyItems = historyAttendee
     ? invitations.filter((invitation) => invitation.attendee_id === historyAttendee.id)
     : []
+  const communityStats = useMemo(
+    () =>
+      attendees.reduce(
+        (stats, attendee) => {
+          if (!matchesCommunityFilter(attendee, 'all')) return stats
+
+          stats.all += 1
+
+          if (matchesCommunityFilter(attendee, 'pending')) stats.pending += 1
+          if (matchesCommunityFilter(attendee, 'sent')) stats.sent += 1
+
+          return stats
+        },
+        { all: 0, pending: 0, sent: 0 },
+      ),
+    [attendees],
+  )
+  const communityFilteredAttendees = useMemo(
+    () =>
+      communityFilter === ALL_ATTENDEES_FILTER
+        ? attendees
+        : attendees.filter((attendee) => matchesCommunityFilter(attendee, communityFilter)),
+    [attendees, communityFilter],
+  )
+  const ticketStats = useMemo(
+    () =>
+      communityFilteredAttendees.reduce(
+        (stats, attendee) => {
+          const status = getTicketStatus(attendee)
+
+          if (status === 'generated') stats.generated += 1
+          if (status === 'used') stats.used += 1
+
+          return stats
+        },
+        { generated: 0, used: 0 },
+      ),
+    [communityFilteredAttendees],
+  )
+  const filteredAttendees = useMemo(() => {
+    if (ticketStatusFilter === 'all') return communityFilteredAttendees
+
+    return communityFilteredAttendees.filter((attendee) => getTicketStatus(attendee) === ticketStatusFilter)
+  }, [communityFilteredAttendees, ticketStatusFilter])
+  const ticketFilterOptions: Array<{
+    count: number
+    icon: ReactNode
+    label: string
+    value: TicketStatusFilter
+  }> = [
+    {
+      count: communityFilteredAttendees.length,
+      icon: <Users className="h-4 w-4" aria-hidden="true" />,
+      label: 'Todas',
+      value: 'all',
+    },
+    {
+      count: ticketStats.generated,
+      icon: <QrCode className="h-4 w-4" aria-hidden="true" />,
+      label: 'Generadas',
+      value: 'generated',
+    },
+    {
+      count: ticketStats.used,
+      icon: <Check className="h-4 w-4" aria-hidden="true" />,
+      label: 'Utilizadas',
+      value: 'used',
+    },
+  ]
 
   function isBusy(action: string, id: string) {
     return busyAction === `${action}:${id}`
@@ -463,6 +745,155 @@ export default function AdminEventAttendees() {
   function resetMessages() {
     setErrorMessage('')
     setMessage('')
+  }
+
+  function getCommunityAttendeeSortTime(attendee: CommunityCsvAttendee) {
+    const dateValue =
+      attendee.community_consent_at ||
+      attendee.created_at ||
+      attendee.ticket_generated_at ||
+      attendee.generated_at ||
+      attendee.updated_at
+    const timestamp = new Date(readString(dateValue)).getTime()
+
+    return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER
+  }
+
+  async function fetchCommunityAttendeesForCsv(filter: CommunityFilter) {
+    if (!eventId) return []
+
+    const communityAttendees: CommunityCsvAttendee[] = []
+
+    for (let page = 0; ; page += 1) {
+      const from = page * COMMUNITY_CSV_PAGE_SIZE
+      const to = from + COMMUNITY_CSV_PAGE_SIZE - 1
+      let attendeeQuery = supabase
+        .from('event_attendees')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('community_consent', true)
+
+      if (filter === 'pending') {
+        attendeeQuery = attendeeQuery.or('community_welcome_sent.eq.false,community_welcome_sent.is.null')
+      }
+
+      if (filter === 'sent') {
+        attendeeQuery = attendeeQuery.eq('community_welcome_sent', true)
+      }
+
+      const { data, error } = await attendeeQuery.range(from, to)
+
+      if (error) throw error
+
+      const pageRows = (data ?? []) as CommunityCsvAttendee[]
+      communityAttendees.push(...pageRows)
+
+      if (pageRows.length < COMMUNITY_CSV_PAGE_SIZE) break
+    }
+
+    return [...communityAttendees].sort(
+      (firstAttendee, secondAttendee) =>
+        getCommunityAttendeeSortTime(firstAttendee) - getCommunityAttendeeSortTime(secondAttendee),
+    )
+  }
+
+  async function handleDownloadCommunityCsv() {
+    if (!eventId) return
+
+    resetMessages()
+    setActionsMenu(null)
+    setIsExportingCommunityCsv(true)
+
+    try {
+      const csvFilter: CommunityFilter =
+        communityFilter === ALL_ATTENDEES_FILTER ? COMMUNITY_CSV_DEFAULT_FILTER : communityFilter
+      const communityAttendees = await fetchCommunityAttendeesForCsv(csvFilter)
+      const { contactCount, csv } = buildCommunityCsv(communityAttendees)
+      const csvLabel =
+        communityFilterOptions.find((option) => option.value === csvFilter)?.label ?? 'Comunidad'
+
+      if (contactCount === 0) {
+        setMessage(`No hay contactos para exportar en "${csvLabel}"`)
+        return
+      }
+
+      const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+
+      downloadBlob(csvBlob, buildCommunityCsvFileName(new Date(), communityFilterFileLabels[csvFilter]))
+      setMessage(`${contactCount} contactos de comunidad exportados.`)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setIsExportingCommunityCsv(false)
+    }
+  }
+
+  async function handleMarkCommunityWelcomeSent(attendee: EventAttendee) {
+    resetMessages()
+    setActionsMenu(null)
+    setBusyAction(`community-welcome:${attendee.id}`)
+
+    try {
+      const { data, error } = await supabase.rpc('mark_community_welcome_sent', {
+        p_attendee_id: attendee.id,
+      })
+
+      if (error) throw error
+
+      const result = Array.isArray(data) ? data[0] : data
+      const sentAt = readString(result?.community_welcome_sent_at) || new Date().toISOString()
+
+      setAttendees((currentAttendees) =>
+        currentAttendees.map((currentAttendee) =>
+          currentAttendee.id === attendee.id
+            ? {
+                ...currentAttendee,
+                community_welcome_sent: true,
+                community_welcome_sent_at: sentAt,
+              }
+            : currentAttendee,
+        ),
+      )
+      window.dispatchEvent(
+        new CustomEvent(COMMUNITY_WELCOME_UPDATED_EVENT, {
+          detail: { attendeeId: attendee.id, communityWelcomeSent: true },
+        }),
+      )
+      setMessage(`${getAttendeeName(attendee)} marcado con correo de bienvenida enviado.`)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  function toggleActionsMenu(attendeeId: string, trigger: HTMLButtonElement) {
+    setActionsMenu((currentMenu) => {
+      if (currentMenu?.attendeeId === attendeeId) return null
+
+      const rect = trigger.getBoundingClientRect()
+      const menuWidth = Math.min(ACTIONS_MENU_WIDTH, window.innerWidth - ACTIONS_MENU_GUTTER * 2)
+      const maxLeft = Math.max(ACTIONS_MENU_GUTTER, window.innerWidth - menuWidth - ACTIONS_MENU_GUTTER)
+      const left = Math.min(Math.max(ACTIONS_MENU_GUTTER, rect.right - menuWidth), maxLeft)
+      const spaceAbove = Math.max(0, rect.top - ACTIONS_MENU_GUTTER * 2)
+      const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - ACTIONS_MENU_GUTTER * 2)
+      const shouldOpenUp = spaceBelow < ACTIONS_MENU_ESTIMATED_HEIGHT && spaceAbove > spaceBelow
+      const availableHeight = shouldOpenUp ? spaceAbove : spaceBelow
+
+      return {
+        attendeeId,
+        left,
+        maxHeight: Math.max(96, Math.min(ACTIONS_MENU_ESTIMATED_HEIGHT, availableHeight)),
+        placement: shouldOpenUp ? 'top' : 'bottom',
+        top: shouldOpenUp ? rect.top - ACTIONS_MENU_GUTTER : rect.bottom + ACTIONS_MENU_GUTTER,
+        width: menuWidth,
+      }
+    })
+  }
+
+  function runActionsMenuAction(action: () => void) {
+    setActionsMenu(null)
+    action()
   }
 
   function resetAttendeeForm() {
@@ -631,6 +1062,7 @@ export default function AdminEventAttendees() {
           .update({
             ...attendeePayload,
             access_code: accessCode,
+            invitation_token: currentAttendee?.invitation_token || createQrToken(),
             qr_token: currentAttendee?.qr_token || createQrToken(),
           })
           .eq('id', editingAttendeeId)
@@ -644,6 +1076,7 @@ export default function AdminEventAttendees() {
           ...attendeePayload,
           access_code: accessCode,
           event_id: eventId,
+          invitation_token: createQrToken(),
           qr_token: createQrToken(),
         })
 
@@ -667,6 +1100,28 @@ export default function AdminEventAttendees() {
     const { data, error } = await supabase
       .from('event_attendees')
       .update({ qr_token: nextToken })
+      .eq('id', attendee.id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+
+    setAttendees((currentAttendees) =>
+      currentAttendees.map((currentAttendee) =>
+        currentAttendee.id === attendee.id ? (data as EventAttendee) : currentAttendee,
+      ),
+    )
+
+    return nextToken
+  }
+
+  async function ensureAttendeeInvitationToken(attendee: EventAttendee) {
+    if (attendee.invitation_token) return attendee.invitation_token
+
+    const nextToken = createQrToken()
+    const { data, error } = await supabase
+      .from('event_attendees')
+      .update({ invitation_token: nextToken })
       .eq('id', attendee.id)
       .select('*')
       .single()
@@ -722,6 +1177,11 @@ export default function AdminEventAttendees() {
       return
     }
 
+    if (getTicketStatus(attendee) === 'used' || getTicketStatus(attendee) === 'cancelled') {
+      setErrorMessage('No se puede generar una invitacion para una entrada utilizada o cancelada.')
+      return
+    }
+
     setBusyAction(`generate:${attendee.id}`)
 
     try {
@@ -737,7 +1197,7 @@ export default function AdminEventAttendees() {
       const accessCode = await ensureAttendeeAccessCode(attendee)
       const qrPayload = buildAdminCheckInUrl(qrToken, eventId)
       const qrBox = normalizeQrBox(qrDraft)
-      const invitationBlob = await renderInvitationPng({
+      const invitationBlob = await renderInvitationImage({
         accessCode,
         qrBox,
         qrPayload,
@@ -800,7 +1260,11 @@ export default function AdminEventAttendees() {
 
       const { error: attendeeUpdateError } = await supabase
         .from('event_attendees')
-        .update({ invitation_generated_at: generatedAt })
+        .update({
+          invitation_generated_at: generatedAt,
+          ticket_generated_at: hasLegalConsent(attendee) ? generatedAt : attendee.ticket_generated_at ?? null,
+          ticket_status: hasLegalConsent(attendee) ? 'generated' : getTicketStatus(attendee),
+        })
         .eq('id', attendee.id)
 
       if (attendeeUpdateError) throw attendeeUpdateError
@@ -981,6 +1445,141 @@ export default function AdminEventAttendees() {
     }
   }
 
+  async function handleCopyGuestInvitationLink(attendee: EventAttendee) {
+    resetMessages()
+    setBusyAction(`copy-guest-link:${attendee.id}`)
+
+    try {
+      const invitationToken = await ensureAttendeeInvitationToken(attendee)
+
+      if (!navigator.clipboard) throw new Error('Clipboard no esta disponible en este navegador.')
+
+      await navigator.clipboard.writeText(buildGuestInvitationUrl(invitationToken))
+      setMessage('Link unico de invitacion copiado.')
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleInvalidateTicket(attendee: EventAttendee) {
+    const confirmed = window.confirm(
+      `Desvalidar entrada de ${getAttendeeName(attendee)}? Quedará pendiente y podrá volver a escanearse.`,
+    )
+
+    if (!confirmed) return
+
+    resetMessages()
+    setBusyAction(`invalidate:${attendee.id}`)
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError) throw sessionError
+
+      const { error } = await supabase
+        .from('event_attendees')
+        .update({
+          check_in_status: 'pending',
+          checked_in_at: null,
+          checked_in_by: null,
+        })
+        .eq('id', attendee.id)
+
+      if (error) throw error
+
+      const { error: logError } = await supabase.from('check_in_logs').insert({
+        attendee_id: attendee.id,
+        event_id: attendee.event_id || eventId,
+        message: 'Entrada desvalidada desde gestion de asistentes.',
+        result: 'pending',
+        scanned_by: sessionData.session?.user.id ?? null,
+        token_scanned: readString(attendee.qr_token) || getAttendeeAccessCode(attendee) || attendee.id,
+      })
+
+      if (logError && import.meta.env.DEV) {
+        console.warn('[AdminEventAttendees] could not audit invalidate action', logError)
+      }
+
+      setMessage('Entrada desvalidada. El QR puede volver a escanearse.')
+      await loadAdminData()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleCancelInvitation(attendee: EventAttendee) {
+    const confirmed = window.confirm(
+      `Cancelar invitación de ${getAttendeeName(attendee)}? El QR dejará de validar y el historial se conservará.`,
+    )
+
+    if (!confirmed) return
+
+    resetMessages()
+    setBusyAction(`cancel:${attendee.id}`)
+
+    try {
+      const { error } = await supabase
+        .from('event_attendees')
+        .update({
+          check_in_status: 'cancelled',
+          checked_in_at: null,
+          checked_in_by: null,
+          ticket_status: 'cancelled',
+        })
+        .eq('id', attendee.id)
+
+      if (error) throw error
+
+      setMessage('Invitacion cancelada. El QR ya no valida.')
+      await loadAdminData()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleDeleteAttendee(attendee: EventAttendee) {
+    const attendeeInvitations = invitations.filter((invitation) => invitation.attendee_id === attendee.id)
+    const confirmation = window.prompt(
+      `Eliminar asistente ${getAttendeeName(attendee)}? Esto eliminará su registro y ${attendeeInvitations.length} invitación(es) del historial. Escribe ELIMINAR para confirmar.`,
+    )
+
+    if (confirmation !== 'ELIMINAR') return
+
+    resetMessages()
+    setBusyAction(`delete-attendee:${attendee.id}`)
+
+    try {
+      const paths = attendeeInvitations.map((invitation) => readString(invitation.path)).filter(Boolean)
+
+      if (paths.length > 0) {
+        const { error: storageError } = await supabase.storage.from(GENERATED_INVITATIONS_BUCKET).remove(paths)
+
+        if (storageError) throw storageError
+      }
+
+      const { error } = await supabase.from('event_attendees').delete().eq('id', attendee.id)
+
+      if (error) throw error
+
+      if (historyAttendee?.id === attendee.id) {
+        setHistoryAttendee(null)
+      }
+
+      setMessage('Asistente eliminado.')
+      await loadAdminData()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   async function handleCopyAccessCode(attendee: EventAttendee) {
     resetMessages()
     setBusyAction(`copy-code:${attendee.id}`)
@@ -1017,6 +1616,13 @@ export default function AdminEventAttendees() {
     }
   }
 
+  const actionsMenuAttendee = actionsMenu
+    ? attendees.find((attendee) => attendee.id === actionsMenu.attendeeId) ?? null
+    : null
+  const isActionsMenuAttendeeValidated = actionsMenuAttendee
+    ? readString(actionsMenuAttendee.check_in_status) === 'checked_in' || Boolean(actionsMenuAttendee.checked_in_at)
+    : false
+
   if (!eventId) {
     return (
       <section className="py-20">
@@ -1030,18 +1636,19 @@ export default function AdminEventAttendees() {
   }
 
   return (
-    <section className="py-20">
+    <section className="pb-40 pt-20 sm:pb-44">
       <div className="onda-container">
-        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div className="grid gap-6">
           <SectionTitle
             eyebrow="Admin"
             title="Asistentes e invitaciones"
             subtitle={isLoading ? 'Cargando evento...' : eventTitle}
           />
-          <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+          <div className="flex w-full flex-col gap-3 rounded-lg border border-onda-purple/22 bg-onda-black/72 p-3 shadow-[0_0_28px_rgba(123,44,255,0.16)] sm:flex-row sm:flex-wrap sm:items-center">
             <CTAButton
               to="/admin/eventos"
               variant="secondary"
+              className="min-h-11 w-full justify-center px-4 py-2 text-[0.66rem] tracking-[0.13em] sm:w-auto sm:min-w-36"
               icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
             >
               Eventos
@@ -1049,11 +1656,12 @@ export default function AdminEventAttendees() {
             <CTAButton
               to="/admin/check-in"
               variant="secondary"
+              className="min-h-11 w-full justify-center px-4 py-2 text-[0.66rem] tracking-[0.13em] sm:w-auto sm:min-w-40"
               icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
             >
               Check-in
             </CTAButton>
-            <AdminSignOutButton />
+            <AdminSignOutButton className="min-h-11 w-full justify-center px-4 py-2 text-[0.66rem] tracking-[0.13em] sm:ml-auto sm:w-auto sm:min-w-48" />
           </div>
         </div>
 
@@ -1235,7 +1843,7 @@ export default function AdminEventAttendees() {
               </div>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+            <div className="grid items-start gap-6 xl:grid-cols-[0.8fr_1.2fr]">
               <form className="glass-panel grid gap-4 rounded-lg p-5" onSubmit={handleAttendeeSubmit}>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-onda-purple/10 text-onda-purple dark:bg-onda-purple/20 dark:text-onda-lavender">
@@ -1357,30 +1965,154 @@ export default function AdminEventAttendees() {
                 </div>
               </form>
 
-              <div className="glass-panel overflow-hidden rounded-lg">
-                <div className="flex items-center justify-between gap-3 border-b border-onda-purple/10 px-5 py-4">
-                  <div>
-                    <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
-                      Gestion de asistentes
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
-                      {attendees.length} asistentes registrados
-                    </p>
+              <div className="glass-panel flex max-h-[min(44rem,calc(100vh-8rem))] min-h-[24rem] flex-col overflow-hidden rounded-lg">
+                <div className="grid shrink-0 gap-4 border-b border-onda-purple/10 px-5 py-4">
+                  <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
+                    <div className="min-w-0">
+                      <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
+                        Gestion de asistentes
+                      </h3>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
+                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                            {attendees.length}
+                          </div>
+                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                            Registrados
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
+                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                            {communityStats.all}
+                          </div>
+                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                            Comunidad
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
+                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                            {communityFilteredAttendees.length}
+                          </div>
+                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                            Visibles
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid w-full gap-2 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] 2xl:w-auto 2xl:min-w-[31rem]">
+                      <label className="sr-only" htmlFor="community-csv-scope">
+                        Filtro comunidad
+                      </label>
+                      <select
+                        id="community-csv-scope"
+                        value={communityFilter}
+                        onChange={(selectEvent) => {
+                          setCommunityFilter(selectEvent.target.value as AttendeeScopeFilter)
+                          setActionsMenu(null)
+                        }}
+                        disabled={isExportingCommunityCsv}
+                        className="h-11 min-w-0 rounded-md border border-onda-lavender/40 bg-[#10051f] px-4 py-2 font-display text-[0.66rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{ backgroundColor: '#10051f', color: '#ffffff' }}
+                      >
+                        <option
+                          value={ALL_ATTENDEES_FILTER}
+                          style={{ backgroundColor: '#10051f', color: '#ffffff' }}
+                        >
+                          Todas las entradas ({attendees.length})
+                        </option>
+                        {communityFilterOptions.map((option) => (
+                          <option
+                            key={option.value}
+                            value={option.value}
+                            style={{ backgroundColor: '#10051f', color: '#ffffff' }}
+                          >
+                            {option.label} ({communityStats[option.value]})
+                          </option>
+                        ))}
+                      </select>
+                      <CTAButton
+                        type="button"
+                        variant="secondary"
+                        className="h-11 justify-center px-4 py-2 text-[0.64rem] tracking-[0.12em]"
+                        icon={
+                          isExportingCommunityCsv ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Download className="h-4 w-4" aria-hidden="true" />
+                          )
+                        }
+                        onClick={() => void handleDownloadCommunityCsv()}
+                        disabled={isExportingCommunityCsv}
+                      >
+                        CSV comunidad
+                      </CTAButton>
+                      <div className="hidden h-11 w-11 items-center justify-center rounded-md border border-onda-purple/18 bg-white/55 text-onda-purple dark:bg-white/5 dark:text-onda-lavender sm:flex">
+                        <Clock3 className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                    </div>
                   </div>
-                  <Clock3 className="h-5 w-5 text-onda-purple dark:text-onda-lavender" aria-hidden="true" />
+
+                  <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="Filtrar entradas por estado">
+                    {ticketFilterOptions.map((option) => {
+                      const isActive = ticketStatusFilter === option.value
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setTicketStatusFilter(option.value)
+                            setActionsMenu(null)
+                          }}
+                          className={cn(
+                            'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-bold transition',
+                            isActive
+                              ? 'border-onda-purple bg-onda-purple text-white shadow-[0_0_18px_rgba(123,44,255,0.28)] dark:border-onda-lavender dark:bg-onda-lavender dark:text-onda-black'
+                              : 'border-onda-purple/20 bg-white/65 text-zinc-700 hover:border-onda-purple/45 hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
+                          )}
+                          aria-pressed={isActive}
+                        >
+                          {option.icon}
+                          <span>{option.label}</span>
+                          <span
+                            className={cn(
+                              'inline-flex min-w-7 justify-center rounded-md px-2 py-0.5 font-display text-[0.66rem] leading-5',
+                              isActive ? 'bg-white/20' : 'bg-onda-purple/10 text-onda-purple dark:text-onda-lavender',
+                            )}
+                          >
+                            {option.count}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 {attendees.length === 0 ? (
                   <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
                     Todavia no hay asistentes para este evento.
                   </div>
+                ) : communityFilteredAttendees.length === 0 ? (
+                  <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
+                    {communityFilter === 'pending'
+                      ? 'No hay correos de bienvenida pendientes.'
+                      : communityFilter === 'sent'
+                        ? 'No hay correos de bienvenida marcados como enviados.'
+                        : 'No hay asistentes con consentimiento de comunidad.'}
+                  </div>
+                ) : filteredAttendees.length === 0 ? (
+                  <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
+                    No hay entradas {ticketStatusFilter === 'generated' ? 'generadas' : 'utilizadas'}.
+                  </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1120px] text-left text-sm">
-                      <thead className="bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <table className="w-full min-w-[1180px] text-left text-sm">
+                      <thead className="sticky top-0 z-10 bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
                         <tr>
                           <th className="px-4 py-3">Asistente</th>
-                          <th className="px-4 py-3">Check-in</th>
+                          <th className="px-4 py-3">Entrada</th>
+                          <th className="px-4 py-3">Consentimiento</th>
+                          <th className="px-4 py-3">Comunidad</th>
                           <th className="px-4 py-3">Codigo</th>
                           <th className="px-4 py-3">Contacto</th>
                           <th className="px-4 py-3">Ultima invitacion</th>
@@ -1388,9 +2120,10 @@ export default function AdminEventAttendees() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-onda-purple/10">
-                        {attendees.map((attendee) => {
+                        {filteredAttendees.map((attendee) => {
                           const latestInvitation = latestInvitationByAttendeeId.get(attendee.id)
                           const accessCode = getAttendeeAccessCode(attendee)
+                          const isActionsMenuOpen = actionsMenu?.attendeeId === attendee.id
 
                           return (
                             <tr key={attendee.id}>
@@ -1406,11 +2139,67 @@ export default function AdminEventAttendees() {
                                 <span
                                   className={cn(
                                     'inline-flex rounded-md border px-2.5 py-1.5 text-xs font-bold',
-                                    getCheckInStatusClassName(attendee),
+                                    getTicketStatusClassName(attendee),
                                   )}
                                 >
-                                  {getCheckInStatusLabel(attendee)}
+                                  {getTicketStatusLabel(attendee)}
                                 </span>
+                                <div className="mt-2 text-xs text-zinc-500 dark:text-onda-muted">
+                                  Check-in: {getCheckInStatusLabel(attendee)}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 align-top">
+                                <span
+                                  className={cn(
+                                    'inline-flex rounded-md border px-2.5 py-1.5 text-xs font-bold',
+                                    getConsentStatusClassName(attendee),
+                                  )}
+                                >
+                                  {getConsentStatusLabel(attendee)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 align-top text-zinc-600 dark:text-onda-muted">
+                                <div className="font-semibold text-zinc-950 dark:text-white">
+                                  {attendee.community_consent ? 'Si' : 'No'}
+                                </div>
+                                <div className="mt-1 text-xs">
+                                  {attendee.community_consent_at ? formatDateTime(attendee.community_consent_at) : 'Sin fecha'}
+                                </div>
+                                {attendee.community_consent ? (
+                                  <div className="mt-3 grid gap-2">
+                                    <span
+                                      className={cn(
+                                        'inline-flex w-fit rounded-md border px-2.5 py-1.5 text-xs font-bold',
+                                        attendee.community_welcome_sent
+                                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+                                          : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200',
+                                      )}
+                                    >
+                                      {attendee.community_welcome_sent ? 'Correo enviado' : 'Bienvenida pendiente'}
+                                    </span>
+                                    {attendee.community_welcome_sent ? (
+                                      <div className="text-xs">
+                                        {attendee.community_welcome_sent_at
+                                          ? formatDateTime(attendee.community_welcome_sent_at)
+                                          : 'Sin fecha de envio'}
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleMarkCommunityWelcomeSent(attendee)}
+                                        disabled={Boolean(busyAction)}
+                                        className="inline-flex min-h-9 w-fit items-center justify-center gap-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 font-display text-[0.6rem] font-bold uppercase tracking-[0.11em] text-emerald-700 transition hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-100"
+                                      >
+                                        {isBusy('community-welcome', attendee.id) ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                                        ) : (
+                                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                        )}
+                                        <span>{isBusy('community-welcome', attendee.id) ? 'Marcando...' : 'Marcar enviado'}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : null}
                               </td>
                               <td className="px-4 py-4 align-top">
                                 <div className="font-display text-base font-extrabold tracking-[0.12em] text-zinc-950 dark:text-white">
@@ -1444,14 +2233,21 @@ export default function AdminEventAttendees() {
                                     disabled={Boolean(busyAction)}
                                     variant="primary"
                                   >
-                                    Generar invitacion
+                                    Generar invitación
                                   </ActionButton>
                                   <ActionButton
                                     icon={<Download className="h-4 w-4" aria-hidden="true" />}
                                     onClick={() => handleDownloadLatest(attendee)}
                                     disabled={!latestInvitation || Boolean(busyAction)}
                                   >
-                                    Descargar ultima
+                                    Descargar última
+                                  </ActionButton>
+                                  <ActionButton
+                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                                    onClick={() => void handleCopyGuestInvitationLink(attendee)}
+                                    disabled={Boolean(busyAction)}
+                                  >
+                                    Copiar link invitación
                                   </ActionButton>
                                   <ActionButton
                                     icon={<History className="h-4 w-4" aria-hidden="true" />}
@@ -1459,34 +2255,22 @@ export default function AdminEventAttendees() {
                                   >
                                     Ver historial
                                   </ActionButton>
-                                  <ActionButton
-                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => void handleCopyAccessCode(attendee)}
-                                    disabled={Boolean(busyAction)}
+                                  <button
+                                    type="button"
+                                    data-attendee-actions-trigger
+                                    onClick={(clickEvent) => toggleActionsMenu(attendee.id, clickEvent.currentTarget)}
+                                    className={cn(
+                                      'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border px-3.5 py-2.5 font-display text-[0.64rem] font-bold uppercase leading-tight tracking-[0.12em] transition duration-300',
+                                      actionButtonVariants.ghost,
+                                      isActionsMenuOpen && 'border-onda-purple/45 bg-onda-purple/10',
+                                    )}
+                                    aria-expanded={isActionsMenuOpen}
+                                    aria-haspopup="menu"
                                   >
-                                    Copiar codigo
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => void handleCopyQrLink(attendee)}
-                                    disabled={Boolean(busyAction)}
-                                  >
-                                    Copiar link QR
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => void handleDownloadQrOnly(attendee)}
-                                    disabled={Boolean(busyAction)}
-                                  >
-                                    Descargar QR solo
-                                  </ActionButton>
-                                  <ActionButton
-                                    icon={<Edit3 className="h-4 w-4" aria-hidden="true" />}
-                                    onClick={() => handleEditAttendee(attendee)}
-                                    variant="ghost"
-                                  >
-                                    Editar
-                                  </ActionButton>
+                                    <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                                    <span>Más acciones</span>
+                                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1505,6 +2289,83 @@ export default function AdminEventAttendees() {
           </div>
         )}
       </div>
+
+      {actionsMenu && actionsMenuAttendee && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              data-attendee-actions-menu
+              role="menu"
+              className={cn(
+                'fixed z-[90] overflow-y-auto rounded-lg border border-onda-purple/18 bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.24)] dark:bg-onda-black',
+                actionsMenu.placement === 'top' && '-translate-y-full',
+              )}
+              style={{
+                left: actionsMenu.left,
+                maxHeight: actionsMenu.maxHeight,
+                top: actionsMenu.top,
+                width: actionsMenu.width,
+              }}
+            >
+              <ActionsMenuItem
+                icon={<Edit3 className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => handleEditAttendee(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Editar
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleCopyAccessCode(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Copiar código
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Clipboard className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleCopyQrLink(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Copiar link QR
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleDownloadQrOnly(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+              >
+                Descargar QR solo
+              </ActionsMenuItem>
+              <div className="my-2 h-px bg-onda-purple/12" />
+              <ActionsMenuItem
+                icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleInvalidateTicket(actionsMenuAttendee))}
+                disabled={Boolean(busyAction) || !isActionsMenuAttendeeValidated}
+              >
+                Desvalidar entrada
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Ban className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleCancelInvitation(actionsMenuAttendee))}
+                disabled={
+                  Boolean(busyAction) ||
+                  getTicketStatus(actionsMenuAttendee) === 'cancelled' ||
+                  getTicketStatus(actionsMenuAttendee) === 'used'
+                }
+                danger
+              >
+                Cancelar invitación
+              </ActionsMenuItem>
+              <ActionsMenuItem
+                icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleDeleteAttendee(actionsMenuAttendee))}
+                disabled={Boolean(busyAction)}
+                danger
+              >
+                Eliminar asistente
+              </ActionsMenuItem>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {historyAttendee ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/72 px-4 py-6 backdrop-blur-sm">

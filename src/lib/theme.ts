@@ -19,28 +19,52 @@ type ThemeContextValue = {
   toggleTheme: () => void
 }
 
-const storageKey = 'onda-multimedia-theme'
+export const THEME_STORAGE_KEY = 'onda-multimedia-theme'
+const systemThemeQuery = '(prefers-color-scheme: dark)'
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
 function isThemePreference(value: string | null): value is ThemePreference {
   return value === 'light' || value === 'dark' || value === 'system'
 }
 
-function getSystemTheme(): ThemeMode {
-  if (typeof window === 'undefined') {
-    return 'dark'
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-function getInitialPreference(): ThemePreference {
+function getStoredPreference(): ThemePreference {
   if (typeof window === 'undefined') {
     return 'system'
   }
 
-  const storedPreference = window.localStorage.getItem(storageKey)
-  return isThemePreference(storedPreference) ? storedPreference : 'system'
+  try {
+    const storedPreference = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return isThemePreference(storedPreference) ? storedPreference : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+function getSystemTheme(): ThemeMode {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'light'
+  }
+
+  try {
+    return window.matchMedia(systemThemeQuery).matches ? 'dark' : 'light'
+  } catch {
+    return 'light'
+  }
+}
+
+function getInitialPreference(): ThemePreference {
+  return getStoredPreference()
+}
+
+function applyTheme(theme: ThemeMode, preference: ThemePreference) {
+  if (typeof document === 'undefined') return
+
+  const root = document.documentElement
+
+  root.classList.toggle('dark', theme === 'dark')
+  root.dataset.theme = theme
+  root.dataset.themePreference = preference
+  root.style.colorScheme = theme
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -49,29 +73,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const theme = preference === 'system' ? systemTheme : preference
 
   useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = () => setSystemTheme(media.matches ? 'dark' : 'light')
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined
+    }
+
+    const media = window.matchMedia(systemThemeQuery)
+    const handleChange = (event?: MediaQueryListEvent) => {
+      setSystemTheme((event?.matches ?? media.matches) ? 'dark' : 'light')
+    }
 
     handleChange()
-    media.addEventListener('change', handleChange)
 
-    return () => media.removeEventListener('change', handleChange)
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleChange)
+      return () => media.removeEventListener('change', handleChange)
+    }
+
+    media.addListener(handleChange)
+    return () => media.removeListener(handleChange)
   }, [])
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    document.documentElement.dataset.theme = theme
-  }, [theme])
+    applyTheme(theme, preference)
+  }, [preference, theme])
 
   const setThemePreference = useCallback((nextPreference: ThemePreference) => {
     setPreference(nextPreference)
 
-    if (nextPreference === 'system') {
-      window.localStorage.removeItem(storageKey)
-      return
-    }
+    try {
+      if (nextPreference === 'system') {
+        window.localStorage.removeItem(THEME_STORAGE_KEY)
+        return
+      }
 
-    window.localStorage.setItem(storageKey, nextPreference)
+      window.localStorage.setItem(THEME_STORAGE_KEY, nextPreference)
+    } catch {
+      // Storage can be unavailable in restricted browser modes; the in-memory preference still applies.
+    }
   }, [])
 
   const toggleTheme = useCallback(() => {

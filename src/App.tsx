@@ -17,7 +17,9 @@ import Artistas from './routes/Artistas'
 import Contacto from './routes/Contacto'
 import Eventos from './routes/Eventos'
 import EventoDetalle from './routes/EventoDetalle'
+import GuestInvitation from './routes/GuestInvitation'
 import Home from './routes/Home'
+import { PrivacyPolicy, TermsConditions } from './routes/LegalPages'
 import Servicios from './routes/Servicios'
 
 function ScrollToTop() {
@@ -31,6 +33,9 @@ function ScrollToTop() {
 }
 
 function App() {
+  const { pathname } = useLocation()
+  const showFloatingAssistant = !pathname.startsWith('/admin')
+
   return (
     <I18nProvider>
       <SpotifyPlayerProvider>
@@ -44,7 +49,11 @@ function App() {
               <Route path="/servicios" element={<Servicios />} />
               <Route path="/eventos" element={<Eventos />} />
               <Route path="/eventos/:eventId" element={<EventoDetalle />} />
+              <Route path="/entrada" element={<GuestInvitation />} />
+              <Route path="/entrada/:invitationToken" element={<GuestInvitation />} />
               <Route path="/contacto" element={<Contacto />} />
+              <Route path="/politicas-de-privacidad" element={<PrivacyPolicy />} />
+              <Route path="/terminos-y-condiciones" element={<TermsConditions />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/reset-password" element={<AdminResetPassword />} />
               <Route
@@ -82,7 +91,7 @@ function App() {
             </Routes>
           </main>
           <Footer />
-          <FloatingAssistant />
+          {showFloatingAssistant ? <FloatingAssistant /> : null}
           <PersistentSpotifyPlayer />
         </div>
       </SpotifyPlayerProvider>

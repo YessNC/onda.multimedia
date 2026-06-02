@@ -68,6 +68,12 @@ export default {
   'artists.description':
     'Canciones destacadas, perfiles oficiales y presencia urbana conectada con Spotify desde una experiencia propia de ONDA MULTIMEDIA.',
   'artists.profile-link': 'Ver perfil en Spotify',
+  'artists.profile.spotify': 'Ver perfil en Spotify',
+  'artists.profile.tiktok': 'Ver perfil en TikTok',
+  'artists.profile.instagram': 'Ver perfil en Instagram',
+  'artists.profile.apple-music': 'Ver perfil en Apple Music',
+  'artists.profile.amazon-music': 'Ver perfil en Amazon Music',
+  'artists.profile.youtube': 'Ver perfil en YouTube',
   'artists.featured': 'Canciones destacadas',
 
   // Artist Descriptions
@@ -241,7 +247,11 @@ export default {
   'hero.listen-youtube': 'Escuchar en YouTube',
   'hero.listen-spotify': 'Escuchar en Spotify',
   'hero.open-spotify': 'Abrir Spotify de',
+  'hero.open-tiktok': 'Abrir TikTok de',
   'hero.open-instagram': 'Abrir Instagram de',
+  'hero.open-apple-music': 'Abrir Apple Music de',
+  'hero.open-amazon-music': 'Abrir Amazon Music de',
+  'hero.open-youtube': 'Abrir YouTube de',
 
   // Tracks / cards
   'track.play': 'Reproducir',

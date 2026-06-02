@@ -2,15 +2,15 @@ import { motion } from 'framer-motion'
 import { ArrowDown, ArrowRight, Calendar, Music, Play, User } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { getArtistHeroOpenLabelKey, getArtistPlatformLinks, getArtistSocialLinks } from '../../data/artistPlatforms'
 import { useBrandLogoAsset } from '../../lib/brandAssets'
 import { useTheme } from '../../lib/theme'
 import { cn } from '../../lib/utils'
 import { useI18n } from '../../hooks/useI18n'
+import ArtistPlatformIcon, { SpotifyIcon } from '../shared/ArtistPlatformIcon'
 
 const robotDaySrc = '/assets/brand/robot-day.png'
 const robotNightSrc = '/assets/brand/robot-night.png'
-const vektorbenSpotifyUrl = 'https://open.spotify.com/intl-es/artist/60f1mSGeUUhevHXVgZpAii?si=diUtB478Sb20GNgTdbMysA'
-const vektorbenInstagramUrl = 'https://www.instagram.com/vektorbenlavision/'
 
 type BrandHeroSlide = {
   kind: 'brand'
@@ -19,6 +19,8 @@ type BrandHeroSlide = {
 type ArtistHeroSlide = {
   accent?: string
   backgroundImage?: string
+  backgroundImageMobile?: string
+  backgroundImageTablet?: string
   backgroundPosition?: string
   kind: 'artist'
   name?: string
@@ -85,30 +87,6 @@ function HeroGlassButton({ children, className, href, icon, to, variant = 'secon
   )
 }
 
-function SpotifyIcon() {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
-  const color = isDark ? '#ffffff' : '#18181b'
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="currentColor" color={color}>
-      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.59 14.42a.69.69 0 0 1-.95.23c-2.6-1.59-5.88-1.95-9.74-1.07a.69.69 0 1 1-.3-1.35c4.22-.96 7.84-.54 10.76 1.25.32.19.43.62.23.94Zm1.22-2.72a.86.86 0 0 1-1.18.28c-2.98-1.83-7.51-2.36-11.03-1.29a.86.86 0 1 1-.5-1.65c4.02-1.22 9.02-.63 12.43 1.46.4.25.53.78.28 1.2Zm.1-2.83C14.34 8.75 8.45 8.55 5.04 9.59a1.03 1.03 0 1 1-.6-1.97c3.92-1.19 10.43-.96 14.52 1.46a1.03 1.03 0 0 1-1.05 1.79Z" />
-    </svg>
-  )
-}
-
-function InstagramIcon() {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
-  const color = isDark ? '#ffffff' : '#18181b'
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none">
-      <rect width="16" height="16" x="4" y="4" rx="4.4" stroke="currentColor" strokeWidth="1.8" color={color} />
-      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" color={color} />
-      <circle cx="16.7" cy="7.35" r="1" fill="currentColor" color={color} />
-    </svg>
-  )
-}
-
 function VektorbenSocialLink({ children, href, label }: { children: ReactNode; href: string; label: string }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -120,7 +98,7 @@ function VektorbenSocialLink({ children, href, label }: { children: ReactNode; h
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'inline-flex h-10 w-10 items-center justify-center rounded-md border transition duration-300 backdrop-blur-xl',
+        'vektorben-social-link inline-flex h-[2.15rem] w-[2.15rem] shrink-0 items-center justify-center rounded-md border p-[0.48rem] transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender sm:h-9 sm:w-9 sm:p-2 lg:h-[2.35rem] lg:w-[2.35rem] lg:p-[0.55rem]',
         isDark
           ? 'border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
           : 'border-zinc-800/60 bg-zinc-900/15 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
@@ -226,7 +204,10 @@ function BrandSlide() {
   const { t } = useI18n()
   const robot = useRobotAsset()
   const logo = useBrandLogoAsset()
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -234,7 +215,6 @@ function BrandSlide() {
     const mediaQuery = window.matchMedia('(max-width: 767px)')
     const updateIsMobile = (event: MediaQueryListEvent) => setIsMobile(event.matches)
 
-    setIsMobile(mediaQuery.matches)
     mediaQuery.addEventListener('change', updateIsMobile)
 
     return () => mediaQuery.removeEventListener('change', updateIsMobile)
@@ -313,11 +293,17 @@ function BrandSlide() {
 
 function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
   const hasImage = Boolean(slide.backgroundImage)
+  const hasResponsiveImage = Boolean(slide.backgroundImageMobile || slide.backgroundImageTablet)
   const { t } = useI18n()
   const { theme } = useTheme()
   const displayName = slide.nameKey ? t(slide.nameKey) : slide.name ?? ''
   const displayTagline = slide.taglineKey ? t(slide.taglineKey) : slide.tagline
-  const isVektorben = displayName.toLowerCase() === 'vektorben'
+  const featuredArtistKey = displayName.toLowerCase()
+  const featuredArtistLinks = getArtistPlatformLinks(featuredArtistKey)
+  const featuredArtistSpotifyLink = featuredArtistLinks.find((link) => link.platform === 'spotify')
+  const featuredArtistSocials = getArtistSocialLinks(featuredArtistKey)
+  const hasFeaturedArtistCard = Boolean(featuredArtistSpotifyLink)
+  const isVektorbenSlide = featuredArtistKey === 'vektorben'
   const isDark = theme === 'dark'
   const fallbackBackground =
     slide.accent ??
@@ -325,16 +311,36 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
 
   return (
     <section className="relative h-full min-h-full overflow-hidden px-4 text-white sm:px-6 lg:px-8">
-      {hasImage ? (
+      {hasImage && hasResponsiveImage ? (
+        <picture className="absolute inset-0 block h-full min-h-full w-full">
+          {slide.backgroundImageMobile ? <source media="(max-width: 640px)" srcSet={slide.backgroundImageMobile} /> : null}
+          {slide.backgroundImageTablet ? (
+            <source media="(min-width: 641px) and (max-width: 1024px)" srcSet={slide.backgroundImageTablet} />
+          ) : null}
+          <source media="(min-width: 1025px)" srcSet={slide.backgroundImage} />
+          <img
+            src={slide.backgroundImage}
+            alt=""
+            aria-hidden="true"
+            className={cn(
+              'h-full min-h-full w-full scale-[1.01] object-cover',
+              hasFeaturedArtistCard && 'vektorben-hero-image',
+              isVektorbenSlide && 'vektorben-hero-image--mobile-balanced',
+            )}
+            style={hasFeaturedArtistCard ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
+          />
+        </picture>
+      ) : hasImage ? (
         <img
           src={slide.backgroundImage}
           alt=""
           aria-hidden="true"
           className={cn(
             'absolute inset-0 h-full min-h-full w-full scale-[1.01] object-cover',
-            isVektorben && 'vektorben-hero-image',
+            hasFeaturedArtistCard && 'vektorben-hero-image',
+            isVektorbenSlide && 'vektorben-hero-image--mobile-balanced',
           )}
-          style={isVektorben ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
+          style={hasFeaturedArtistCard ? undefined : { objectPosition: slide.backgroundPosition ?? 'center center' }}
         />
       ) : (
         <div className="absolute inset-0" style={{ background: fallbackBackground }} />
@@ -342,7 +348,7 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
       <div
         className={cn(
           'absolute inset-0',
-          isVektorben
+          hasFeaturedArtistCard
             ? 'bg-[linear-gradient(90deg,rgba(5,5,5,0.58)_0%,rgba(5,5,5,0.28)_38%,rgba(5,5,5,0.1)_68%,rgba(5,5,5,0.34)_100%)]'
             : 'bg-[linear-gradient(90deg,rgba(5,5,5,0.82)_0%,rgba(5,5,5,0.42)_42%,rgba(5,5,5,0.68)_100%)]',
         )}
@@ -350,27 +356,28 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
       <div
         className={cn(
           'absolute inset-0',
-          isVektorben
+          hasFeaturedArtistCard
             ? 'bg-[linear-gradient(180deg,rgba(5,5,5,0.04)_0%,rgba(123,44,255,0.08)_52%,rgba(5,5,5,0.2)_100%)]'
             : 'bg-[radial-gradient(circle_at_48%_50%,rgba(168,85,247,0.18),transparent_34%),linear-gradient(180deg,rgba(5,5,5,0.16)_0%,rgba(5,5,5,0.66)_100%)]',
         )}
       />
-      {!isVektorben ? <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/45 to-transparent" /> : null}
+      {!hasFeaturedArtistCard ? <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/45 to-transparent" /> : null}
 
       <div
         className={cn(
-          isVektorben
-            ? 'absolute bottom-[clamp(4.75rem,10vh,8rem)] left-[clamp(1rem,5vw,6rem)] z-10 w-[calc(100%_-_2rem)] sm:w-auto'
+          hasFeaturedArtistCard
+            ? 'vektorben-hero-content absolute bottom-[clamp(2.5rem,4.8svh,3.25rem)] left-[clamp(1rem,5vw,6rem)] z-10 w-[calc(100%_-_2rem)] sm:bottom-[clamp(3rem,5.2vh,4.25rem)] sm:w-auto lg:bottom-[clamp(2.8rem,5.5vh,4.6rem)]'
             : 'onda-container relative z-10 flex h-full min-h-full items-end py-16 sm:items-center',
+          isVektorbenSlide && 'vektorben-hero-content--mobile-balanced',
         )}
       >
         <motion.div
           className={cn(
             'rounded-lg border backdrop-blur-2xl',
-            isVektorben
+            hasFeaturedArtistCard
               ? isDark
-                ? 'w-full max-w-[24rem] border-white/18 bg-black/24 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[26rem] sm:p-5'
-                : 'w-full max-w-[24rem] border-onda-purple/35 bg-white/95 p-4 shadow-[0_18px_70px_rgba(123,44,255,0.16)] sm:max-w-[26rem] sm:p-5'
+                ? 'vektorben-hero-card w-full max-w-full border-white/18 bg-black/24 p-3 shadow-[0_18px_70px_rgba(123,44,255,0.18)] sm:max-w-[30rem] sm:p-5 lg:max-w-[32rem]'
+                : 'vektorben-hero-card w-full max-w-full border-onda-purple/35 bg-white/95 p-3 shadow-[0_18px_70px_rgba(123,44,255,0.16)] sm:max-w-[30rem] sm:p-5 lg:max-w-[32rem]'
               : 'max-w-xl border-white/18 bg-black/28 p-5 shadow-[0_26px_100px_rgba(123,44,255,0.22)] sm:p-6',
           )}
           initial={{ opacity: 0, y: 26 }}
@@ -380,39 +387,45 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
           <h2
             className={cn(
               'font-display font-black uppercase leading-none',
-              isVektorben
+              hasFeaturedArtistCard
                 ? isDark
-                  ? 'text-3xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-4xl lg:text-5xl'
-                  : 'text-3xl text-zinc-900 sm:text-4xl lg:text-5xl'
+                  ? 'vektorben-hero-title text-3xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-4xl lg:text-5xl'
+                  : 'vektorben-hero-title text-3xl text-zinc-900 sm:text-4xl lg:text-5xl'
                 : 'text-4xl text-white drop-shadow-[0_0_28px_rgba(168,85,247,0.35)] sm:text-5xl lg:text-6xl',
             )}
           >
             {displayName}
           </h2>
-          {!isVektorben && displayTagline ? (
+          {!hasFeaturedArtistCard && displayTagline ? (
             <p className="mt-3 max-w-md text-sm font-medium text-white/78 sm:text-base">{displayTagline}</p>
           ) : null}
 
-          {isVektorben ? (
-            <div className="mt-5 flex flex-wrap items-center gap-2">
+          {featuredArtistSpotifyLink ? (
+            <div className="vektorben-hero-actions mt-3 flex flex-nowrap items-center gap-[0.35rem] overflow-x-auto pb-0.5 sm:mt-5 sm:gap-2 sm:overflow-visible sm:pb-0">
               <a
-                href="#"
+                href={featuredArtistSpotifyLink.href}
+                aria-label={`${t('hero.open-spotify')} ${displayName}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={cn(
-                  'inline-flex h-10 items-center justify-center gap-2 rounded-md border font-display text-[0.62rem] font-bold uppercase tracking-[0.14em] transition duration-300 backdrop-blur-xl',
+                  'vektorben-hero-primary inline-flex h-[2.15rem] min-w-[7.85rem] shrink-0 items-center justify-center gap-1.5 rounded-md border px-2 font-display text-[0.5rem] font-bold uppercase tracking-[0.1em] transition duration-300 backdrop-blur-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-onda-lavender sm:h-9 sm:min-w-[8.9rem] sm:gap-2 sm:px-3 sm:text-[0.56rem] sm:tracking-[0.12em] lg:h-[2.35rem] lg:min-w-[9.35rem] lg:px-[0.9rem] lg:text-[0.6rem] lg:tracking-[0.14em]',
                   isDark
-                    ? 'border-white/18 bg-white/10 px-4 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
-                    : 'border-zinc-800/60 bg-zinc-900/15 px-4 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
+                    ? 'border-white/18 bg-white/10 text-white shadow-[0_0_22px_rgba(123,44,255,0.18)] hover:-translate-y-0.5 hover:border-onda-lavender/70 hover:bg-onda-purple/22 hover:shadow-[0_0_32px_rgba(168,85,247,0.38)]'
+                    : 'border-zinc-800/60 bg-zinc-900/15 text-zinc-800 shadow-[0_0_12px_rgba(24,24,27,0.08)] hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-900/25 hover:shadow-[0_0_16px_rgba(24,24,27,0.16)]',
                 )}
               >
-                <User className="h-3.5 w-3.5" aria-hidden="true" />
+                <SpotifyIcon className="h-3.5 w-3.5" />
                 {t('hero.view-artist')}
               </a>
-              <VektorbenSocialLink href={vektorbenSpotifyUrl} label={`${t('hero.open-spotify')} ${displayName}`}>
-                <SpotifyIcon />
-              </VektorbenSocialLink>
-              <VektorbenSocialLink href={vektorbenInstagramUrl} label={`${t('hero.open-instagram')} ${displayName}`}>
-                <InstagramIcon />
-              </VektorbenSocialLink>
+              {featuredArtistSocials.map((social) => (
+                <VektorbenSocialLink
+                  key={social.platform}
+                  href={social.href}
+                  label={`${t(getArtistHeroOpenLabelKey(social.platform))} ${displayName}`}
+                >
+                  <ArtistPlatformIcon platform={social.platform} />
+                </VektorbenSocialLink>
+              ))}
             </div>
           ) : (
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
