@@ -1997,7 +1997,7 @@ export default function AdminEventAttendees() {
 
               <div className="glass-panel flex max-h-[min(44rem,calc(100vh-8rem))] min-h-[24rem] flex-col overflow-hidden rounded-lg">
                 <div className="grid shrink-0 gap-4 border-b border-onda-purple/10 px-5 py-4">
-                  <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
+                  <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,44rem)] 2xl:items-start">
                     <div className="min-w-0">
                       <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
                         Gestion de asistentes
@@ -2029,7 +2029,7 @@ export default function AdminEventAttendees() {
                         </div>
                       </div>
                     </div>
-                    <div className="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1fr)_minmax(16rem,1fr)_auto_auto] 2xl:w-auto 2xl:min-w-[44rem]">
+                    <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
                       <label className="sr-only" htmlFor="community-csv-scope">
                         Filtro comunidad
                       </label>
@@ -2041,7 +2041,7 @@ export default function AdminEventAttendees() {
                           setActionsMenu(null)
                         }}
                         disabled={isExportingCommunityCsv}
-                        className="h-11 min-w-0 rounded-md border border-onda-lavender/40 bg-[#10051f] px-4 py-2 font-display text-[0.66rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="h-11 w-full min-w-0 rounded-md border border-onda-lavender/40 bg-[#10051f] px-4 py-2 font-display text-[0.66rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
                         style={{ backgroundColor: '#10051f', color: '#ffffff' }}
                       >
                         <option
@@ -2096,7 +2096,7 @@ export default function AdminEventAttendees() {
                       <CTAButton
                         type="button"
                         variant="secondary"
-                        className="h-11 justify-center px-4 py-2 text-[0.64rem] tracking-[0.12em]"
+                        className="h-11 min-w-0 justify-center px-3 py-2 text-[0.64rem] tracking-[0.12em] sm:min-w-20"
                         icon={
                           isExportingCommunityCsv ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -2107,7 +2107,7 @@ export default function AdminEventAttendees() {
                         onClick={() => void handleDownloadCommunityCsv()}
                         disabled={isExportingCommunityCsv}
                       >
-                        CSV comunidad
+                        CSV
                       </CTAButton>
                       <div className="hidden h-11 w-11 items-center justify-center rounded-md border border-onda-purple/18 bg-white/55 text-onda-purple dark:bg-white/5 dark:text-onda-lavender sm:flex">
                         <Clock3 className="h-5 w-5" aria-hidden="true" />
