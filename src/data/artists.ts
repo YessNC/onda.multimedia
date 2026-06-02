@@ -1,3 +1,5 @@
+import { getArtistSpotifyProfileUrl } from './artistPlatforms'
+
 export type Track = {
   id: string
   title: string
@@ -28,7 +30,7 @@ export const artists: Artist[] = [
     heroImage: '/assets/artists/vektorben-portada.webp',
     descriptionKey: 'artist.vektorben',
     heroPhraseKey: 'artist.vektorben-phrase',
-    spotifyProfileUrl: 'https://open.spotify.com/intl-es/artist/60f1mSGeUUhevHXVgZpAii?si=UHTTuaz0SX2KV00Os9wIeA',
+    spotifyProfileUrl: getArtistSpotifyProfileUrl('vektorben') ?? '',
     spotifyArtistEmbedUrl: 'https://open.spotify.com/embed/artist/60f1mSGeUUhevHXVgZpAii',
     tracks: [
       {
@@ -67,7 +69,7 @@ export const artists: Artist[] = [
     heroImage: '/assets/artists/giovane-portada.webp',
     descriptionKey: 'artist.giovane',
     heroPhraseKey: 'artist.giovane-phrase',
-    spotifyProfileUrl: 'https://open.spotify.com/intl-es/artist/41BsWiQu4cfQoSSiohNba6?si=-LBw624nQpyU16rhX6S6Jg',
+    spotifyProfileUrl: getArtistSpotifyProfileUrl('giovan-e') ?? '',
     spotifyArtistEmbedUrl: 'https://open.spotify.com/embed/artist/41BsWiQu4cfQoSSiohNba6',
     tracks: [
       {

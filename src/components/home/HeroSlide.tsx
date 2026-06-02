@@ -2,62 +2,15 @@ import { motion } from 'framer-motion'
 import { ArrowDown, ArrowRight, Calendar, Music, Play, User } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { getArtistHeroOpenLabelKey, getArtistPlatformLinks, getArtistSocialLinks } from '../../data/artistPlatforms'
 import { useBrandLogoAsset } from '../../lib/brandAssets'
 import { useTheme } from '../../lib/theme'
 import { cn } from '../../lib/utils'
 import { useI18n } from '../../hooks/useI18n'
+import ArtistPlatformIcon, { SpotifyIcon } from '../shared/ArtistPlatformIcon'
 
 const robotDaySrc = '/assets/brand/robot-day.png'
 const robotNightSrc = '/assets/brand/robot-night.png'
-
-type FeaturedArtistPlatform = 'tiktok' | 'instagram' | 'appleMusic' | 'amazonMusic' | 'youtube'
-
-type FeaturedArtistSocialLinkData = {
-  href: string
-  labelKey: string
-  platform: FeaturedArtistPlatform
-}
-
-type FeaturedArtistProfile = {
-  socials: FeaturedArtistSocialLinkData[]
-  spotifyUrl: string
-}
-
-const vektorbenSpotifyUrl = 'https://open.spotify.com/intl-es/artist/60f1mSGeUUhevHXVgZpAii?si=7rjKhyVfQ4Onh3NSoFW45w'
-const vektorbenTikTokUrl = 'https://www.tiktok.com/@vektorbenlavision'
-const vektorbenInstagramUrl = 'https://www.instagram.com/vektorbenlavision/'
-const vektorbenAppleMusicUrl = 'https://music.apple.com/us/artist/vektorben/1518007114'
-const vektorbenAmazonMusicUrl = 'https://music.amazon.com/artists/B08B2RHY69/vektorben'
-const vektorbenYouTubeUrl = 'https://www.youtube.com/@Vektorben'
-const giovanESpotifyUrl = 'https://open.spotify.com/intl-es/artist/41BsWiQu4cfQoSSiohNba6?si=JI0DucjbSJWWIYgrvKMXdQ'
-const giovanETikTokUrl = 'https://www.tiktok.com/@giovan.e'
-const giovanEInstagramUrl = 'https://www.instagram.com/il.giovan.e/'
-const giovanEAppleMusicUrl = 'https://music.apple.com/us/artist/giovan-e/1474278863'
-const giovanEAmazonMusicUrl = 'https://music.amazon.com/artists/B07VMQLBR8/giovan-e'
-const giovanEYouTubeUrl = 'https://www.youtube.com/channel/UChU4UU2EPwutpxHD9EUmPYg'
-
-const featuredArtistProfiles: Record<string, FeaturedArtistProfile> = {
-  vektorben: {
-    spotifyUrl: vektorbenSpotifyUrl,
-    socials: [
-      { platform: 'tiktok', href: vektorbenTikTokUrl, labelKey: 'hero.open-tiktok' },
-      { platform: 'instagram', href: vektorbenInstagramUrl, labelKey: 'hero.open-instagram' },
-      { platform: 'appleMusic', href: vektorbenAppleMusicUrl, labelKey: 'hero.open-apple-music' },
-      { platform: 'amazonMusic', href: vektorbenAmazonMusicUrl, labelKey: 'hero.open-amazon-music' },
-      { platform: 'youtube', href: vektorbenYouTubeUrl, labelKey: 'hero.open-youtube' },
-    ],
-  },
-  'giovan-e': {
-    spotifyUrl: giovanESpotifyUrl,
-    socials: [
-      { platform: 'tiktok', href: giovanETikTokUrl, labelKey: 'hero.open-tiktok' },
-      { platform: 'instagram', href: giovanEInstagramUrl, labelKey: 'hero.open-instagram' },
-      { platform: 'appleMusic', href: giovanEAppleMusicUrl, labelKey: 'hero.open-apple-music' },
-      { platform: 'amazonMusic', href: giovanEAmazonMusicUrl, labelKey: 'hero.open-amazon-music' },
-      { platform: 'youtube', href: giovanEYouTubeUrl, labelKey: 'hero.open-youtube' },
-    ],
-  },
-}
 
 type BrandHeroSlide = {
   kind: 'brand'
@@ -89,10 +42,6 @@ type HeroGlassButtonProps = {
   icon?: ReactNode
   to?: string
   variant?: 'primary' | 'secondary'
-}
-
-type VektorbenIconProps = {
-  className?: string
 }
 
 function useRobotAsset() {
@@ -136,85 +85,6 @@ function HeroGlassButton({ children, className, href, icon, to, variant = 'secon
       {content}
     </a>
   )
-}
-
-function SpotifyIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
-  const color = isDark ? '#ffffff' : '#18181b'
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor" color={color}>
-      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.59 14.42a.69.69 0 0 1-.95.23c-2.6-1.59-5.88-1.95-9.74-1.07a.69.69 0 1 1-.3-1.35c4.22-.96 7.84-.54 10.76 1.25.32.19.43.62.23.94Zm1.22-2.72a.86.86 0 0 1-1.18.28c-2.98-1.83-7.51-2.36-11.03-1.29a.86.86 0 1 1-.5-1.65c4.02-1.22 9.02-.63 12.43 1.46.4.25.53.78.28 1.2Zm.1-2.83C14.34 8.75 8.45 8.55 5.04 9.59a1.03 1.03 0 1 1-.6-1.97c3.92-1.19 10.43-.96 14.52 1.46a1.03 1.03 0 0 1-1.05 1.79Z" />
-    </svg>
-  )
-}
-
-function InstagramIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
-  const color = isDark ? '#ffffff' : '#18181b'
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
-      <rect width="16" height="16" x="4" y="4" rx="4.4" stroke="currentColor" strokeWidth="1.8" color={color} />
-      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" color={color} />
-      <circle cx="16.7" cy="7.35" r="1" fill="currentColor" color={color} />
-    </svg>
-  )
-}
-
-function TikTokIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
-      <path d="M16.32 3.5c.43 1.92 1.61 3.27 3.68 3.62v3.12a7.19 7.19 0 0 1-3.66-1.08v5.61c0 3.22-2.08 5.73-5.23 5.73-2.96 0-5.11-1.92-5.11-4.66 0-2.97 2.26-4.9 5.64-4.66v3.17c-1.51-.24-2.44.47-2.44 1.52 0 .86.7 1.46 1.72 1.46 1.2 0 2.02-.83 2.02-2.43V3.5h3.38Z" />
-    </svg>
-  )
-}
-
-function AppleMusicIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
-      <rect x="4" y="3.8" width="16" height="16.4" rx="4" stroke="currentColor" strokeWidth="1.8" />
-      <path
-        d="M15.9 7.1v8.08c0 1.32-1.1 2.29-2.48 2.29-1.08 0-1.88-.58-1.88-1.42 0-.97.92-1.7 2.1-1.7.38 0 .76.07 1.08.22V9.1l-5.3.9v6.07c0 1.32-1.1 2.29-2.48 2.29-1.08 0-1.88-.58-1.88-1.42 0-.97.91-1.69 2.1-1.69.38 0 .76.07 1.08.21V8.55l7.66-1.45Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}
-
-function AmazonMusicIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
-      <path
-        d="M14.52 16.56c-.68.56-1.56.84-2.64.84-2.02 0-3.35-1.08-3.35-2.73 0-1.92 1.61-2.98 4.64-2.98h1.08v-.61c0-1.02-.62-1.56-1.75-1.56-1.04 0-1.75.42-2.08 1.22l-2.25-.72c.58-1.62 2.16-2.54 4.46-2.54 2.62 0 4.07 1.26 4.07 3.56v3.5c0 .64.08 1.18.24 1.64h-2.42Zm-.27-3.35h-.84c-1.78 0-2.62.44-2.62 1.27 0 .64.55 1.06 1.42 1.06 1.22 0 2.04-.76 2.04-1.83v-.5Z"
-        fill="currentColor"
-      />
-      <path d="M6.8 18.75c3.24 1.88 7.84 1.68 10.88-.4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-      <path d="m16.68 17.27 2.44.12-.98 2.22" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-    </svg>
-  )
-}
-
-function YouTubeIcon({ className = 'h-4 w-4' }: VektorbenIconProps) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
-      <path
-        d="M21.1 7.2a3.03 3.03 0 0 0-2.13-2.14C17.1 4.56 12 4.56 12 4.56s-5.1 0-6.97.5A3.03 3.03 0 0 0 2.9 7.2C2.5 8.7 2.5 12 2.5 12s0 3.3.4 4.8a3.03 3.03 0 0 0 2.13 2.14c1.87.5 6.97.5 6.97.5s5.1 0 6.97-.5a3.03 3.03 0 0 0 2.13-2.14c.4-1.5.4-4.8.4-4.8s0-3.3-.4-4.8Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path d="m10.05 14.95 4.95-2.95-4.95-2.95v5.9Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function FeaturedArtistSocialIcon({ platform }: { platform: FeaturedArtistPlatform }) {
-  if (platform === 'tiktok') return <TikTokIcon />
-  if (platform === 'instagram') return <InstagramIcon />
-  if (platform === 'appleMusic') return <AppleMusicIcon />
-  if (platform === 'amazonMusic') return <AmazonMusicIcon />
-
-  return <YouTubeIcon />
 }
 
 function VektorbenSocialLink({ children, href, label }: { children: ReactNode; href: string; label: string }) {
@@ -429,8 +299,10 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
   const displayName = slide.nameKey ? t(slide.nameKey) : slide.name ?? ''
   const displayTagline = slide.taglineKey ? t(slide.taglineKey) : slide.tagline
   const featuredArtistKey = displayName.toLowerCase()
-  const featuredArtistProfile = featuredArtistProfiles[featuredArtistKey]
-  const hasFeaturedArtistCard = Boolean(featuredArtistProfile)
+  const featuredArtistLinks = getArtistPlatformLinks(featuredArtistKey)
+  const featuredArtistSpotifyLink = featuredArtistLinks.find((link) => link.platform === 'spotify')
+  const featuredArtistSocials = getArtistSocialLinks(featuredArtistKey)
+  const hasFeaturedArtistCard = Boolean(featuredArtistSpotifyLink)
   const isVektorbenSlide = featuredArtistKey === 'vektorben'
   const isDark = theme === 'dark'
   const fallbackBackground =
@@ -528,10 +400,10 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
             <p className="mt-3 max-w-md text-sm font-medium text-white/78 sm:text-base">{displayTagline}</p>
           ) : null}
 
-          {featuredArtistProfile ? (
+          {featuredArtistSpotifyLink ? (
             <div className="vektorben-hero-actions mt-3 flex flex-nowrap items-center gap-[0.35rem] overflow-x-auto pb-0.5 sm:mt-5 sm:gap-2 sm:overflow-visible sm:pb-0">
               <a
-                href={featuredArtistProfile.spotifyUrl}
+                href={featuredArtistSpotifyLink.href}
                 aria-label={`${t('hero.open-spotify')} ${displayName}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -545,9 +417,13 @@ function ArtistSlide({ slide }: { slide: ArtistHeroSlide }) {
                 <SpotifyIcon className="h-3.5 w-3.5" />
                 {t('hero.view-artist')}
               </a>
-              {featuredArtistProfile.socials.map((social) => (
-                <VektorbenSocialLink key={social.platform} href={social.href} label={`${t(social.labelKey)} ${displayName}`}>
-                  <FeaturedArtistSocialIcon platform={social.platform} />
+              {featuredArtistSocials.map((social) => (
+                <VektorbenSocialLink
+                  key={social.platform}
+                  href={social.href}
+                  label={`${t(getArtistHeroOpenLabelKey(social.platform))} ${displayName}`}
+                >
+                  <ArtistPlatformIcon platform={social.platform} />
                 </VektorbenSocialLink>
               ))}
             </div>

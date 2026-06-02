@@ -68,6 +68,12 @@ export default {
   'artists.description':
     'Featured songs, official profiles and urban presence connected with Spotify from ONDA MULTIMEDIA\'s own experience.',
   'artists.profile-link': 'View profile on Spotify',
+  'artists.profile.spotify': 'View profile on Spotify',
+  'artists.profile.tiktok': 'View profile on TikTok',
+  'artists.profile.instagram': 'View profile on Instagram',
+  'artists.profile.apple-music': 'View profile on Apple Music',
+  'artists.profile.amazon-music': 'View profile on Amazon Music',
+  'artists.profile.youtube': 'View profile on YouTube',
   'artists.featured': 'Featured songs',
 
   // Artist Descriptions
