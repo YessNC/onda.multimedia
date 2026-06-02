@@ -3,6 +3,7 @@ import { getArtistSpotifyProfileUrl } from './artistPlatforms'
 export type Track = {
   id: string
   title: string
+  artistName?: string
   spotifyTrackUrl: string
   spotifyEmbedUrl: string
   coverImage?: string
@@ -54,6 +55,7 @@ export const artists: Artist[] = [
       {
         id: '6wsCiQekAcfLlE3ZzLz2nj',
         title: 'NINFÓMANA',
+        artistName: 'Flow Cuarenta FT Mirkosis FT Vektorben',
         spotifyTrackUrl: 'https://open.spotify.com/intl-es/track/6wsCiQekAcfLlE3ZzLz2nj?si=c6960ec2f6ab4845',
         spotifyEmbedUrl: 'https://open.spotify.com/embed/track/6wsCiQekAcfLlE3ZzLz2nj',
         coverImage: '',

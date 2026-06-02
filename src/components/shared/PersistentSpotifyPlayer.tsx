@@ -20,6 +20,8 @@ export default function PersistentSpotifyPlayer() {
     return null
   }
 
+  const trackArtistName = currentTrack.artistName ?? currentArtist.name
+
   return (
     <aside
       ref={playerRef}
@@ -45,7 +47,7 @@ export default function PersistentSpotifyPlayer() {
             <p className="truncate font-display text-xs font-extrabold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
               {currentTrack.title}
             </p>
-            <p className="mt-1 truncate text-xs font-semibold text-zinc-600 dark:text-onda-muted">{currentArtist.name}</p>
+            <p className="mt-1 truncate text-xs font-semibold text-zinc-600 dark:text-onda-muted">{trackArtistName}</p>
           </div>
 
           <div className="flex items-center gap-1">
@@ -96,7 +98,7 @@ export default function PersistentSpotifyPlayer() {
             <div className="p-3">
               {/* Spotify Embed does not expose real volume control here. Advanced volume/playback controls require Spotify Web Playback SDK with OAuth/Premium or authorized first-party audio files. */}
               <iframe
-                title={`${currentTrack.title} - ${currentArtist.name} en Spotify`}
+                title={`${currentTrack.title} - ${trackArtistName} en Spotify`}
                 src={currentTrack.spotifyEmbedUrl}
                 width="100%"
                 height="152"

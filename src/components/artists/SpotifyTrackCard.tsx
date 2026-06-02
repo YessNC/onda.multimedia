@@ -12,6 +12,7 @@ type SpotifyTrackCardProps = {
 export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProps) {
   const { playTrack } = useSpotifyPlayer()
   const { t } = useI18n()
+  const trackArtistName = track.artistName ?? artist.name
 
   return (
     <article className="glass-panel flex min-h-[23rem] flex-col overflow-hidden rounded-lg">
@@ -23,7 +24,7 @@ export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProp
           <h4 className="mt-4 font-display text-lg font-extrabold uppercase tracking-[0.12em] text-zinc-950 dark:text-white">
             {track.title}
           </h4>
-          <p className="mt-2 text-sm font-semibold text-zinc-600 dark:text-onda-muted">{artist.name}</p>
+          <p className="mt-2 text-sm font-semibold text-zinc-600 dark:text-onda-muted">{trackArtistName}</p>
         </div>
         {track.isFeatured ? (
           <span className="rounded-full border border-onda-purple/25 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-onda-purple dark:text-onda-lavender">
@@ -34,7 +35,7 @@ export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProp
 
       <div className="px-5">
         <iframe
-          title={`${track.title} - ${artist.name} en Spotify`}
+          title={`${track.title} - ${trackArtistName} en Spotify`}
           src={track.spotifyEmbedUrl}
           width="100%"
           height="80"
@@ -44,11 +45,11 @@ export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProp
         />
       </div>
 
-      <div className="mt-auto grid gap-3 p-5 sm:grid-cols-2">
+      <div className="mt-auto grid gap-3 p-5 md:grid-cols-2">
         <CTAButton
           onClick={() => playTrack(track, artist)}
-          icon={<Play className="h-4 w-4 fill-current" aria-hidden="true" />}
-          className="w-full px-4"
+          icon={<Play className="h-4 w-4 shrink-0 fill-current" aria-hidden="true" />}
+          className="h-12 w-full !gap-1.5 whitespace-nowrap !px-2.5 !text-[0.56rem] !tracking-[0.06em] [&>span]:!whitespace-nowrap"
         >
           {t('track.play')}
         </CTAButton>
@@ -57,8 +58,8 @@ export default function SpotifyTrackCard({ artist, track }: SpotifyTrackCardProp
           target="_blank"
           rel="noopener noreferrer"
           variant="secondary"
-          icon={<ExternalLink className="h-4 w-4" aria-hidden="true" />}
-          className="w-full px-4"
+          icon={<ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />}
+          className="h-12 w-full !gap-1.5 whitespace-nowrap !px-2.5 !text-[0.56rem] !tracking-[0.06em] [&>span]:!whitespace-nowrap"
         >
           {t('track.open-spotify')}
         </CTAButton>
