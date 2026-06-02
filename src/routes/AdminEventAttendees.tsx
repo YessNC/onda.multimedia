@@ -18,6 +18,7 @@ import {
   QrCode,
   RotateCcw,
   Save,
+  Search,
   Trash2,
   Upload,
   Users,
@@ -246,6 +247,14 @@ function readString(value: unknown) {
   return ''
 }
 
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
 function nullableString(value: string) {
   const trimmed = value.trim()
   return trimmed || null
@@ -369,6 +378,17 @@ function getAttendeeName(attendee: EventAttendee) {
     readString(attendee.full_name) ||
     'Asistente sin nombre'
   )
+}
+
+function getAttendeeSearchName(attendee: EventAttendee) {
+  return [
+    buildAttendeeFullName(attendee.first_name ?? '', attendee.last_name ?? ''),
+    readString(attendee.full_name),
+    readString(attendee.first_name),
+    readString(attendee.last_name),
+  ]
+    .filter(Boolean)
+    .join(' ')
 }
 
 function formatDateTime(value?: string | null) {
@@ -501,6 +521,7 @@ export default function AdminEventAttendees() {
   const [templateImageSize, setTemplateImageSize] = useState({ height: 0, width: 0 })
   const [templatePreviewUrl, setTemplatePreviewUrl] = useState('')
   const [ticketStatusFilter, setTicketStatusFilter] = useState<TicketStatusFilter>('all')
+  const [searchTerm, setSearchTerm] = useState('')
 
   const loadAdminData = useCallback(async () => {
     if (!eventId) return
@@ -707,11 +728,20 @@ export default function AdminEventAttendees() {
       ),
     [communityFilteredAttendees],
   )
-  const filteredAttendees = useMemo(() => {
+  const ticketFilteredAttendees = useMemo(() => {
     if (ticketStatusFilter === 'all') return communityFilteredAttendees
 
     return communityFilteredAttendees.filter((attendee) => getTicketStatus(attendee) === ticketStatusFilter)
   }, [communityFilteredAttendees, ticketStatusFilter])
+  const normalizedSearchTerm = useMemo(() => normalizeText(searchTerm), [searchTerm])
+  const filteredAttendees = useMemo(() => {
+    if (!normalizedSearchTerm) return ticketFilteredAttendees
+
+    return ticketFilteredAttendees.filter((attendee) =>
+      normalizeText(getAttendeeSearchName(attendee)).includes(normalizedSearchTerm),
+    )
+  }, [normalizedSearchTerm, ticketFilteredAttendees])
+  const isSearchActive = normalizedSearchTerm.length > 0
   const ticketFilterOptions: Array<{
     count: number
     icon: ReactNode
@@ -1991,7 +2021,7 @@ export default function AdminEventAttendees() {
                         </div>
                         <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
                           <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
-                            {communityFilteredAttendees.length}
+                            {filteredAttendees.length}
                           </div>
                           <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
                             Visibles
@@ -1999,7 +2029,7 @@ export default function AdminEventAttendees() {
                         </div>
                       </div>
                     </div>
-                    <div className="grid w-full gap-2 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] 2xl:w-auto 2xl:min-w-[31rem]">
+                    <div className="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1fr)_minmax(16rem,1fr)_auto_auto] 2xl:w-auto 2xl:min-w-[44rem]">
                       <label className="sr-only" htmlFor="community-csv-scope">
                         Filtro comunidad
                       </label>
@@ -2030,6 +2060,39 @@ export default function AdminEventAttendees() {
                           </option>
                         ))}
                       </select>
+                      <div className="relative min-w-0">
+                        <label className="sr-only" htmlFor="attendee-name-search">
+                          Buscar por nombre
+                        </label>
+                        <Search
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-onda-lavender/75"
+                          aria-hidden="true"
+                        />
+                        <input
+                          id="attendee-name-search"
+                          type="search"
+                          value={searchTerm}
+                          onChange={(inputEvent) => {
+                            setSearchTerm(inputEvent.target.value)
+                            setActionsMenu(null)
+                          }}
+                          placeholder="Buscar por nombre…"
+                          className="h-11 w-full appearance-none rounded-md border border-onda-lavender/40 bg-[#10051f] py-2 pl-10 pr-10 text-sm font-semibold text-white outline-none transition placeholder:text-zinc-400 focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40"
+                        />
+                        {searchTerm ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSearchTerm('')
+                              setActionsMenu(null)
+                            }}
+                            className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-onda-lavender transition hover:bg-onda-purple/20 hover:text-white focus:outline-none focus:ring-2 focus:ring-onda-purple/50"
+                            aria-label="Limpiar busqueda"
+                          >
+                            <X className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
                       <CTAButton
                         type="button"
                         variant="secondary"
@@ -2086,6 +2149,10 @@ export default function AdminEventAttendees() {
                       )
                     })}
                   </div>
+
+                  <div className="text-xs font-semibold text-zinc-500 dark:text-onda-muted">
+                    Mostrando {filteredAttendees.length} de {ticketFilteredAttendees.length} asistentes
+                  </div>
                 </div>
 
                 {attendees.length === 0 ? (
@@ -2100,9 +2167,13 @@ export default function AdminEventAttendees() {
                         ? 'No hay correos de bienvenida marcados como enviados.'
                         : 'No hay asistentes con consentimiento de comunidad.'}
                   </div>
-                ) : filteredAttendees.length === 0 ? (
+                ) : ticketFilteredAttendees.length === 0 ? (
                   <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
                     No hay entradas {ticketStatusFilter === 'generated' ? 'generadas' : 'utilizadas'}.
+                  </div>
+                ) : filteredAttendees.length === 0 && isSearchActive ? (
+                  <div className="p-6 text-sm font-semibold text-zinc-600 dark:text-onda-muted">
+                    No se encontraron asistentes con ese nombre.
                   </div>
                 ) : (
                   <div className="min-h-0 flex-1 overflow-auto">
