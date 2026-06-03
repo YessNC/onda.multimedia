@@ -1995,41 +1995,41 @@ export default function AdminEventAttendees() {
                 </div>
               </form>
 
-              <div className="glass-panel flex max-h-[min(44rem,calc(100vh-8rem))] min-h-[24rem] flex-col overflow-hidden rounded-lg">
-                <div className="grid shrink-0 gap-4 border-b border-onda-purple/10 px-5 py-4">
-                  <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,44rem)] 2xl:items-start">
+              <div className="glass-panel flex h-[calc(100dvh-5.75rem)] min-h-[36rem] max-h-none flex-col overflow-hidden rounded-lg sm:h-auto sm:max-h-[min(44rem,calc(100dvh-8rem))] sm:min-h-[24rem]">
+                <div className="grid shrink-0 gap-3 border-b border-onda-purple/10 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4">
+                  <div className="grid gap-3 sm:gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,44rem)] 2xl:items-start">
                     <div className="min-w-0">
-                      <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
+                      <h3 className="font-display text-base font-bold uppercase tracking-[0.12em] text-zinc-950 dark:text-white sm:text-lg sm:tracking-[0.14em]">
                         Gestion de asistentes
                       </h3>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
-                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                      <div className="mt-2 grid grid-cols-3 gap-1.5 sm:mt-3 sm:gap-2">
+                        <div className="min-w-0 rounded-md border border-onda-purple/15 bg-white/55 px-2 py-1.5 dark:bg-white/5 sm:px-3 sm:py-2">
+                          <div className="font-display text-xs font-bold text-zinc-950 dark:text-white sm:text-sm">
                             {attendees.length}
                           </div>
-                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                          <div className="mt-0.5 truncate text-[0.54rem] font-semibold uppercase tracking-[0.03em] text-zinc-500 dark:text-onda-muted sm:text-[0.68rem] sm:tracking-[0.1em]">
                             Registrados
                           </div>
                         </div>
-                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
-                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                        <div className="min-w-0 rounded-md border border-onda-purple/15 bg-white/55 px-2 py-1.5 dark:bg-white/5 sm:px-3 sm:py-2">
+                          <div className="font-display text-xs font-bold text-zinc-950 dark:text-white sm:text-sm">
                             {communityStats.all}
                           </div>
-                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                          <div className="mt-0.5 truncate text-[0.54rem] font-semibold uppercase tracking-[0.03em] text-zinc-500 dark:text-onda-muted sm:text-[0.68rem] sm:tracking-[0.1em]">
                             Comunidad
                           </div>
                         </div>
-                        <div className="rounded-md border border-onda-purple/15 bg-white/55 px-3 py-2 dark:bg-white/5">
-                          <div className="font-display text-sm font-bold text-zinc-950 dark:text-white">
+                        <div className="min-w-0 rounded-md border border-onda-purple/15 bg-white/55 px-2 py-1.5 dark:bg-white/5 sm:px-3 sm:py-2">
+                          <div className="font-display text-xs font-bold text-zinc-950 dark:text-white sm:text-sm">
                             {filteredAttendees.length}
                           </div>
-                          <div className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-onda-muted">
+                          <div className="mt-0.5 truncate text-[0.54rem] font-semibold uppercase tracking-[0.03em] text-zinc-500 dark:text-onda-muted sm:text-[0.68rem] sm:tracking-[0.1em]">
                             Visibles
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+                    <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
                       <label className="sr-only" htmlFor="community-csv-scope">
                         Filtro comunidad
                       </label>
@@ -2041,7 +2041,7 @@ export default function AdminEventAttendees() {
                           setActionsMenu(null)
                         }}
                         disabled={isExportingCommunityCsv}
-                        className="h-11 w-full min-w-0 rounded-md border border-onda-lavender/40 bg-[#10051f] px-4 py-2 font-display text-[0.66rem] font-bold uppercase tracking-[0.12em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="col-span-2 h-10 w-full min-w-0 rounded-md border border-onda-lavender/40 bg-[#10051f] px-3 py-2 font-display text-[0.62rem] font-bold uppercase tracking-[0.08em] text-white outline-none transition focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 disabled:cursor-not-allowed disabled:opacity-60 sm:col-auto sm:h-11 sm:px-4 sm:text-[0.66rem] sm:tracking-[0.12em]"
                         style={{ backgroundColor: '#10051f', color: '#ffffff' }}
                       >
                         <option
@@ -2077,7 +2077,7 @@ export default function AdminEventAttendees() {
                             setActionsMenu(null)
                           }}
                           placeholder="Buscar por nombre…"
-                          className="h-11 w-full appearance-none rounded-md border border-onda-lavender/40 bg-[#10051f] py-2 pl-10 pr-10 text-sm font-semibold text-white outline-none transition placeholder:text-zinc-400 focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40"
+                          className="h-10 w-full appearance-none rounded-md border border-onda-lavender/40 bg-[#10051f] py-2 pl-10 pr-10 text-sm font-semibold text-white outline-none transition placeholder:text-zinc-400 focus:border-onda-lavender focus:ring-2 focus:ring-onda-purple/40 sm:h-11"
                         />
                         {searchTerm ? (
                           <button
@@ -2096,7 +2096,7 @@ export default function AdminEventAttendees() {
                       <CTAButton
                         type="button"
                         variant="secondary"
-                        className="h-11 min-w-0 justify-center px-3 py-2 text-[0.64rem] tracking-[0.12em] sm:min-w-20"
+                        className="h-10 min-w-16 justify-center px-3 py-2 text-[0.62rem] tracking-[0.1em] sm:h-11 sm:min-w-20 sm:text-[0.64rem] sm:tracking-[0.12em]"
                         icon={
                           isExportingCommunityCsv ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -2115,7 +2115,7 @@ export default function AdminEventAttendees() {
                     </div>
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="Filtrar entradas por estado">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2" role="group" aria-label="Filtrar entradas por estado">
                     {ticketFilterOptions.map((option) => {
                       const isActive = ticketStatusFilter === option.value
 
@@ -2128,7 +2128,7 @@ export default function AdminEventAttendees() {
                             setActionsMenu(null)
                           }}
                           className={cn(
-                            'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-bold transition',
+                            'inline-flex min-h-[3.35rem] w-full flex-col items-center justify-center gap-1 rounded-md border px-1.5 py-1.5 text-[0.68rem] font-bold leading-none transition sm:min-h-11 sm:flex-row sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:leading-normal',
                             isActive
                               ? 'border-onda-purple bg-onda-purple text-white shadow-[0_0_18px_rgba(123,44,255,0.28)] dark:border-onda-lavender dark:bg-onda-lavender dark:text-onda-black'
                               : 'border-onda-purple/20 bg-white/65 text-zinc-700 hover:border-onda-purple/45 hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
@@ -2176,7 +2176,7 @@ export default function AdminEventAttendees() {
                     No se encontraron asistentes con ese nombre.
                   </div>
                 ) : (
-                  <div className="min-h-0 flex-1 overflow-auto">
+                  <div className="min-h-[300px] flex-1 overflow-x-auto overflow-y-auto overscroll-contain [&_td]:px-3 [&_td]:py-3 [&_th]:px-3 [&_th]:py-2.5 sm:min-h-0 sm:[&_td]:px-4 sm:[&_td]:py-4 sm:[&_th]:px-4 sm:[&_th]:py-3">
                     <table className="w-full min-w-[1180px] text-left text-sm">
                       <thead className="sticky top-0 z-10 bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
                         <tr>
