@@ -155,7 +155,7 @@ const actionButtonVariants = {
     'border-onda-purple/35 bg-white/65 text-onda-purple hover:border-onda-purple hover:bg-onda-purple/10 dark:bg-white/5 dark:text-onda-soft',
 }
 
-const ACTIONS_MENU_ESTIMATED_HEIGHT = 392
+const ACTIONS_MENU_ESTIMATED_HEIGHT = 448
 const ACTIONS_MENU_GUTTER = 12
 const ACTIONS_MENU_WIDTH = 288
 const COMMUNITY_CSV_PAGE_SIZE = 1000
@@ -1493,6 +1493,82 @@ export default function AdminEventAttendees() {
     }
   }
 
+  async function handleValidateGeneratedTicket(attendee: EventAttendee) {
+    const latestInvitation = latestInvitationByAttendeeId.get(attendee.id)
+    const ticketStatus = getTicketStatus(attendee)
+
+    if (!latestInvitation) {
+      setErrorMessage('Este asistente aun no tiene una entrada generada en historial.')
+      return
+    }
+
+    if (ticketStatus === 'used') {
+      setErrorMessage('Esta entrada ya esta validada.')
+      return
+    }
+
+    if (ticketStatus === 'cancelled') {
+      setErrorMessage('No se puede validar una invitacion cancelada.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Validar manualmente la entrada generada de ${getAttendeeName(attendee)}? Se marcara como utilizada aunque el formulario publico no este completo.`,
+    )
+
+    if (!confirmed) return
+
+    resetMessages()
+    setBusyAction(`validate-generated:${attendee.id}`)
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError) throw sessionError
+
+      const checkedInAt = new Date().toISOString()
+      const generatedAt = readString(latestInvitation.generated_at)
+      const ticketGeneratedAt = readString(attendee.ticket_generated_at) || generatedAt || checkedInAt
+      const scannedToken =
+        readString(latestInvitation.qr_token) ||
+        readString(attendee.qr_token) ||
+        getAttendeeAccessCode(attendee) ||
+        attendee.id
+
+      const { error } = await supabase
+        .from('event_attendees')
+        .update({
+          check_in_status: 'checked_in',
+          checked_in_at: checkedInAt,
+          checked_in_by: sessionData.session?.user.id ?? null,
+          ticket_generated_at: ticketGeneratedAt,
+        })
+        .eq('id', attendee.id)
+
+      if (error) throw error
+
+      const { error: logError } = await supabase.from('check_in_logs').insert({
+        attendee_id: attendee.id,
+        event_id: attendee.event_id || eventId,
+        message: 'Entrada validada manualmente desde gestion de asistentes.',
+        result: 'checked_in',
+        scanned_by: sessionData.session?.user.id ?? null,
+        token_scanned: scannedToken,
+      })
+
+      if (logError && import.meta.env.DEV) {
+        console.warn('[AdminEventAttendees] could not audit manual validation action', logError)
+      }
+
+      setMessage('Entrada generada validada manualmente.')
+      await loadAdminData()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   async function handleInvalidateTicket(attendee: EventAttendee) {
     const confirmed = window.confirm(
       `Desvalidar entrada de ${getAttendeeName(attendee)}? Quedará pendiente y podrá volver a escanearse.`,
@@ -1649,9 +1725,18 @@ export default function AdminEventAttendees() {
   const actionsMenuAttendee = actionsMenu
     ? attendees.find((attendee) => attendee.id === actionsMenu.attendeeId) ?? null
     : null
+  const actionsMenuAttendeeLatestInvitation = actionsMenuAttendee
+    ? latestInvitationByAttendeeId.get(actionsMenuAttendee.id) ?? null
+    : null
+  const actionsMenuAttendeeTicketStatus = actionsMenuAttendee ? getTicketStatus(actionsMenuAttendee) : 'pending'
   const isActionsMenuAttendeeValidated = actionsMenuAttendee
     ? readString(actionsMenuAttendee.check_in_status) === 'checked_in' || Boolean(actionsMenuAttendee.checked_in_at)
     : false
+  const canActionsMenuValidateGeneratedTicket =
+    Boolean(actionsMenuAttendeeLatestInvitation) &&
+    actionsMenuAttendeeTicketStatus !== 'used' &&
+    actionsMenuAttendeeTicketStatus !== 'cancelled' &&
+    !isActionsMenuAttendeeValidated
 
   if (!eventId) {
     return (
@@ -2407,6 +2492,13 @@ export default function AdminEventAttendees() {
               </ActionsMenuItem>
               <div className="my-2 h-px bg-onda-purple/12" />
               <ActionsMenuItem
+                icon={<Check className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => runActionsMenuAction(() => void handleValidateGeneratedTicket(actionsMenuAttendee))}
+                disabled={Boolean(busyAction) || !canActionsMenuValidateGeneratedTicket}
+              >
+                Validar entrada generada
+              </ActionsMenuItem>
+              <ActionsMenuItem
                 icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}
                 onClick={() => runActionsMenuAction(() => void handleInvalidateTicket(actionsMenuAttendee))}
                 disabled={Boolean(busyAction) || !isActionsMenuAttendeeValidated}
@@ -2418,8 +2510,8 @@ export default function AdminEventAttendees() {
                 onClick={() => runActionsMenuAction(() => void handleCancelInvitation(actionsMenuAttendee))}
                 disabled={
                   Boolean(busyAction) ||
-                  getTicketStatus(actionsMenuAttendee) === 'cancelled' ||
-                  getTicketStatus(actionsMenuAttendee) === 'used'
+                  actionsMenuAttendeeTicketStatus === 'cancelled' ||
+                  actionsMenuAttendeeTicketStatus === 'used'
                 }
                 danger
               >
