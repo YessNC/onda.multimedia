@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, Camera, ExternalLink, Film, MapPin, Sparkles, Ticket, Video } from 'lucide-react'
+import { ArrowLeft, CalendarDays, MapPin, Ticket } from 'lucide-react'
+import EventGallerySection from '../components/events/EventGallerySection'
 import EventPosterFrame from '../components/events/EventPosterFrame'
 import CTAButton from '../components/shared/CTAButton'
 import GlowCard from '../components/shared/GlowCard'
@@ -15,6 +16,7 @@ import {
   getEventTitle,
   getEventVisibility,
   getPublicEventVisibilityBadgeLabel,
+  getPublicEventStatusLabel,
   getTicketButtonLabel,
   hasActiveTicketButton,
   isEventPublished,
@@ -26,14 +28,6 @@ function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return 'Ocurrió un error inesperado.'
 }
-
-const futureContentItems = [
-  { icon: Camera, label: 'Fotos' },
-  { icon: Video, label: 'Videos' },
-  { icon: Film, label: 'Reels' },
-  { icon: Sparkles, label: 'Aftermovie' },
-  { icon: ExternalLink, label: 'Links externos' },
-]
 
 export default function EventoDetalle() {
   const { eventId } = useParams<{ eventId: string }>()
@@ -120,6 +114,7 @@ export default function EventoDetalle() {
   const locationLabel = getEventLocation(event) || 'Lugar por confirmar'
   const description = getEventDescription(event) || 'Pronto compartiremos más detalles de esta experiencia.'
   const imagePath = getEventImageSource(event)
+  const statusLabel = getPublicEventStatusLabel(event)
   const visibility = getEventVisibility(event)
   const isPrivate = visibility === 'private'
   const hasTickets = hasActiveTicketButton(event)
@@ -153,7 +148,7 @@ export default function EventoDetalle() {
             <div className="glass-panel grid gap-6 rounded-lg bg-onda-black/70 p-5 sm:p-7 lg:p-8">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full border border-onda-lavender/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-onda-lavender">
-                  Próximo
+                  {statusLabel}
                 </span>
                 <span className="rounded-full border border-onda-lavender/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-onda-lavender">
                   {getPublicEventVisibilityBadgeLabel(event)}
@@ -209,49 +204,7 @@ export default function EventoDetalle() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20">
-        <div className="onda-container">
-          <div className="mb-8">
-            <p className="mb-3 inline-flex items-center gap-2 font-display text-xs font-bold uppercase tracking-[0.3em] text-onda-purple dark:text-onda-lavender">
-              <span className="h-px w-8 bg-onda-purple opacity-70" />
-              Registro oficial
-            </p>
-            <h2 className="font-display text-3xl font-extrabold uppercase tracking-[0.1em] text-zinc-950 dark:text-white">
-              Galería del evento
-            </h2>
-          </div>
-
-          <div className="tech-grid overflow-hidden rounded-lg border border-dashed border-onda-purple/40 bg-white/60 p-6 shadow-[0_0_44px_rgba(123,44,255,0.14)] dark:border-onda-lavender/40 dark:bg-onda-black/55 sm:p-8">
-            <div className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
-              <span className="inline-flex h-14 w-14 items-center justify-center rounded-md border border-onda-purple/25 bg-white/70 text-onda-purple shadow-[0_0_28px_rgba(123,44,255,0.16)] dark:bg-onda-black/70 dark:text-onda-lavender">
-                <Camera className="h-6 w-6" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-onda-purple dark:text-onda-lavender">
-                  Contenido en preparación
-                </p>
-                <h3 className="mt-2 font-display text-xl font-extrabold uppercase tracking-[0.08em] text-zinc-950 dark:text-white">
-                  Galería próximamente
-                </h3>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600 dark:text-onda-muted">
-                  Cuando el evento finalice, aquí compartiremos registros oficiales, fotografías y momentos destacados.
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {futureContentItems.map(({ icon: Icon, label }) => (
-                    <span
-                      key={label}
-                      className="inline-flex min-h-9 items-center gap-2 rounded-full border border-onda-purple/20 bg-white/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-onda-purple dark:bg-white/5 dark:text-onda-lavender"
-                    >
-                      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <EventGallerySection event={event} />
     </>
   )
 }

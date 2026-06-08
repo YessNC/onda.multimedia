@@ -1,16 +1,22 @@
 import { supabase } from './supabaseClient'
 
 export type EventStatus = 'draft' | 'upcoming' | 'archived' | 'cancelled'
+export type EventTemporalStatus = 'upcoming' | 'completed'
 export type EventVisibility = 'public' | 'private'
 
 export type EventRecord = Record<string, unknown> & {
   collaboration?: string | null
+  aftermovie_url?: string | null
   cover_image_path?: string | null
   id: string
   deleted_at?: string | null
   description?: string | null
+  event_gallery?: unknown
   event_date?: string | null
+  external_links?: unknown
+  gallery_photos?: unknown
   image_path?: string | null
+  instagram_reel_urls?: unknown
   is_published?: boolean | null
   location?: string | null
   published_at?: string | null
@@ -23,6 +29,7 @@ export type EventRecord = Record<string, unknown> & {
   ticket_url?: string | null
   title?: string | null
   visibility?: string | null
+  youtube_video_urls?: unknown
 }
 
 export const DEFAULT_TICKET_LABEL = 'Comprar entradas'
@@ -52,7 +59,12 @@ const publicEventStatusLabels: Record<EventStatus, string> = {
   archived: 'Archivo',
   cancelled: 'Cancelado',
   draft: 'Borrador',
-  upcoming: 'Próximo',
+  upcoming: 'Pr\u00f3ximo',
+}
+
+const publicEventTemporalStatusLabels: Record<EventTemporalStatus, string> = {
+  completed: 'Realizado',
+  upcoming: 'Pr\u00f3ximo',
 }
 
 export function readString(value: unknown) {
@@ -144,8 +156,54 @@ export function getEventStatusLabel(event: Record<string, unknown> | null | unde
   return eventStatusLabels[getEventStatus(event)]
 }
 
-export function getPublicEventStatusLabel(event: Record<string, unknown> | null | undefined) {
-  return publicEventStatusLabels[getEventStatus(event)]
+function isDateOnlyValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function parseDateOnly(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+
+  if (!year || !month || !day) return null
+
+  return new Date(year, month - 1, day)
+}
+
+export function hasEventDatePassed(value: string, now = new Date()) {
+  const trimmedValue = readString(value)
+
+  if (!trimmedValue) return false
+
+  if (isDateOnlyValue(trimmedValue)) {
+    const eventDate = parseDateOnly(trimmedValue)
+
+    if (!eventDate) return false
+
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return eventDate.getTime() < today.getTime()
+  }
+
+  const eventDate = new Date(trimmedValue)
+
+  if (Number.isNaN(eventDate.getTime())) return false
+
+  return eventDate.getTime() < now.getTime()
+}
+
+export function getEventTemporalStatus(
+  event: Record<string, unknown> | null | undefined,
+  now = new Date(),
+): EventTemporalStatus {
+  return hasEventDatePassed(getEventDateRaw(event), now) ? 'completed' : 'upcoming'
+}
+
+export function getPublicEventStatusLabel(event: Record<string, unknown> | null | undefined, now = new Date()) {
+  const status = getEventStatus(event)
+
+  if (status === 'cancelled' || status === 'draft') {
+    return publicEventStatusLabels[status]
+  }
+
+  return publicEventTemporalStatusLabels[getEventTemporalStatus(event, now)]
 }
 
 export function getEventVisibility(event: Record<string, unknown> | null | undefined): EventVisibility {
