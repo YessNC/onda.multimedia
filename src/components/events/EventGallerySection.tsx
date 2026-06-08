@@ -2,9 +2,10 @@ import { Camera, ExternalLink, Film, Image as ImageIcon, Link as LinkIcon, PlayC
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { EffectCoverflow } from 'swiper/modules'
+import { EffectCoverflow, Navigation } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/effect-coverflow'
+import 'swiper/css/navigation'
 import {
   getDirectVideoMime,
   getEventGalleryContent,
@@ -313,6 +314,8 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
             {activeTab === 'videos' && youtubeEmbeds.length > 0 ? (
               <GalleryBlock icon={<Video className="h-4 w-4" aria-hidden="true" />} title="Videos">
                 <Swiper
+                  modules={[Navigation]}
+                  navigation
                   grabCursor={true}
                   spaceBetween={16}
                   breakpoints={{
@@ -323,7 +326,7 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
                       slidesPerView: 2,
                     },
                   }}
-                  className="w-full"
+                  className="event-video-swiper w-full"
                 >
                   {youtubeEmbeds.map((video) => (
                     <SwiperSlide key={video.url}>
