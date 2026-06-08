@@ -27,7 +27,7 @@ const casaMatrizAssets = [
   {
     alt: 'casamatriz.img-5-alt',
     className: 'aspect-[4/3] sm:aspect-auto',
-    src: '/assets/casa-matriz/estudio-01.webp',
+    src: '/assets/casa-matriz/casa-matriz-05.webp',
   },
   {
     alt: 'casamatriz.img-6-alt',
