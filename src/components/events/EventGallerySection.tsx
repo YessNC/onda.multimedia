@@ -1,6 +1,10 @@
 import { Camera, ExternalLink, Film, Image as ImageIcon, Link as LinkIcon, PlayCircle, Sparkles, Video } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { EffectCoverflow } from 'swiper/modules'
+import 'swiper/css'
+import 'swiper/css/effect-coverflow'
 import {
   getDirectVideoMime,
   getEventGalleryContent,
@@ -27,7 +31,7 @@ const futureContentItems = [
   { icon: Camera, label: 'Fotos' },
   { icon: Video, label: 'Videos' },
   { icon: Film, label: 'Reels' },
-  { icon: Sparkles, label: 'Aftermovie' },
+  { icon: Sparkles, label: 'Video Oficial' },
   { icon: ExternalLink, label: 'Links externos' },
 ]
 
@@ -199,6 +203,7 @@ function EmptyGallery() {
 }
 
 export default function EventGallerySection({ event }: EventGallerySectionProps) {
+  const [activeTab, setActiveTab] = useState<'official' | 'photos' | 'videos' | 'reels' | 'links'>('official')
   const gallery = getEventGalleryContent(event)
   const youtubeEmbeds = gallery.youtubeVideos
     .map((video) => ({ ...video, embedUrl: getYouTubeEmbedUrl(video.url) }))
@@ -216,6 +221,14 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
         gallery.externalLinks.length > 0,
     )
 
+  const tabs = [
+    { id: 'official' as const, label: 'Video Oficial', icon: Sparkles, hasContent: !!gallery.aftermovie },
+    { id: 'photos' as const, label: 'Fotos', icon: ImageIcon, hasContent: gallery.photos.length > 0 },
+    { id: 'videos' as const, label: 'Videos', icon: Video, hasContent: youtubeEmbeds.length > 0 },
+    { id: 'reels' as const, label: 'Reels', icon: Film, hasContent: instagramEmbeds.length > 0 },
+    { id: 'links' as const, label: 'Links', icon: LinkIcon, hasContent: gallery.externalLinks.length > 0 },
+  ].filter((tab) => tab.hasContent)
+
   return (
     <section className="py-16 sm:py-20">
       <div className="onda-container">
@@ -230,55 +243,103 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
         </div>
 
         {hasContent ? (
-          <div className="grid gap-10">
-            {gallery.aftermovie ? (
-              <GalleryBlock icon={<Sparkles className="h-4 w-4" aria-hidden="true" />} title="Aftermovie">
+          <div className="grid gap-8">
+            {/* Tab Navigation */}
+            <div className="flex flex-wrap gap-2 border-b border-onda-purple/20 dark:border-onda-lavender/20 pb-4">
+              {tabs.map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-display text-xs font-bold uppercase tracking-[0.12em] transition ${
+                      activeTab === tab.id
+                        ? 'bg-onda-purple text-white shadow-[0_0_24px_rgba(123,44,255,0.3)] dark:bg-onda-lavender dark:text-onda-black'
+                        : 'border border-onda-purple/30 text-onda-purple hover:border-onda-purple/60 dark:border-onda-lavender/30 dark:text-onda-lavender dark:hover:border-onda-lavender/60'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'official' && gallery.aftermovie ? (
+              <GalleryBlock icon={<Sparkles className="h-4 w-4" aria-hidden="true" />} title="Video Oficial">
                 <Aftermovie video={gallery.aftermovie} />
               </GalleryBlock>
             ) : null}
 
-            {gallery.photos.length > 0 ? (
+            {activeTab === 'photos' && gallery.photos.length > 0 ? (
               <GalleryBlock icon={<ImageIcon className="h-4 w-4" aria-hidden="true" />} title="Fotos">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Swiper
+                  effect="coverflow"
+                  grabCursor={true}
+                  centeredSlides={true}
+                  slidesPerView="auto"
+                  coverflowEffect={{
+                    rotate: 50,
+                    stretch: 0,
+                    depth: 100,
+                    modifier: 1,
+                    slideShadows: true,
+                  }}
+                  modules={[EffectCoverflow]}
+                  className="w-full"
+                >
                   {gallery.photos.map((photo) => (
-                    <figure
-                      key={photo.src}
-                      className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-onda-purple/18 bg-white/60 shadow-[0_0_28px_rgba(123,44,255,0.12)] dark:bg-onda-black/55"
-                    >
-                      <img
-                        src={photo.src}
-                        srcSet={photo.srcSet}
-                        sizes={photo.sizes}
-                        width={photo.width}
-                        height={photo.height}
-                        alt={photo.alt}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
-                      />
-                    </figure>
+                    <SwiperSlide key={photo.src} className="w-80 h-auto">
+                      <figure className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-onda-purple/18 bg-white/60 shadow-[0_0_28px_rgba(123,44,255,0.12)] dark:bg-onda-black/55 h-full">
+                        <img
+                          src={photo.src}
+                          srcSet={photo.srcSet}
+                          sizes={photo.sizes}
+                          width={photo.width}
+                          height={photo.height}
+                          alt={photo.alt}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
+                        />
+                      </figure>
+                    </SwiperSlide>
                   ))}
-                </div>
+                </Swiper>
               </GalleryBlock>
             ) : null}
 
-            {youtubeEmbeds.length > 0 ? (
-              <GalleryBlock icon={<Video className="h-4 w-4" aria-hidden="true" />} title="Videos YouTube">
-                <div className="grid gap-4 lg:grid-cols-2">
+            {activeTab === 'videos' && youtubeEmbeds.length > 0 ? (
+              <GalleryBlock icon={<Video className="h-4 w-4" aria-hidden="true" />} title="Videos">
+                <Swiper
+                  grabCursor={true}
+                  spaceBetween={16}
+                  breakpoints={{
+                    320: {
+                      slidesPerView: 1,
+                    },
+                    1024: {
+                      slidesPerView: 2,
+                    },
+                  }}
+                  className="w-full"
+                >
                   {youtubeEmbeds.map((video) => (
-                    <LazyFrame
-                      key={video.url}
-                      src={video.embedUrl}
-                      title={video.title}
-                      icon={<PlayCircle className="h-5 w-5" aria-hidden="true" />}
-                    />
+                    <SwiperSlide key={video.url}>
+                      <LazyFrame
+                        src={video.embedUrl}
+                        title={video.title}
+                        icon={<PlayCircle className="h-5 w-5" aria-hidden="true" />}
+                      />
+                    </SwiperSlide>
                   ))}
-                </div>
+                </Swiper>
               </GalleryBlock>
             ) : null}
 
-            {instagramEmbeds.length > 0 ? (
-              <GalleryBlock icon={<Film className="h-4 w-4" aria-hidden="true" />} title="Reels Instagram">
+            {activeTab === 'reels' && instagramEmbeds.length > 0 ? (
+              <GalleryBlock icon={<Film className="h-4 w-4" aria-hidden="true" />} title="Reels">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {instagramEmbeds.map((reel) => (
                     <LazyFrame
@@ -293,7 +354,7 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
               </GalleryBlock>
             ) : null}
 
-            {gallery.externalLinks.length > 0 ? (
+            {activeTab === 'links' && gallery.externalLinks.length > 0 ? (
               <GalleryBlock icon={<LinkIcon className="h-4 w-4" aria-hidden="true" />} title="Links externos">
                 <div className="flex flex-wrap gap-3">
                   {gallery.externalLinks.map((link) => (
