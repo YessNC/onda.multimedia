@@ -146,7 +146,7 @@ function Aftermovie({ video }: { video: EventGalleryMedia }) {
         src={youtubeEmbedUrl}
         title={video.title}
         icon={<PlayCircle className="h-5 w-5" aria-hidden="true" />}
-        className="lg:min-h-[28rem]"
+        className="lg:min-h-[22rem]"
       />
     )
   }
