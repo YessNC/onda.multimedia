@@ -49,7 +49,7 @@ export default function BookingModal({
   const [studio, setStudio] = useState('')
   const [producer, setProducer] = useState('')
   const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
+  const [times, setTimes] = useState<string[]>([])
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -82,18 +82,19 @@ useEffect(() => {
   const handleBooking = async () => {
     const { error } = await supabase
       .from('bookings')
-      .insert({
-        studio,
-        producer,
-        booking_date: date,
-        booking_time: time,
-        name,
-        phone,
-        email,
-        community,
-        status: 'pending',
-      })
-
+      .insert(
+        times.map((hour) => ({
+          studio,
+          producer,
+          booking_date: date,
+          booking_time: hour,
+          name,
+          phone,
+          email,
+          community,
+          status: 'pending',
+        }))
+      )
     if (error) {
       console.error(error)
       alert('Error al guardar la reserva')
@@ -107,7 +108,7 @@ useEffect(() => {
     setStudio('')
     setProducer('')
     setDate('')
-    setTime('')
+    setTimes([])
 
     setName('')
     setPhone('')
@@ -219,28 +220,29 @@ useEffect(() => {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {availableTimes.map((hour) => {
                 const reserved = reservedTimes.includes(hour)
+                const selected = times.includes(hour)
 
                 return (
                   <button
                     key={hour}
                     type="button"
                     disabled={reserved}
-                    onClick={() => setTime(hour)}
+                    onClick={() => {
+                      if (selected) {
+                        setTimes(times.filter((item) => item !== hour))
+                      } else {
+                        setTimes([...times, hour])
+                      }
+                    }}
                     className={`rounded-lg border p-3 transition ${
                       reserved
-                        ? 'cursor-not-allowed border-red-500/30 bg-red-500/10 text-red-400 opacity-50'
-                        : time === hour
-                          ? 'border-onda-purple bg-onda-purple text-white'
-                          : 'border-zinc-700'
+                        ? 'cursor-not-allowed border-red-500/40 bg-red-500/10 text-red-400'
+                        : selected
+                        ? 'border-onda-purple bg-onda-purple text-white'
+                        : 'border-zinc-700'
                     }`}
                   >
-                    {hour}
-
-                    {reserved && (
-                      <div className="mt-1 text-xs">
-                        Reservado
-                      </div>
-                    )}
+                    {reserved ? `${hour} · Reservado` : hour}
                   </button>
                 )
               })}
@@ -249,7 +251,7 @@ useEffect(() => {
 
             <button
               type="button"
-              disabled={!studio || !producer || !date || !time}
+              disabled={!studio || !producer || !date || times.length === 0}
               onClick={() => setStep(2)}
               className="w-full rounded-lg bg-onda-purple p-3 font-semibold disabled:opacity-40"
             >
@@ -275,7 +277,7 @@ useEffect(() => {
               </p>
 
               <p>
-                <strong>Hora:</strong> {time}
+                <strong>Horas:</strong> {times.join(', ')}
               </p>
             </div>
 
