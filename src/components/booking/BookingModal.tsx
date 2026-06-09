@@ -65,8 +65,8 @@ export default function BookingModal({
       .insert({
         studio,
         producer,
-        date,
-        time,
+        booking_date: date,
+        booking_time: time,
         name,
         phone,
         email,
