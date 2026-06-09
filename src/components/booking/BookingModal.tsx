@@ -79,48 +79,49 @@ useEffect(() => {
 
   loadBookings()
 }, [date, studio])
-  const handleBooking = async () => {
-    const { error } = await supabase
-      .from('bookings')
-      .insert(
-        times.map((hour) => ({
-          studio,
-          producer,
-          booking_date: date,
-          booking_time: hour,
-          name,
-          phone,
-          email,
-          community,
-          status: 'pending',
-        }))
-      )
-    if (error) {
-      console.error(error)
-      alert('Error al guardar la reserva')
-      return
-    }
+const handleBooking = async () => {
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert(
+      times.map((hour) => ({
+        studio,
+        producer,
+        booking_date: date,
+        booking_time: hour,
+        name,
+        phone,
+        email,
+        community,
+        status: 'pending',
+        qr_token: crypto.randomUUID(),
+        checked_in: false,
+      })),
+    )
+    .select()
 
-    alert('Reserva enviada correctamente')
-
-    setStep(1)
-
-    setStudio('')
-    setProducer('')
-    setDate('')
-    setTimes([])
-
-    setName('')
-    setPhone('')
-    setEmail('')
-
-    setCommunity(false)
-    setTerms(false)
-
-    setReservedTimes([])
-
-    onClose()
+  if (error) {
+    console.error(error)
+    alert('Error al guardar la reserva')
+    return
   }
+
+  console.log('BOOKINGS CREADAS:', data)
+
+  alert('Reserva enviada correctamente')
+
+  setStudio('')
+  setProducer('')
+  setDate('')
+  setTimes([])
+  setName('')
+  setPhone('')
+  setEmail('')
+  setCommunity(false)
+  setTerms(false)
+  setStep(1)
+
+  onClose()
+}
 
   if (!open) return null
 
