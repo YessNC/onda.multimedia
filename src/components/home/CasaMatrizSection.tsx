@@ -2,6 +2,9 @@ import { ArrowUpRight, CalendarCheck, MapPin } from 'lucide-react'
 import CTAButton from '../shared/CTAButton'
 import ScratchImageCard from './ScratchImageCard'
 import { useI18n } from '../../hooks/useI18n'
+import { useState } from 'react'
+import BookingModal from '../booking/BookingModal'
+import CalendarModal from '../booking/CalendarModal'
 
 const casaMatrizAssets = [
   {
@@ -49,6 +52,9 @@ const casaMatrizAssets = [
 export default function CasaMatrizSection() {
   const { t } = useI18n()
 
+  const [bookingOpen, setBookingOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+
   return (
     <section id="casa-matriz" className="relative isolate overflow-hidden py-20 sm:py-24">
       <div
@@ -83,14 +89,14 @@ export default function CasaMatrizSection() {
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <CTAButton
-                  href="#casa-matriz-galeria"
+                  onClick={() => setCalendarOpen(true)}
                   icon={<ArrowUpRight className="h-4 w-4" aria-hidden="true" />}
                   className="w-full border border-onda-lavender/35 bg-[linear-gradient(135deg,rgba(123,44,255,0.78),rgba(192,132,252,0.2))] shadow-[0_0_32px_rgba(123,44,255,0.32)] backdrop-blur-xl sm:w-auto"
                 >
                   {t('casamatriz.cta-studio')}
                 </CTAButton>
                 <CTAButton
-                  to="/contacto"
+                  onClick={() => setBookingOpen(true)}
                   variant="secondary"
                   icon={<CalendarCheck className="h-4 w-4" aria-hidden="true" />}
                   className="w-full border-onda-lavender/30 bg-white/60 shadow-[0_0_28px_rgba(123,44,255,0.12)] backdrop-blur-xl dark:bg-white/10 sm:w-auto"
@@ -114,6 +120,15 @@ export default function CasaMatrizSection() {
           </div>
         </div>
       </div>
+      <BookingModal
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+      />
+
+      <CalendarModal
+        open={calendarOpen}
+        onClose={() => setCalendarOpen(false)}
+      />
     </section>
   )
 }

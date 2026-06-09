@@ -6,7 +6,7 @@ export default {
   'nav.events': 'Events',
   'nav.services': 'Services',
   'nav.contact': 'Contact',
-  'nav.quote': 'Quote',
+  'nav.quote': 'Book',
   'nav.quote-full': 'Get a quote for your project',
   'nav.main-aria': 'Main navigation',
   'nav.close-menu': 'Close menu',

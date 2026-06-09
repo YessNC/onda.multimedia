@@ -1,17 +1,19 @@
 import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useI18n } from '../../hooks/useI18n'
 import { cn } from '../../lib/utils'
 import BrandLogo from '../shared/BrandLogo'
 import LanguageToggle from './LanguageToggle'
 import MobileMenu, { type NavItem } from './MobileMenu'
 import ThemeToggle from './ThemeToggle'
+import BookingModal from '../booking/BookingModal'
 
 export default function Header() {
   const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [bookingOpen, setBookingOpen] = useState(false)
 
   const navItems: NavItem[] = [
     { label: t('nav.home'), to: '/' },
@@ -68,25 +70,57 @@ export default function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 lg:justify-self-end">
-          <Link
-            to="/contacto"
-            aria-label={t('header.quote-cta')}
-            className="hidden min-h-11 w-32 items-center justify-center rounded-md border border-onda-purple/20 bg-onda-purple/8 px-4 py-3 text-center font-display text-[0.68rem] font-bold uppercase tracking-[0.14em] text-onda-purple shadow-[0_0_28px_rgba(123,44,255,0.12)] backdrop-blur-2xl transition duration-300 hover:border-onda-purple/45 hover:bg-onda-purple/12 hover:shadow-[0_0_36px_rgba(168,85,247,0.18)] xl:inline-flex dark:border-onda-lavender/30 dark:bg-white/[0.07] dark:text-white dark:shadow-[0_0_28px_rgba(123,44,255,0.2)] dark:hover:border-onda-lavender/60 dark:hover:bg-onda-purple/16 dark:hover:shadow-[0_0_36px_rgba(168,85,247,0.3)]"
-          >
-            {t('nav.quote')}
-          </Link>
+         <button
+          type="button"
+          onClick={() => setBookingOpen(true)}
+          aria-label={t('header.quote-cta')}
+          className="
+          hidden xl:inline-flex
+          relative overflow-hidden
+          items-center justify-center
+          h-10 px-4
+          rounded-full
+          font-display text-[0.68rem]
+          font-bold uppercase tracking-[0.22em]
+          text-white
+          bg-gradient-to-r from-onda-purple to-onda-electric
+          shadow-[0_0_18px_rgba(123,44,255,0.45)]
+          transition-all duration-300
+          hover:scale-105
+          hover:shadow-[0_0_30px_rgba(123,44,255,0.65)]
+          animate-onda-glow
+          "
+        >
+          <>
+
+          <span className="absolute inset-0 flex items-center justify-center opacity-10">
+            <img
+              src="/assets/brand/logo-onda.png"
+              alt=""
+              className="h-8 w-auto"
+            />
+          </span>
+                    <span className="relative z-10">
+              {t('nav.quote')}
+            </span>
+          </>
+        </button>
           <ThemeToggle />
           <button
             type="button"
             aria-label={isOpen ? t('nav.close-menu') : t('nav.open-menu')}
             onClick={() => setIsOpen((current) => !current)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-onda-purple/18 bg-white/80 text-onda-purple shadow-[0_0_22px_rgba(123,44,255,0.1)] backdrop-blur-xl transition duration-300 hover:border-onda-purple hover:bg-onda-purple/10 lg:hidden dark:border-onda-purple/30 dark:bg-white/5 dark:text-onda-lavender dark:shadow-[0_0_22px_rgba(123,44,255,0.14)]"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-onda-purple/18 bg-white/80 text-onda-purple shadow-[0_0_22px_rgba(123,44,255,0.1)] backdrop-blur-xl transition duration-300 hover:border-onda-purple hover:bg-onda-purple/10 lg:hidden dark:border-onda-purple/30 dark:bg-white/5 dark:text-onda-lavender dark:shadow-[0_0_22px_rgba(123,44,255,0.14)] "
           >
             {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
 
         <MobileMenu isOpen={isOpen} navItems={navItems} onClose={() => setIsOpen(false)} />
+        <BookingModal
+          open={bookingOpen}
+          onClose={() => setBookingOpen(false)}
+        />
       </div>
     </header>
   )

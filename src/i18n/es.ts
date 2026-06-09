@@ -6,7 +6,7 @@ export default {
   'nav.events': 'Eventos',
   'nav.services': 'Servicios',
   'nav.contact': 'Contacto',
-  'nav.quote': 'Cotizar',
+  'nav.quote': 'Reserva',
   'nav.quote-full': 'Cotiza tu proyecto',
   'nav.main-aria': 'Navegacion principal',
   'nav.close-menu': 'Cerrar menu',
@@ -47,11 +47,11 @@ export default {
 
   // Casa Matriz Section
   'casamatriz.eyebrow': 'Freirina',
-  'casamatriz.title': 'Conoce nuestra casa matriz',
+  'casamatriz.title': 'Casa Estudio ONDA MULTIMEDIA',
   'casamatriz.subtitle': 'Desde Freirina creamos experiencias, contenido y sonido con identidad propia.',
   'casamatriz.description':
     'Nuestra casa matriz en Freirina es el punto de encuentro donde nacen proyectos audiovisuales, musicales y experiencias en vivo. Un espacio pensado para crear, grabar, producir, conectar artistas y desarrollar contenido con identidad urbana y profesional.',
-  'casamatriz.cta-studio': 'Conoce la casa estudio',
+  'casamatriz.cta-studio': 'Revisa nuestro calendario',
   'casamatriz.cta-visit': 'Agenda una visita',
   'casamatriz.img-1-alt': 'Casa matriz de Onda Multimedia en Freirina',
   'casamatriz.img-2-alt': 'Espacio creativo de la casa matriz',
