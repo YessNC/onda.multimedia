@@ -102,6 +102,22 @@ useEffect(() => {
 
     alert('Reserva enviada correctamente')
 
+    setStep(1)
+
+    setStudio('')
+    setProducer('')
+    setDate('')
+    setTime('')
+
+    setName('')
+    setPhone('')
+    setEmail('')
+
+    setCommunity(false)
+    setTerms(false)
+
+    setReservedTimes([])
+
     onClose()
   }
 
