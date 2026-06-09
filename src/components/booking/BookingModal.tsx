@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+
 
 interface BookingModalProps {
   open: boolean
@@ -38,6 +39,7 @@ const availableTimes = [
   '16:00',
 ]
 
+
 export default function BookingModal({
   open,
   onClose,
@@ -55,10 +57,28 @@ export default function BookingModal({
 
   const [community, setCommunity] = useState(false)
   const [terms, setTerms] = useState(false)
+  const [reservedTimes, setReservedTimes] = useState<string[]>([])
 
   const selectedStudio = studios.find(
   (item) => item.id === studio
 )
+useEffect(() => {
+  const loadBookings = async () => {
+    if (!date || !studio) return
+
+    const { data } = await supabase
+      .from('bookings')
+      .select('booking_time')
+      .eq('studio', studio)
+      .eq('booking_date', date)
+
+    setReservedTimes(
+      data?.map((item) => item.booking_time) ?? []
+    )
+  }
+
+  loadBookings()
+}, [date, studio])
   const handleBooking = async () => {
     const { error } = await supabase
       .from('bookings')
@@ -180,22 +200,35 @@ export default function BookingModal({
                 Horario
               </label>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {availableTimes.map((hour) => (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {availableTimes.map((hour) => {
+                const reserved = reservedTimes.includes(hour)
+
+                return (
                   <button
                     key={hour}
                     type="button"
+                    disabled={reserved}
                     onClick={() => setTime(hour)}
                     className={`rounded-lg border p-3 transition ${
-                      time === hour
-                        ? 'border-onda-purple bg-onda-purple text-white'
-                        : 'border-zinc-700'
+                      reserved
+                        ? 'cursor-not-allowed border-red-500/30 bg-red-500/10 text-red-400 opacity-50'
+                        : time === hour
+                          ? 'border-onda-purple bg-onda-purple text-white'
+                          : 'border-zinc-700'
                     }`}
                   >
                     {hour}
+
+                    {reserved && (
+                      <div className="mt-1 text-xs">
+                        Reservado
+                      </div>
+                    )}
                   </button>
-                ))}
-              </div>
+                )
+              })}
+            </div>
             </div>
 
             <button
