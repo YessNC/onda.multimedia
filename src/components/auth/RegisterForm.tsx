@@ -1,109 +1,103 @@
-// src/components/auth/RegisterForm.tsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PasswordInput } from './PasswordInput'
+import { useAuth } from '../../contexts/AuthContext'
 import { cn } from '../../lib/utils'
-import { supabase } from '../../lib/supabaseClient'
+import { PasswordInput } from './PasswordInput'
+
+interface RegisterFormData {
+  nombre: string
+  email: string
+  telefono: string
+  password: string
+  confirmPassword: string
+}
+
+const initialFormData: RegisterFormData = {
+  nombre: '',
+  email: '',
+  telefono: '',
+  password: '',
+  confirmPassword: '',
+}
+
+function getRegisterErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : ''
+
+  if (message === 'User already registered') {
+    return 'Este email ya esta registrado. Inicia sesion o recupera tu contrasena.'
+  }
+
+  if (message === 'Signups not allowed for this instance') {
+    return 'Los registros estan desactivados en Supabase. Activa Allow new users to sign up en Authentication.'
+  }
+
+  return message || 'Error al registrar usuario. Intenta nuevamente.'
+}
 
 export function RegisterForm() {
   const navigate = useNavigate()
+  const { register } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    nombre: '',
-    email: '',
-    telefono: '',
-    password: '',
-    confirmPassword: ''
-  })
+  const [formData, setFormData] = useState(initialFormData)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
+
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }))
+      setErrors((prev) => ({ ...prev, [name]: '' }))
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // Validaciones
+  const validateForm = () => {
     const newErrors: Record<string, string> = {}
-    
+
     if (!formData.nombre.trim()) newErrors.nombre = 'Nombre completo requerido'
     if (!formData.email.trim()) {
       newErrors.email = 'Email requerido'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email inválido'
+      newErrors.email = 'Email invalido'
     }
-    if (!formData.telefono.trim()) newErrors.telefono = 'Teléfono requerido'
+    if (!formData.telefono.trim()) newErrors.telefono = 'Telefono requerido'
     if (!formData.password) {
-      newErrors.password = 'Contraseña requerida'
+      newErrors.password = 'Contrasena requerida'
     } else if (formData.password.length < 6) {
-      newErrors.password = 'La contraseña debe tener al menos 6 caracteres'
+      newErrors.password = 'La contrasena debe tener al menos 6 caracteres'
     }
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Las contraseñas no coinciden'
+      newErrors.confirmPassword = 'Las contrasenas no coinciden'
     }
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
+
+    return newErrors
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const validationErrors = validateForm()
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors)
       return
     }
-    
+
     setIsLoading(true)
-    
+    setErrors({})
+
     try {
-      // 1. Registrar usuario en Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.nombre,
-            phone: formData.telefono,
-          }
-        }
-      })
-      
-      if (authError) {
-        throw authError
-      }
-      
-      if (authData.user) {
-        // 2. (Opcional) Guardar datos adicionales en una tabla 'profiles'
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: authData.user.id,
-              full_name: formData.nombre,
-              email: formData.email,
-              phone: formData.telefono,
-              created_at: new Date().toISOString()
-            }
-          ])
-        
-        if (profileError) {
-          console.error('Error guardando perfil:', profileError)
-          // No bloqueamos el registro si falla el perfil
-        }
-        
-        // Registro exitoso
-        alert('✅ ¡Registro exitoso! Revisa tu email para confirmar tu cuenta.\n\nRedirigiendo al inicio de sesión...')
-        navigate('/login')
-      }
-      
-    } catch (error: any) {
+      await register(
+        formData.email.trim(),
+        formData.password,
+        formData.nombre.trim(),
+        formData.telefono.trim(),
+      )
+
+      setFormData(initialFormData)
+      navigate('/login?registered=1', { replace: true })
+    } catch (error) {
       console.error('Error de registro:', error)
-      
-      // Manejar errores específicos de Supabase
-      if (error.message === 'User already registered') {
-        setErrors({ submit: 'Este email ya está registrado. Inicia sesión o recupera tu contraseña.' })
-      } else {
-        setErrors({ submit: error.message || 'Error al registrar usuario. Intenta nuevamente.' })
-      }
+      setErrors({ submit: getRegisterErrorMessage(error) })
     } finally {
       setIsLoading(false)
     }
@@ -111,9 +105,8 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Nombre completo */}
       <div>
-        <label className="block text-sm font-semibold text-zinc-700 dark:text-onda-muted mb-2">
+        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-onda-muted">
           Nombre completo
         </label>
         <input
@@ -122,22 +115,20 @@ export function RegisterForm() {
           value={formData.nombre}
           onChange={handleChange}
           autoComplete="name"
-          placeholder="Juan Pérez"
+          placeholder="Juan Perez"
           className={cn(
-            "w-full px-4 py-3 rounded-xl border transition-all duration-200",
-            "focus:outline-none focus:ring-2 focus:ring-onda-purple/50 focus:border-onda-purple",
-            "bg-white dark:bg-white/10",
-            errors.nombre 
-              ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
-              : "border-onda-purple/20 hover:border-onda-purple/50 dark:border-white/20"
+            'w-full rounded-md border px-4 py-3 transition-all duration-200',
+            'bg-white focus:border-onda-purple focus:outline-none focus:ring-2 focus:ring-onda-purple/50 dark:bg-white/10',
+            errors.nombre
+              ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+              : 'border-onda-purple/20 hover:border-onda-purple/50 dark:border-white/20',
           )}
         />
-        {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre}</p>}
+        {errors.nombre ? <p className="mt-1 text-xs text-red-500">{errors.nombre}</p> : null}
       </div>
 
-      {/* Email */}
       <div>
-        <label className="block text-sm font-semibold text-zinc-700 dark:text-onda-muted mb-2">
+        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-onda-muted">
           Email
         </label>
         <input
@@ -148,21 +139,19 @@ export function RegisterForm() {
           autoComplete="email"
           placeholder="hola@correo.cl"
           className={cn(
-            "w-full px-4 py-3 rounded-xl border transition-all duration-200",
-            "focus:outline-none focus:ring-2 focus:ring-onda-purple/50 focus:border-onda-purple",
-            "bg-white dark:bg-white/10",
-            errors.email 
-              ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
-              : "border-onda-purple/20 hover:border-onda-purple/50 dark:border-white/20"
+            'w-full rounded-md border px-4 py-3 transition-all duration-200',
+            'bg-white focus:border-onda-purple focus:outline-none focus:ring-2 focus:ring-onda-purple/50 dark:bg-white/10',
+            errors.email
+              ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+              : 'border-onda-purple/20 hover:border-onda-purple/50 dark:border-white/20',
           )}
         />
-        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+        {errors.email ? <p className="mt-1 text-xs text-red-500">{errors.email}</p> : null}
       </div>
 
-      {/* Teléfono */}
       <div>
-        <label className="block text-sm font-semibold text-zinc-700 dark:text-onda-muted mb-2">
-          Teléfono
+        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-onda-muted">
+          Telefono
         </label>
         <input
           type="tel"
@@ -172,63 +161,48 @@ export function RegisterForm() {
           autoComplete="tel"
           placeholder="+56999999999"
           className={cn(
-            "w-full px-4 py-3 rounded-xl border transition-all duration-200",
-            "focus:outline-none focus:ring-2 focus:ring-onda-purple/50 focus:border-onda-purple",
-            "bg-white dark:bg-white/10",
-            errors.telefono 
-              ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
-              : "border-onda-purple/20 hover:border-onda-purple/50 dark:border-white/20"
+            'w-full rounded-md border px-4 py-3 transition-all duration-200',
+            'bg-white focus:border-onda-purple focus:outline-none focus:ring-2 focus:ring-onda-purple/50 dark:bg-white/10',
+            errors.telefono
+              ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+              : 'border-onda-purple/20 hover:border-onda-purple/50 dark:border-white/20',
           )}
         />
-        {errors.telefono && <p className="text-red-500 text-xs mt-1">{errors.telefono}</p>}
+        {errors.telefono ? <p className="mt-1 text-xs text-red-500">{errors.telefono}</p> : null}
       </div>
 
-      {/* Contraseña */}
       <PasswordInput
         name="password"
         value={formData.password}
         onChange={handleChange}
-        label="Contraseña"
+        label="Contrasena"
         error={errors.password}
         autoComplete="new-password"
-        placeholder="Mínimo 6 caracteres"
+        placeholder="Minimo 6 caracteres"
       />
 
-      {/* Confirmar Contraseña */}
       <PasswordInput
         name="confirmPassword"
         value={formData.confirmPassword}
         onChange={handleChange}
-        label="Confirmar contraseña"
+        label="Confirmar contrasena"
         error={errors.confirmPassword}
         autoComplete="new-password"
-        placeholder="Repite tu contraseña"
+        placeholder="Repite tu contrasena"
       />
 
-      {/* Error general del submit */}
-      {errors.submit && (
-        <div className="p-3 rounded-lg bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800">
-          <p className="text-red-600 dark:text-red-400 text-sm text-center">{errors.submit}</p>
+      {errors.submit ? (
+        <div className="rounded-md border border-red-300 bg-red-100 p-3 dark:border-red-800 dark:bg-red-900/20">
+          <p className="text-center text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
         </div>
-      )}
+      ) : null}
 
-      {/* Botón de registro */}
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full bg-gradient-to-r from-onda-purple to-onda-electric text-white font-bold py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-onda-purple/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-md bg-gradient-to-r from-onda-purple to-onda-electric px-4 py-3 font-bold text-white transition hover:shadow-lg hover:shadow-onda-purple/30 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Registrando...
-          </span>
-        ) : (
-          'Registrarse'
-        )}
+        {isLoading ? 'Registrando...' : 'Registrarse'}
       </button>
     </form>
   )

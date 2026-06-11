@@ -1,14 +1,23 @@
-// src/components/auth/LoginForm.tsx
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabaseClient'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
+import { PasswordInput } from './PasswordInput'
+
+function getLoginErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : ''
+  return message || 'No pudimos iniciar sesion. Revisa tus datos e intenta nuevamente.'
+}
 
 export function LoginForm() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const registered = searchParams.get('registered') === '1'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -16,19 +25,10 @@ export function LoginForm() {
     setError(null)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
-      if (data.session) {
-        // Redirige al dashboard después de login exitoso
-        navigate('/dashboard')
-      }
-    } catch (err: any) {
-      setError(err.message)
+      await login(email.trim(), password)
+      navigate('/dashboard', { replace: true })
+    } catch (loginError) {
+      setError(getLoginErrorMessage(loginError))
     } finally {
       setLoading(false)
     }
@@ -36,42 +36,47 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleLogin} className="space-y-5">
+      {registered ? (
+        <div className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-200">
+          Registro recibido. Si activaste confirmacion por email, confirma tu cuenta antes de iniciar sesion.
+        </div>
+      ) : null}
+
       <div>
-        <label className="block text-sm font-semibold mb-2">Email</label>
+        <label className="mb-2 block text-sm font-semibold">Email</label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-4 py-3 rounded-xl border"
+          className="w-full rounded-md border border-onda-purple/20 bg-white px-4 py-3 outline-none transition focus:border-onda-purple focus:ring-2 focus:ring-onda-purple/40 dark:bg-white/10"
           placeholder="hola@correo.cl"
+          autoComplete="email"
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-semibold mb-2">Contraseña</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="w-full px-4 py-3 rounded-xl border"
-          placeholder="••••••••"
-        />
-      </div>
+      <PasswordInput
+        name="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        label="Contrasena"
+        placeholder="********"
+        autoComplete="current-password"
+        required
+      />
 
-      {error && (
-        <div className="p-3 rounded-lg bg-red-100 text-red-600 text-sm">
+      {error ? (
+        <div className="rounded-md bg-red-100 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-300">
           {error}
         </div>
-      )}
+      ) : null}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-gradient-to-r from-onda-purple to-onda-electric text-white font-bold py-3 rounded-xl"
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-md bg-gradient-to-r from-onda-purple to-onda-electric px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+        {loading ? 'Iniciando sesion...' : 'Iniciar sesion'}
       </button>
     </form>
   )

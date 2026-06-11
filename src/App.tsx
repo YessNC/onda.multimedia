@@ -10,6 +10,7 @@ import SpotifyPlayerProvider from './components/shared/SpotifyPlayerProvider'
 import ProtectedAdminRoute from './components/admin/ProtectedAdminRoute'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import AdminCheckIn from './routes/AdminCheckIn'
+import AdminAvailability from './routes/AdminAvailability'
 import AdminEventAttendees from './routes/AdminEventAttendees'
 import AdminPanel from './routes/AdminPanel'
 import AdminEventos from './routes/AdminEventos'
@@ -108,6 +109,14 @@ function App() {
                   element={
                     <ProtectedAdminRoute>
                       <AdminEventos />
+                    </ProtectedAdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/disponibilidad"
+                  element={
+                    <ProtectedAdminRoute>
+                      <AdminAvailability />
                     </ProtectedAdminRoute>
                   }
                 />

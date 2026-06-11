@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, QrCode } from 'lucide-react'
+import { CalendarClock, Plus, QrCode } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
 import AdminEventTable from '../components/admin/AdminEventTable'
@@ -239,6 +239,14 @@ export default function AdminEventos() {
               icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
             >
               Registro de entrada
+            </CTAButton>
+            <CTAButton
+              to="/admin/disponibilidad"
+              variant="secondary"
+              className="w-full justify-center sm:w-auto sm:min-w-56"
+              icon={<CalendarClock className="h-4 w-4" aria-hidden="true" />}
+            >
+              Disponibilidad
             </CTAButton>
             <AdminSignOutButton className="w-full justify-center sm:ml-auto sm:w-auto sm:min-w-48" />
           </div>
