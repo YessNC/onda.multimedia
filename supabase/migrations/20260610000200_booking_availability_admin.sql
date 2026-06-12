@@ -199,6 +199,25 @@ alter table public.bookings
 alter table public.bookings
   alter column studio_id drop not null;
 
+do $$
+declare
+  v_column_name text;
+begin
+  foreach v_column_name in array array['studio', 'producer', 'booking_time', 'name', 'email', 'phone']
+  loop
+    if exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'bookings'
+        and column_name = v_column_name
+        and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.bookings alter column %I drop not null', v_column_name);
+    end if;
+  end loop;
+end $$;
+
 update public.bookings
 set status = 'pending'
 where status is null or status = '';

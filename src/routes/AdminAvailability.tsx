@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
+  AlertTriangle,
   ArrowLeft,
   Building2,
   CalendarClock,
@@ -9,12 +10,15 @@ import {
   RefreshCw,
   Save,
   Sparkles,
+  Trash2,
+  X,
 } from 'lucide-react'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
 import OndaSelect, { type OndaSelectOption } from '../components/shared/OndaSelect'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
 import { useI18n } from '../hooks/useI18n'
+import { getActiveAdminMembership } from '../lib/adminAuth'
 import {
   type AvailabilityException,
   type AvailabilityExceptionType,
@@ -27,12 +31,19 @@ import {
   normalizeTime,
   statusClassName,
 } from '../lib/dashboard'
-import { supabase } from '../lib/supabaseClient'
+import { supabaseAdmin as supabase } from '../lib/supabaseAdminClient'
 import { cn } from '../lib/utils'
 
 type MessageState = {
   tone: 'success' | 'error'
   text: string
+}
+
+type DeleteExceptionsScope = 'filtered' | 'all'
+
+type DeleteExceptionsDialogState = {
+  count: number
+  scope: DeleteExceptionsScope
 }
 
 type ServiceForm = {
@@ -89,6 +100,7 @@ type ExceptionForm = {
 type BookingRow = {
   id: string
   client_id: string | null
+  email: string | null
   service_id: string | null
   studio_id: string | null
   producer_id: string | null
@@ -96,7 +108,27 @@ type BookingRow = {
   start_time: string
   end_time: string
   status: BookingStatus
+  name: string | null
   notes: string | null
+}
+
+type BookingProfileRow = {
+  id: string
+  full_name: string | null
+}
+
+type ExceptionBasePayload = {
+  end_time: string | null
+  producer_id: string | null
+  reason: string | null
+  service_id: string | null
+  start_time: string | null
+  studio_id: string | null
+  type: AvailabilityExceptionType
+}
+
+type ExceptionInsertPayload = ExceptionBasePayload & {
+  exception_date: string
 }
 
 const weekdayKeys = [
@@ -110,6 +142,9 @@ const weekdayKeys = [
 ]
 const allWeekdayValues = weekdayKeys.map((weekday) => weekday.value)
 const workdayValues = ['1', '2', '3', '4', '5']
+const deleteConfirmationToken = 'ELIMINAR'
+const startOfDayTime = '00:00'
+const endOfDayTime = '23:59'
 
 const bookingStatuses: BookingStatus[] = ['pending', 'confirmed', 'cancelled', 'completed']
 
@@ -183,6 +218,37 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Ocurrio un error inesperado.'
 }
 
+function getErrorCode(error: unknown) {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    return typeof code === 'string' ? code : ''
+  }
+
+  return ''
+}
+
+function isAdminPermissionError(error: unknown) {
+  const code = getErrorCode(error)
+  const message = getErrorMessage(error).toLowerCase()
+
+  return (
+    code === '42501' ||
+    message.includes('permission denied') ||
+    message.includes('row-level security') ||
+    message.includes('rls')
+  )
+}
+
+function getAdminActionErrorMessage(error: unknown, permissionMessage: string) {
+  const message = getErrorMessage(error)
+
+  if (isAdminPermissionError(error)) {
+    return `${permissionMessage} ${message}`
+  }
+
+  return message
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -195,6 +261,12 @@ function slugify(value: string) {
 function getNameById<T extends { id: string; name: string }>(items: T[], id: string | null | undefined, fallback: string) {
   if (!id) return fallback
   return items.find((item) => item.id === id)?.name ?? fallback
+}
+
+function getBookingClientName(row: BookingRow, profilesById: Map<string, string>, fallback: string) {
+  const profileName = row.client_id ? profilesById.get(row.client_id)?.trim() : ''
+
+  return profileName || row.name?.trim() || row.email?.trim() || fallback
 }
 
 function dateFromKey(dateKey: string) {
@@ -213,6 +285,17 @@ function getWeekdayValue(dateKey: string) {
   return String(dateFromKey(dateKey).getDay())
 }
 
+function getNextDateKey(dateKey: string) {
+  const date = dateFromKey(dateKey)
+  date.setDate(date.getDate() + 1)
+  return dateToKey(date)
+}
+
+function minutesFromFormTime(value: string) {
+  const [hour = '0', minute = '0'] = normalizeTime(value).split(':')
+  return Number(hour) * 60 + Number(minute)
+}
+
 function buildExceptionDateKeys(startDate: string, endDate: string, weekdays: string[]) {
   const start = dateFromKey(startDate)
   const end = dateFromKey(endDate || startDate)
@@ -228,21 +311,65 @@ function buildExceptionDateKeys(startDate: string, endDate: string, weekdays: st
   return dateKeys
 }
 
+function buildExceptionRows(dateKeys: string[], basePayload: ExceptionBasePayload) {
+  if (!basePayload.start_time || !basePayload.end_time) {
+    return dateKeys.map((exceptionDate): ExceptionInsertPayload => ({
+      ...basePayload,
+      end_time: null,
+      exception_date: exceptionDate,
+      start_time: null,
+    }))
+  }
+
+  const startMinutes = minutesFromFormTime(basePayload.start_time)
+  const endMinutes = minutesFromFormTime(basePayload.end_time)
+
+  if (endMinutes > startMinutes) {
+    return dateKeys.map((exceptionDate): ExceptionInsertPayload => ({
+      ...basePayload,
+      exception_date: exceptionDate,
+    }))
+  }
+
+  return dateKeys.flatMap((exceptionDate): ExceptionInsertPayload[] => {
+    const currentDayRow: ExceptionInsertPayload = {
+      ...basePayload,
+      end_time: endOfDayTime,
+      exception_date: exceptionDate,
+    }
+
+    if (endMinutes === 0) return [currentDayRow]
+
+    return [
+      currentDayRow,
+      {
+        ...basePayload,
+        end_time: basePayload.end_time,
+        exception_date: getNextDateKey(exceptionDate),
+        start_time: startOfDayTime,
+      },
+    ]
+  })
+}
+
 function mapBookingRows(
   rows: BookingRow[],
   services: BookingService[],
   studios: Studio[],
   producers: Producer[],
+  profilesById: Map<string, string>,
   labels: {
     defaultProducer: string
     defaultService: string
     defaultStudio: string
+    registeredClient: string
   },
 ): Booking[] {
   return rows.map((row) => ({
     ...row,
     start_time: normalizeTime(row.start_time),
     end_time: normalizeTime(row.end_time),
+    client_name: getBookingClientName(row, profilesById, labels.registeredClient),
     service_name: getNameById(services, row.service_id, labels.defaultService),
     studio_name: row.studio_id ? getNameById(studios, row.studio_id, labels.defaultStudio) : null,
     producer_name: row.producer_id ? getNameById(producers, row.producer_id, labels.defaultProducer) : null,
@@ -265,6 +392,9 @@ export default function AdminAvailability() {
   const [ruleForm, setRuleForm] = useState<RuleForm>(emptyRuleForm)
   const [exceptionForm, setExceptionForm] = useState<ExceptionForm>(emptyExceptionForm)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [deleteExceptionsDialog, setDeleteExceptionsDialog] = useState<DeleteExceptionsDialogState | null>(null)
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('')
+  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false)
   const serviceOptions = useMemo<OndaSelectOption[]>(
     () => [
       { value: '', label: t('adminAvailability.select.service'), disabled: true },
@@ -303,9 +433,9 @@ export default function AdminAvailability() {
   )
   const selectedExceptionWeekdays = exceptionForm.weekdays ?? []
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async ({ clearMessage = true }: { clearMessage?: boolean } = {}) => {
     setIsLoading(true)
-    setMessage(null)
+    if (clearMessage) setMessage(null)
 
     try {
       const [servicesResult, studiosResult, producersResult, rulesResult, exceptionsResult, bookingsResult] =
@@ -331,7 +461,7 @@ export default function AdminAvailability() {
             .limit(80),
           supabase
             .from('bookings')
-            .select('id, client_id, service_id, studio_id, producer_id, booking_date, start_time, end_time, status, notes')
+            .select('id, client_id, service_id, studio_id, producer_id, booking_date, start_time, end_time, status, notes, name, email')
             .order('booking_date', { ascending: false })
             .order('start_time', { ascending: true })
             .limit(120),
@@ -350,6 +480,28 @@ export default function AdminAvailability() {
       const nextServices = (servicesResult.data ?? []) as BookingService[]
       const nextStudios = (studiosResult.data ?? []) as Studio[]
       const nextProducers = (producersResult.data ?? []) as Producer[]
+      const bookingRows = (bookingsResult.data ?? []) as BookingRow[]
+      const clientIds = [
+        ...new Set(bookingRows.map((booking) => booking.client_id).filter((clientId): clientId is string => Boolean(clientId))),
+      ]
+      const profilesById = new Map<string, string>()
+
+      if (clientIds.length > 0) {
+        const { data: profileRows, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', clientIds)
+
+        if (profilesError) throw profilesError
+
+        for (const profile of (profileRows ?? []) as BookingProfileRow[]) {
+          const profileName = profile.full_name?.trim()
+
+          if (profileName) {
+            profilesById.set(profile.id, profileName)
+          }
+        }
+      }
 
       setServices(nextServices)
       setStudios(nextStudios)
@@ -357,10 +509,11 @@ export default function AdminAvailability() {
       setRules((rulesResult.data ?? []) as AvailabilityRule[])
       setExceptions((exceptionsResult.data ?? []) as AvailabilityException[])
       setBookings(
-        mapBookingRows((bookingsResult.data ?? []) as BookingRow[], nextServices, nextStudios, nextProducers, {
+        mapBookingRows(bookingRows, nextServices, nextStudios, nextProducers, profilesById, {
           defaultProducer: t('dashboard.producer'),
           defaultService: t('adminAvailability.defaultBooking'),
           defaultStudio: t('dashboard.studio'),
+          registeredClient: t('adminAvailability.registeredClient'),
         }),
       )
     } catch (error) {
@@ -398,9 +551,9 @@ export default function AdminAvailability() {
     try {
       await task()
       setMessage({ tone: 'success', text: successMessage })
-      await loadData()
+      await loadData({ clearMessage: false })
     } catch (error) {
-      setMessage({ tone: 'error', text: getErrorMessage(error) })
+      setMessage({ tone: 'error', text: getAdminActionErrorMessage(error, t('adminAvailability.error.adminPermission')) })
     } finally {
       setBusyKey(null)
     }
@@ -593,6 +746,15 @@ export default function AdminAvailability() {
       return
     }
 
+    if (
+      exceptionForm.startTime &&
+      exceptionForm.endTime &&
+      minutesFromFormTime(exceptionForm.startTime) === minutesFromFormTime(exceptionForm.endTime)
+    ) {
+      setMessage({ tone: 'error', text: t('adminAvailability.error.invalidTimeRange') })
+      return
+    }
+
     if (!exceptionForm.id && selectedExceptionWeekdays.length === 0) {
       setMessage({ tone: 'error', text: t('adminAvailability.error.noDatesInRange') })
       return
@@ -607,7 +769,7 @@ export default function AdminAvailability() {
       return
     }
 
-    const basePayload = {
+    const basePayload: ExceptionBasePayload = {
       end_time: exceptionForm.endTime || null,
       producer_id: exceptionForm.producerId || null,
       reason: exceptionForm.reason.trim() || null,
@@ -616,6 +778,7 @@ export default function AdminAvailability() {
       studio_id: exceptionForm.studioId || null,
       type: exceptionForm.type,
     }
+    const exceptionRows = buildExceptionRows(dateKeys, basePayload)
 
     void runAction(
       'exception',
@@ -623,19 +786,25 @@ export default function AdminAvailability() {
         const result = exceptionForm.id
           ? await supabase
               .from('availability_exceptions')
-              .update({ ...basePayload, exception_date: exceptionForm.exceptionDate })
+              .update(exceptionRows[0])
               .eq('id', exceptionForm.id)
           : await supabase
               .from('availability_exceptions')
-              .insert(dateKeys.map((exceptionDate) => ({ ...basePayload, exception_date: exceptionDate })))
+              .insert(exceptionRows)
 
         if (result.error) throw result.error
+
+        if (exceptionForm.id && exceptionRows.length > 1) {
+          const extraRowsResult = await supabase.from('availability_exceptions').insert(exceptionRows.slice(1))
+          if (extraRowsResult.error) throw extraRowsResult.error
+        }
+
         setExceptionForm(emptyExceptionForm)
       },
       exceptionForm.id
         ? t('adminAvailability.message.exceptionUpdated')
-        : dateKeys.length > 1
-          ? t('adminAvailability.message.exceptionsCreated').replace('{count}', String(dateKeys.length))
+        : exceptionRows.length > 1
+          ? t('adminAvailability.message.exceptionsCreated').replace('{count}', String(exceptionRows.length))
           : t('adminAvailability.message.exceptionCreated'),
     )
   }
@@ -669,12 +838,163 @@ export default function AdminAvailability() {
     )
   }
 
+  function hasSelectedExceptionDeleteFilters() {
+    return Boolean(
+      exceptionForm.serviceId ||
+        exceptionForm.studioId ||
+        exceptionForm.producerId ||
+        exceptionForm.exceptionDate,
+    )
+  }
+
+  function getSelectedExceptionDeleteDates() {
+    if (!exceptionForm.exceptionDate) return null
+
+    const finalDate = exceptionForm.endDate || exceptionForm.exceptionDate
+
+    if (dateFromKey(finalDate) < dateFromKey(exceptionForm.exceptionDate)) {
+      throw new Error(t('adminAvailability.error.invalidDateRange'))
+    }
+
+    const dateKeys = buildExceptionDateKeys(
+      exceptionForm.exceptionDate,
+      finalDate,
+      selectedExceptionWeekdays.length > 0 ? selectedExceptionWeekdays : allWeekdayValues,
+    )
+
+    if (dateKeys.length === 0) throw new Error(t('adminAvailability.error.noDatesInRange'))
+
+    return dateKeys
+  }
+
+  async function assertActiveAdmin() {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+
+    if (error) throw error
+    if (!user) throw new Error(t('adminAvailability.error.adminPermission'))
+
+    const membership = await getActiveAdminMembership(user)
+
+    if (!membership) throw new Error(t('adminAvailability.error.adminPermission'))
+  }
+
+  async function countAvailabilityExceptions(scope: DeleteExceptionsScope) {
+    let query = supabase.from('availability_exceptions').select('id', { count: 'exact', head: true })
+
+    if (scope === 'filtered') {
+      const dateKeys = getSelectedExceptionDeleteDates()
+
+      if (exceptionForm.serviceId) query = query.eq('service_id', exceptionForm.serviceId)
+      if (exceptionForm.studioId) query = query.eq('studio_id', exceptionForm.studioId)
+      if (exceptionForm.producerId) query = query.eq('producer_id', exceptionForm.producerId)
+      if (dateKeys) query = query.in('exception_date', dateKeys)
+    }
+
+    const { count, error } = await query
+
+    if (error) throw error
+
+    return count ?? 0
+  }
+
+  async function openDeleteExceptionsDialog(scope: DeleteExceptionsScope) {
+    setMessage(null)
+
+    if (scope === 'filtered' && !hasSelectedExceptionDeleteFilters()) {
+      setMessage({ tone: 'error', text: t('adminAvailability.error.deleteFilterRequired') })
+      return
+    }
+
+    setBusyKey(`delete-exceptions-${scope}-count`)
+
+    try {
+      await assertActiveAdmin()
+      const count = await countAvailabilityExceptions(scope)
+      setDeleteAcknowledged(false)
+      setDeleteConfirmationInput('')
+      setDeleteExceptionsDialog({ count, scope })
+    } catch (error) {
+      setMessage({
+        tone: 'error',
+        text: isAdminPermissionError(error)
+          ? t('adminAvailability.error.deleteBlocks')
+          : getErrorMessage(error),
+      })
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  async function deleteAvailabilityExceptions(scope: DeleteExceptionsScope) {
+    let query = supabase.from('availability_exceptions').delete({ count: 'exact' })
+
+    if (scope === 'filtered') {
+      const dateKeys = getSelectedExceptionDeleteDates()
+
+      if (exceptionForm.serviceId) query = query.eq('service_id', exceptionForm.serviceId)
+      if (exceptionForm.studioId) query = query.eq('studio_id', exceptionForm.studioId)
+      if (exceptionForm.producerId) query = query.eq('producer_id', exceptionForm.producerId)
+      if (dateKeys) query = query.in('exception_date', dateKeys)
+    } else {
+      query = query.not('id', 'is', null)
+    }
+
+    const { count, error } = await query
+
+    if (error) throw error
+
+    return count ?? 0
+  }
+
+  function confirmDeleteExceptions(event: FormEvent) {
+    event.preventDefault()
+
+    if (!deleteExceptionsDialog) return
+
+    void (async () => {
+      setBusyKey('delete-exceptions')
+      setMessage(null)
+
+      try {
+        await assertActiveAdmin()
+        const deletedCount = await deleteAvailabilityExceptions(deleteExceptionsDialog.scope)
+
+        if (deleteExceptionsDialog.count > 0 && deletedCount === 0) {
+          throw new Error(t('adminAvailability.error.deleteBlocks'))
+        }
+
+        setDeleteExceptionsDialog(null)
+        setDeleteAcknowledged(false)
+        setDeleteConfirmationInput('')
+        setMessage({ tone: 'success', text: t('adminAvailability.message.blocksDeleted') })
+        await loadData({ clearMessage: false })
+      } catch (error) {
+        setMessage({
+          tone: 'error',
+          text: isAdminPermissionError(error) ? t('adminAvailability.error.deleteBlocks') : getErrorMessage(error),
+        })
+      } finally {
+        setBusyKey(null)
+      }
+    })()
+  }
+
   function updateBookingStatus(bookingId: string, status: BookingStatus) {
     void runAction(
       `booking-${bookingId}`,
       async () => {
-        const result = await supabase.from('bookings').update({ status }).eq('id', bookingId)
+        const result = await supabase
+          .from('bookings')
+          .update({ status })
+          .eq('id', bookingId)
+          .select('id, status')
+          .maybeSingle()
+
         if (result.error) throw result.error
+        if (!result.data) throw new Error(t('adminAvailability.error.updateNotApplied'))
       },
       t('adminAvailability.message.bookingStatusUpdated'),
     )
@@ -1098,7 +1418,37 @@ export default function AdminAvailability() {
               </div>
 
               <div className={panelClassName}>
-                <h2 className={panelTitleClassName}>{t('adminAvailability.exceptions.title')}</h2>
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <h2 className={panelTitleClassName}>{t('adminAvailability.exceptions.title')}</h2>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => void openDeleteExceptionsDialog('filtered')}
+                      disabled={busyKey === 'delete-exceptions-filtered-count' || busyKey === 'delete-exceptions'}
+                      className={dangerButtonClassName}
+                    >
+                      {busyKey === 'delete-exceptions-filtered-count' ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                      )}
+                      {t('adminAvailability.exceptions.deleteFiltered')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openDeleteExceptionsDialog('all')}
+                      disabled={busyKey === 'delete-exceptions-all-count' || busyKey === 'delete-exceptions'}
+                      className={dangerButtonClassName}
+                    >
+                      {busyKey === 'delete-exceptions-all-count' ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                      )}
+                      {t('adminAvailability.exceptions.deleteAll')}
+                    </button>
+                  </div>
+                </div>
                 <form onSubmit={saveException} className="mt-5 grid min-w-0 gap-4">
                   <OndaSelect
                     label={t('dashboard.service')}
@@ -1241,7 +1591,11 @@ export default function AdminAvailability() {
                     className={primaryButtonClassName}
                   >
                     <CalendarClock className="h-4 w-4" aria-hidden="true" />
-                    {exceptionForm.id ? t('adminAvailability.exceptions.save') : t('adminAvailability.exceptions.create')}
+                    {exceptionForm.id
+                      ? t('adminAvailability.exceptions.save')
+                      : exceptionForm.type === 'available'
+                        ? t('adminAvailability.exceptions.createOpening')
+                        : t('adminAvailability.exceptions.createBlock')}
                   </button>
                 </form>
 
@@ -1304,7 +1658,9 @@ export default function AdminAvailability() {
                           <td className="px-4 py-4 text-onda-muted">
                             {booking.booking_date} - {normalizeTime(booking.start_time)} - {normalizeTime(booking.end_time)}
                           </td>
-                          <td className="px-4 py-4 text-onda-muted">{booking.client_id?.slice(0, 8) ?? t('adminAvailability.client')}</td>
+                          <td className="px-4 py-4 text-onda-muted">
+                            {booking.client_name ?? t('adminAvailability.registeredClient')}
+                          </td>
                           <td className="px-4 py-4 align-middle">
                             <OndaSelect
                               value={booking.status}
@@ -1326,6 +1682,108 @@ export default function AdminAvailability() {
             </div>
           </>
         )}
+
+        {deleteExceptionsDialog ? (
+          <div
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onClick={() => {
+              if (busyKey !== 'delete-exceptions') setDeleteExceptionsDialog(null)
+            }}
+            role="presentation"
+          >
+            <form
+              onSubmit={confirmDeleteExceptions}
+              className="max-h-[92vh] w-full max-w-lg overflow-y-auto overflow-x-hidden rounded-lg border border-red-400/25 bg-white p-5 text-zinc-950 shadow-[0_30px_90px_rgba(24,24,27,0.22)] sm:p-6 dark:border-red-300/25 dark:bg-onda-night dark:text-white"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-exceptions-modal-title"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-red-600 dark:text-red-200">
+                    {t('adminAvailability.exceptions.deleteBlocks')}
+                  </p>
+                  <h2 id="delete-exceptions-modal-title" className="mt-2 font-display text-xl font-bold uppercase tracking-[0.08em]">
+                    {deleteExceptionsDialog.scope === 'all'
+                      ? t('adminAvailability.exceptions.deleteAll')
+                      : t('adminAvailability.exceptions.deleteFiltered')}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeleteExceptionsDialog(null)}
+                  disabled={busyKey === 'delete-exceptions'}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-onda-lavender/25 text-onda-lavender transition hover:bg-onda-purple hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={t('common.close')}
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div className="mt-5 flex items-start gap-3 rounded-md border border-red-400/25 bg-red-500/10 p-4 text-sm leading-6 text-red-800 dark:text-red-100">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                <p>{t('adminAvailability.exceptions.deleteWarning')}</p>
+              </div>
+
+              <div className="mt-4 rounded-md border border-onda-purple/15 bg-white/60 px-4 py-3 text-sm font-semibold text-zinc-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-onda-soft">
+                {t('adminAvailability.exceptions.deleteCount').replace('{count}', String(deleteExceptionsDialog.count))}
+              </div>
+
+              {deleteExceptionsDialog.scope === 'all' ? (
+                <label className={`${labelClassName} mt-5`}>
+                  {t('adminAvailability.exceptions.deleteTypeConfirm').replace('{token}', deleteConfirmationToken)}
+                  <input
+                    value={deleteConfirmationInput}
+                    onChange={(event) => setDeleteConfirmationInput(event.target.value)}
+                    className={inputClassName}
+                    disabled={busyKey === 'delete-exceptions'}
+                    autoComplete="off"
+                  />
+                </label>
+              ) : (
+                <label className={cn(checkboxLabelClassName, 'mt-5')}>
+                  <input
+                    type="checkbox"
+                    checked={deleteAcknowledged}
+                    onChange={(event) => setDeleteAcknowledged(event.target.checked)}
+                    disabled={busyKey === 'delete-exceptions'}
+                  />
+                  {t('adminAvailability.exceptions.deleteAcknowledge')}
+                </label>
+              )}
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDeleteExceptionsDialog(null)}
+                  disabled={busyKey === 'delete-exceptions'}
+                  className={secondaryButtonClassName}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    busyKey === 'delete-exceptions' ||
+                    deleteExceptionsDialog.count === 0 ||
+                    (deleteExceptionsDialog.scope === 'all'
+                      ? deleteConfirmationInput !== deleteConfirmationToken
+                      : !deleteAcknowledged)
+                  }
+                  className={cn(dangerButtonClassName, 'bg-red-600 text-white hover:bg-red-700 dark:text-white')}
+                >
+                  {busyKey === 'delete-exceptions' ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                  )}
+                  {t('adminAvailability.exceptions.confirmDelete')}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
       </div>
     </section>
   )

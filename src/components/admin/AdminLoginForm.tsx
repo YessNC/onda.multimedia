@@ -3,9 +3,14 @@ import { Lock } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import CTAButton from '../shared/CTAButton'
 import { useI18n } from '../../hooks/useI18n'
-import { supabase } from '../../lib/supabaseClient'
+import { getActiveAdminMembership } from '../../lib/adminAuth'
+import { supabaseAdmin } from '../../lib/supabaseAdminClient'
 
 const adminPanelPath = '/admin/eventos'
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'No pudimos validar permisos admin.'
+}
 
 export default function AdminLoginForm() {
   const { t } = useI18n()
@@ -16,16 +21,40 @@ export default function AdminLoginForm() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const statusMessage =
-    searchParams.get('reason') === 'inactive' ? 'Sesion cerrada por inactividad.' : ''
+    searchParams.get('reason') === 'inactive'
+      ? 'Sesion cerrada por inactividad.'
+      : searchParams.get('unauthorized') === '1'
+        ? 'Tu usuario no tiene acceso administrador activo.'
+        : ''
 
   useEffect(() => {
     let isMounted = true
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (isMounted && data.session) {
-        navigate(adminPanelPath, { replace: true })
+    async function redirectIfAdminSessionExists() {
+      try {
+        const {
+          data: { user },
+        } = await supabaseAdmin.auth.getUser()
+
+        if (!isMounted || !user) return
+
+        const membership = await getActiveAdminMembership(user)
+
+        if (!isMounted) return
+
+        if (membership) {
+          navigate(adminPanelPath, { replace: true })
+          return
+        }
+
+        await supabaseAdmin.auth.signOut()
+      } catch (adminCheckError) {
+        console.error(getErrorMessage(adminCheckError))
+        await supabaseAdmin.auth.signOut()
       }
-    })
+    }
+
+    void redirectIfAdminSessionExists()
 
     return () => {
       isMounted = false
@@ -43,13 +72,37 @@ export default function AdminLoginForm() {
 
     setIsLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabaseAdmin.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
 
     if (error) {
       setErrorMessage('No pudimos iniciar sesion. Revisa el email y password.')
+      setIsLoading(false)
+      return
+    }
+
+    if (!data.user) {
+      setErrorMessage('No pudimos iniciar sesion. Intenta nuevamente.')
+      setIsLoading(false)
+      return
+    }
+
+    let membership = null
+
+    try {
+      membership = await getActiveAdminMembership(data.user)
+    } catch (membershipError) {
+      await supabaseAdmin.auth.signOut()
+      setErrorMessage(`No pudimos validar permisos admin. ${getErrorMessage(membershipError)}`)
+      setIsLoading(false)
+      return
+    }
+
+    if (!membership) {
+      await supabaseAdmin.auth.signOut()
+      setErrorMessage('Tu usuario no tiene acceso administrador activo.')
       setIsLoading(false)
       return
     }

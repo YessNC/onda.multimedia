@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellRing, Check, Loader2, RefreshCw, Volume2, X } from 'lucide-react'
 import { COMMUNITY_WELCOME_UPDATED_EVENT, readCommunityBoolean } from '../../lib/communityWelcome'
-import { supabase } from '../../lib/supabaseClient'
+import { supabaseAdmin as supabase } from '../../lib/supabaseAdminClient'
 import { cn } from '../../lib/utils'
 
 type CommunityWelcomePending = {

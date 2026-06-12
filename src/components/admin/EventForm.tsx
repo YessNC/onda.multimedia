@@ -22,7 +22,7 @@ import {
   readBoolean,
   readString,
 } from '../../lib/events'
-import { supabase } from '../../lib/supabaseClient'
+import { supabaseAdmin as supabase } from '../../lib/supabaseAdminClient'
 
 type EventFormState = {
   aftermovieUrl: string

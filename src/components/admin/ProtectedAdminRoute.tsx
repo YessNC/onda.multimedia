@@ -1,38 +1,87 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabaseClient'
+import { getActiveAdminMembership } from '../../lib/adminAuth'
+import { supabaseAdmin } from '../../lib/supabaseAdminClient'
 
 type ProtectedAdminRouteProps = {
   children: ReactNode
 }
 
+type AdminAccessState = 'checking' | 'anonymous' | 'authorized'
+
 const adminInactivityLimitMs = 30 * 60 * 1000
 const adminActivityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'] as const
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Error validando acceso administrador.'
+}
+
 export default function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
   const navigate = useNavigate()
-  const [isCheckingSession, setIsCheckingSession] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [accessState, setAccessState] = useState<AdminAccessState>('checking')
   const inactivityTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     let isMounted = true
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!isMounted) return
+    async function validateAdminAccess() {
+      setAccessState('checking')
 
-      setIsAuthenticated(Boolean(data.session))
-      setIsCheckingSession(false)
-    })
+      try {
+        const {
+          data: { user },
+        } = await supabaseAdmin.auth.getUser()
+
+        if (!isMounted) return
+
+        if (!user) {
+          setAccessState('anonymous')
+          return
+        }
+
+        const membership = await getActiveAdminMembership(user)
+
+        if (!isMounted) return
+
+        if (!membership) {
+          await supabaseAdmin.auth.signOut()
+
+          if (isMounted) {
+            navigate('/admin/login?unauthorized=1', { replace: true })
+          }
+
+          return
+        }
+
+        setAccessState('authorized')
+      } catch (error) {
+        console.error(getErrorMessage(error))
+        await supabaseAdmin.auth.signOut()
+
+        if (isMounted) {
+          navigate('/admin/login?unauthorized=1', { replace: true })
+        }
+      }
+    }
+
+    void validateAdminAccess()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabaseAdmin.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return
 
-      setIsAuthenticated(Boolean(session))
-      setIsCheckingSession(false)
+      if (!session?.user) {
+        setAccessState('anonymous')
+        return
+      }
+
+      window.setTimeout(() => {
+        if (isMounted) {
+          void validateAdminAccess()
+        }
+      }, 0)
     })
 
     return () => {
@@ -42,7 +91,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
   }, [])
 
   useEffect(() => {
-    if (!isAuthenticated) return undefined
+    if (accessState !== 'authorized') return undefined
 
     let isMounted = true
 
@@ -55,7 +104,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
 
     async function closeInactiveSession() {
       clearInactivityTimer()
-      await supabase.auth.signOut()
+      await supabaseAdmin.auth.signOut()
 
       if (isMounted) {
         navigate('/admin/login?reason=inactive', { replace: true })
@@ -83,9 +132,9 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
         window.removeEventListener(eventName, resetInactivityTimer)
       }
     }
-  }, [isAuthenticated, navigate])
+  }, [accessState, navigate])
 
-  if (isCheckingSession) {
+  if (accessState === 'checking') {
     return (
       <section className="py-20">
         <div className="onda-container">
@@ -97,7 +146,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
     )
   }
 
-  if (!isAuthenticated) {
+  if (accessState === 'anonymous') {
     return <Navigate to="/admin/login" replace />
   }
 

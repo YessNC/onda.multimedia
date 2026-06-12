@@ -8,7 +8,7 @@ import SectionTitle from '../components/shared/SectionTitle'
 import { isUuid, normalizeAccessCode } from '../lib/accessCodes'
 import { parseCheckInQrPayload } from '../lib/checkInQr'
 import { type EventRecord, getEventTitle, readString } from '../lib/events'
-import { supabase } from '../lib/supabaseClient'
+import { supabaseAdmin as supabase } from '../lib/supabaseAdminClient'
 
 type EventAttendee = Record<string, unknown> & {
   access_code?: string | null

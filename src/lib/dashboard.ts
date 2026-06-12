@@ -69,6 +69,7 @@ export interface Booking {
   end_time: string
   status: BookingStatus
   notes: string | null
+  client_name?: string | null
   service_name: string
   studio_name: string | null
   producer_name: string | null
@@ -780,7 +781,8 @@ function intervalsOverlap(startA: number, endA: number, startB: number, endB: nu
 function generateSlots(startTime: string, endTime: string, durationMinutes: number, slotMinutes: number) {
   const slots: AvailabilitySlot[] = []
   const start = minutesFromTime(startTime)
-  const end = minutesFromTime(endTime)
+  const normalizedEndTime = normalizeTime(endTime)
+  const end = normalizedEndTime === '23:59' ? minutesFromTime(endTime) + 1 : minutesFromTime(endTime)
   const step = Math.max(slotMinutes, 5)
 
   for (let minute = start; minute + durationMinutes <= end; minute += step) {

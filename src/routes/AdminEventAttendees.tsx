@@ -57,7 +57,7 @@ import {
   communityFilterOptions,
   matchesCommunityFilter,
 } from '../lib/communityWelcome'
-import { supabase } from '../lib/supabaseClient'
+import { supabaseAdmin as supabase } from '../lib/supabaseAdminClient'
 import { cn } from '../lib/utils'
 
 type AdminEvent = Record<string, unknown> & {

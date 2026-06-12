@@ -8,18 +8,37 @@ import ImageUploader from '../components/admin/ImageUploader'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
 import {
+  type EventStatus,
   type EventRecord,
   compareEventsByDate,
   getEventStatus,
   hasActiveTicketButton,
   isEventDeleted,
   readBoolean,
+  readString,
 } from '../lib/events'
-import { supabase } from '../lib/supabaseClient'
+import { supabaseAdmin as supabase } from '../lib/supabaseAdminClient'
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return 'Ocurrio un error inesperado.'
+}
+
+function isPermissionErrorMessage(message: string) {
+  const normalizedMessage = message.toLowerCase()
+
+  return (
+    normalizedMessage.includes('permission') ||
+    normalizedMessage.includes('policy') ||
+    normalizedMessage.includes('rls') ||
+    normalizedMessage.includes('row-level') ||
+    normalizedMessage.includes('not authorized') ||
+    normalizedMessage.includes('denied')
+  )
+}
+
+function getRestoredEventStatus(event: EventRecord): EventStatus {
+  return readString(event.published_at) || readBoolean(event.is_published) ? 'upcoming' : 'draft'
 }
 
 export default function AdminEventos() {
@@ -72,13 +91,18 @@ export default function AdminEventos() {
   }, [loadEvents])
 
   const stats = useMemo(
-    () => [
-      { label: 'Activos', value: events.length },
-      { label: 'Borradores', value: events.filter((event) => getEventStatus(event) === 'draft').length },
-      { label: 'Tickets', value: events.filter(hasActiveTicketButton).length },
-      { label: 'QR', value: events.filter((event) => readBoolean(event.qr_checkin_enabled)).length },
-    ],
-    [events],
+    () => {
+      const visibleEvents = events.filter((event) => getEventStatus(event) !== 'archived')
+
+      return [
+        { label: t('adminEvents.stats.active'), value: visibleEvents.length },
+        { label: t('adminEvents.stats.archived'), value: events.filter((event) => getEventStatus(event) === 'archived').length },
+        { label: t('adminEvents.stats.drafts'), value: visibleEvents.filter((event) => getEventStatus(event) === 'draft').length },
+        { label: t('adminEvents.stats.tickets'), value: visibleEvents.filter(hasActiveTicketButton).length },
+        { label: t('adminEvents.stats.qr'), value: visibleEvents.filter((event) => readBoolean(event.qr_checkin_enabled)).length },
+      ]
+    },
+    [events, t],
   )
 
   async function updateEvent(event: EventRecord, payload: Record<string, unknown>, message: string) {
@@ -108,8 +132,12 @@ export default function AdminEventos() {
       if (editingEvent?.id === updatedEvent.id) {
         setEditingEvent(isEventDeleted(updatedEvent) ? null : updatedEvent)
       }
+
+      return updatedEvent
     } catch (error) {
-      setErrorMessage(getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setErrorMessage(isPermissionErrorMessage(message) ? `${t('adminEvents.error.permission')} ${message}` : message)
+      return null
     } finally {
       setBusyEventId(null)
     }
@@ -194,15 +222,31 @@ export default function AdminEventos() {
     void updateEvent(
       event,
       {
-        published_at: new Date().toISOString(),
+        published_at: readString(event.published_at) || new Date().toISOString(),
         status: 'upcoming',
       },
-      'Evento publicado.',
+      t('adminEvents.message.published'),
     )
   }
 
   function handleArchive(event: EventRecord) {
-    void updateEvent(event, { status: 'archived' }, 'Evento archivado.')
+    void updateEvent(event, { status: 'archived' }, t('adminEvents.message.archived'))
+  }
+
+  function handleUnarchive(event: EventRecord) {
+    const restoredStatus = getRestoredEventStatus(event)
+    const payload: Record<string, unknown> = {
+      deleted_at: null,
+      status: restoredStatus,
+    }
+
+    if (restoredStatus === 'upcoming' && !readString(event.published_at)) {
+      payload.published_at = new Date().toISOString()
+    }
+
+    void updateEvent(event, payload, t('adminEvents.message.unarchived')).then((updatedEvent) => {
+      if (updatedEvent) void loadEvents()
+    })
   }
 
   function handleDelete(event: EventRecord) {
@@ -252,7 +296,7 @@ export default function AdminEventos() {
           </div>
         </div>
 
-        <div className="mt-8 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {stats.map((stat) => (
             <div key={stat.label} className="glass-panel min-w-0 rounded-lg bg-onda-black/62 p-4">
               <div className="font-display text-2xl font-extrabold text-white">{stat.value}</div>
@@ -281,6 +325,7 @@ export default function AdminEventos() {
               onDelete={handleDelete}
               onEdit={handleEditEvent}
               onPublish={handlePublish}
+              onUnarchive={handleUnarchive}
             />
           </div>
           <div ref={formPanelRef} className="grid min-w-0 max-w-full scroll-mt-24 content-start gap-6 overflow-hidden">
