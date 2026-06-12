@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+type TemplateVariables = Record<string, unknown>
+
 type ReachRecipient = {
   id: string
   booking_id: string | null
@@ -8,14 +10,13 @@ type ReachRecipient = {
   recipient_name: string | null
   template_key: string
   event_type: string
-  template_variables: Record<string, unknown>
+  template_variables: TemplateVariables | null
 }
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const reachApiToken = Deno.env.get('HOSTINGER_REACH_API_TOKEN') ?? ''
 const reachContactsUrl = Deno.env.get('HOSTINGER_REACH_CONTACTS_URL') ?? ''
-const reachListId = Deno.env.get('HOSTINGER_REACH_LIST_ID') ?? ''
 const syncSecret = Deno.env.get('HOSTINGER_REACH_SYNC_SECRET') ?? ''
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -27,6 +28,39 @@ function jsonResponse(body: unknown, status = 200) {
     headers: { 'content-type': 'application/json' },
     status,
   })
+}
+
+function stringValue(value: unknown) {
+  if (typeof value === 'string') return value.trim()
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return ''
+}
+
+function splitName(fullName: string | null, email: string) {
+  const fallbackName = email.split('@')[0] || email
+  const parts = (fullName || fallbackName).trim().split(/\s+/).filter(Boolean)
+  const name = parts.shift() || fallbackName
+  const surname = parts.join(' ')
+
+  return { name, surname }
+}
+
+function buildReachNote(recipient: ReachRecipient) {
+  const variables = recipient.template_variables ?? {}
+  const noteParts = [
+    stringValue(variables.community_consent) === 'true' ? 'Comunidad Onda' : '',
+    'Reservas Onda',
+    `booking_id=${stringValue(variables.booking_id) || recipient.booking_id || ''}`,
+    `servicio=${stringValue(variables.service_name)}`,
+    `estudio=${stringValue(variables.studio_name)}`,
+    `responsable=${stringValue(variables.producer_name)}`,
+    `fecha=${stringValue(variables.booking_date)}`,
+    `hora=${stringValue(variables.start_time)}-${stringValue(variables.end_time)}`,
+    `pago=${stringValue(variables.payment_status)}`,
+    `descuento=${stringValue(variables.discount_code)}`,
+  ]
+
+  return noteParts.filter((part) => part && !part.endsWith('=')).join(' | ')
 }
 
 async function logEmail(recipient: ReachRecipient, status: 'failed' | 'synced', errorMessage?: string, providerMessageId?: string) {
@@ -85,20 +119,21 @@ Deno.serve(async (request) => {
   let failed = 0
 
   for (const recipient of recipients) {
+    const { name, surname } = splitName(recipient.recipient_name, recipient.recipient_email)
     const payload = {
       email: recipient.recipient_email,
-      name: recipient.recipient_name ?? recipient.recipient_email,
-      list_id: reachListId || undefined,
-      tags: ['onda_booking', recipient.event_type, recipient.template_key],
-      fields: recipient.template_variables,
+      name,
+      surname,
+      note: buildReachNote(recipient),
     }
 
     try {
       const reachResponse = await fetch(reachContactsUrl, {
         body: JSON.stringify(payload),
         headers: {
-          authorization: `Bearer ${reachApiToken}`,
-          'content-type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${reachApiToken}`,
+          'Content-Type': 'application/json',
         },
         method: 'POST',
       })
@@ -153,3 +188,8 @@ Deno.serve(async (request) => {
 
   return jsonResponse({ failed, pending: recipients.length, synced })
 })
+
+// Hostinger Reach POST /contacts only syncs contact data and a reservation note.
+// Real personalized email delivery still requires a compatible Reach automation
+// (segment/trigger), a transactional email provider, or a dedicated campaigns API
+// endpoint if Hostinger enables one for this account/plan.

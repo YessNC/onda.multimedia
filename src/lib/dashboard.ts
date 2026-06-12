@@ -1869,6 +1869,14 @@ export async function createBooking(input: CreateBookingInput) {
   }
   if (!isMissingOrIncompleteSchema(rpcError)) throw rpcError
 
+  const requestedDiscountCode = input.discountCode?.trim()
+
+  if (requestedDiscountCode) {
+    throw new Error(
+      'No se pudo crear la reserva con descuento porque el RPC create_booking_with_slots no esta disponible o el cache de esquema no esta actualizado. Aplica la migracion de reservas con descuentos antes de reintentar.',
+    )
+  }
+
   const modernPayload = {
     client_id: input.clientId,
     service_id: input.serviceId,
