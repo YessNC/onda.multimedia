@@ -282,7 +282,7 @@ as $$
       booking.studio_id,
       booking.producer_id
     from public.bookings booking
-    where booking.status in ('pending', 'confirmed', 'completed')
+    where booking.status in ('pending_payment', 'pending', 'confirmed', 'completed')
   ),
   available_slots as (
     select candidate_slots.*

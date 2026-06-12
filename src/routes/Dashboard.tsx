@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CalendarDays, FileText, Loader2, LogOut } from 'lucide-react'
 import DashboardCalendar from '../components/dashboard/DashboardCalendar'
+import CommunityPreferencesSection from '../components/dashboard/CommunityPreferencesSection'
 import FilesSection from '../components/dashboard/FilesSection'
 import StatsCards from '../components/dashboard/StatsCards'
 import StudioBookingModal, { type BookingModalInitialSelection } from '../components/dashboard/StudioBookingModal'
@@ -11,11 +12,14 @@ import {
   type AvailabilityRule,
   type Booking,
   type BookingService,
+  type CommunityPreferences,
+  type CreateBookingResult,
   type DashboardIssue,
   type DashboardTab,
   type Producer,
   type SharedFile,
   type Studio,
+  cancelOwnBooking,
   fetchDashboardData,
   getDashboardStats,
   getStartOfToday,
@@ -35,6 +39,7 @@ export default function Dashboard() {
   const [availabilityRules, setAvailabilityRules] = useState<AvailabilityRule[]>([])
   const [availabilityExceptions, setAvailabilityExceptions] = useState<AvailabilityException[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [communityPreferences, setCommunityPreferences] = useState<CommunityPreferences | null>(null)
   const [files, setFiles] = useState<SharedFile[]>([])
   const [issues, setIssues] = useState<DashboardIssue[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,6 +47,7 @@ export default function Dashboard() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
   const [bookingInitialSelection, setBookingInitialSelection] = useState<BookingModalInitialSelection | null>(null)
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
 
   const selectedDateKey = toDateKey(selectedDate)
 
@@ -57,6 +63,7 @@ export default function Dashboard() {
       setAvailabilityRules(data.availabilityRules)
       setAvailabilityExceptions(data.availabilityExceptions)
       setBookings(data.bookings)
+      setCommunityPreferences(data.communityPreferences)
       setFiles(data.files)
       setIssues(data.issues)
     } catch (dashboardError) {
@@ -101,9 +108,13 @@ export default function Dashboard() {
   )
   const issueSectionLabels: Record<string, string> = {
     Archivos: t('dashboard.issue.files'),
+    'Asignaciones servicio-equipo': t('dashboard.issue.producers'),
+    'Asignaciones servicio-estudio': t('dashboard.issue.studios'),
+    'Asignaciones estudio-equipo': t('dashboard.issue.producers'),
     'Disponibilidad semanal': t('dashboard.issue.weeklyAvailability'),
     'Excepciones de disponibilidad': t('dashboard.issue.availabilityExceptions'),
     Equipo: t('dashboard.issue.producers'),
+    'Preferencias comunidad': t('dashboard.issue.communityPreferences'),
     Productores: t('dashboard.issue.producers'),
     Reservas: t('dashboard.issue.bookings'),
     Servicios: t('dashboard.issue.services'),
@@ -119,10 +130,35 @@ export default function Dashboard() {
     [selectedDateKey],
   )
 
-  const handleBookingCreated = useCallback(async () => {
+  const handleBookingCreated = useCallback(async (result: CreateBookingResult) => {
     await loadDashboardData()
-    setSuccessMessage(t('booking.successCreated'))
+    setSuccessMessage(
+      result.payment_status === 'pending' && result.deposit_amount_due > 0
+        ? t('booking.paymentHoldCreated')
+        : t('booking.successCreated'),
+    )
   }, [loadDashboardData, t])
+
+  const handleCancelBooking = useCallback(
+    async (booking: Booking) => {
+      if (!window.confirm(t('dashboard.cancelBookingConfirm'))) return
+
+      setCancellingBookingId(booking.id)
+      setError(null)
+      setSuccessMessage(null)
+
+      try {
+        await cancelOwnBooking(booking.id)
+        await loadDashboardData()
+        setSuccessMessage(t('dashboard.cancelBookingSuccess'))
+      } catch {
+        setError(t('dashboard.cancelBookingError'))
+      } finally {
+        setCancellingBookingId(null)
+      }
+    },
+    [loadDashboardData, t],
+  )
 
   return (
     <section className="min-h-[calc(100vh-5rem)] bg-white py-8 text-zinc-950 sm:py-12 dark:bg-onda-night dark:text-onda-soft">
@@ -151,6 +187,20 @@ export default function Dashboard() {
         </div>
 
         <StatsCards stats={stats} />
+
+        <CommunityPreferencesSection
+          fallbackEmail={user?.email}
+          preferences={communityPreferences}
+          onError={(message) => {
+            setSuccessMessage(null)
+            setError(message)
+          }}
+          onSuccess={(message) => {
+            setError(null)
+            setSuccessMessage(message)
+          }}
+          onUpdated={setCommunityPreferences}
+        />
 
         <div className="mt-6 flex flex-col gap-3 rounded-lg border border-onda-purple/15 bg-white/70 p-2 shadow-[0_0_28px_rgba(123,44,255,0.12)] sm:w-fit sm:flex-row dark:border-onda-lavender/15 dark:bg-white/[0.04]">
           <button
@@ -219,12 +269,14 @@ export default function Dashboard() {
             availabilityRules={availabilityRules}
             bookingDates={bookingDates}
             bookings={selectedDateBookings}
+            cancellingBookingId={cancellingBookingId}
             canBook={canBook}
             producers={producers}
             selectedDate={selectedDate}
             services={services}
             studios={studios}
             onDateChange={setSelectedDate}
+            onCancelBooking={handleCancelBooking}
             onOpenBookingModal={openBookingModal}
           />
         ) : null}
