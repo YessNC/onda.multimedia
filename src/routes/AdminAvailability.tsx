@@ -6,11 +6,11 @@ import {
   CalendarClock,
   Clock3,
   Loader2,
-  Mic2,
   RefreshCw,
   Save,
   Sparkles,
   Trash2,
+  UsersRound,
   X,
 } from 'lucide-react'
 import AdminSignOutButton from '../components/admin/AdminSignOutButton'
@@ -68,11 +68,15 @@ type ProducerForm = {
   isActive: boolean
   name: string
   role: string
+  roleDescription: string
   specialty: string
+  userId: string
 }
 
 type RuleForm = {
+  groupId: string | null
   id: string | null
+  ids: string[]
   endTime: string
   isActive: boolean
   producerId: string
@@ -80,14 +84,17 @@ type RuleForm = {
   slotMinutes: string
   startTime: string
   studioId: string
-  weekday: string
+  weekdays: string[]
 }
 
 type ExceptionForm = {
+  groupId: string | null
   id: string | null
+  ids: string[]
   endTime: string
   endDate: string
   exceptionDate: string
+  isIndefinite: boolean
   producerId: string
   reason: string
   serviceId: string
@@ -117,18 +124,29 @@ type BookingProfileRow = {
   full_name: string | null
 }
 
-type ExceptionBasePayload = {
-  end_time: string | null
-  producer_id: string | null
-  reason: string | null
-  service_id: string | null
-  start_time: string | null
-  studio_id: string | null
-  type: AvailabilityExceptionType
+type RuleGroup = {
+  ids: string[]
+  isActive: boolean
+  key: string
+  rule: AvailabilityRule
+  weekdays: string[]
 }
 
-type ExceptionInsertPayload = ExceptionBasePayload & {
-  exception_date: string
+type ExceptionGroup = {
+  dateFrom: string
+  dateTo: string | null
+  exception: AvailabilityException
+  ids: string[]
+  isIndefinite: boolean
+  key: string
+  weekdays: string[]
+}
+
+type ExceptionFilterQuery = {
+  eq: (column: string, value: string) => ExceptionFilterQuery
+  lte: (column: string, value: string) => ExceptionFilterQuery
+  or: (filters: string) => ExceptionFilterQuery
+  overlaps: (column: string, value: number[]) => ExceptionFilterQuery
 }
 
 const weekdayKeys = [
@@ -142,9 +160,8 @@ const weekdayKeys = [
 ]
 const allWeekdayValues = weekdayKeys.map((weekday) => weekday.value)
 const workdayValues = ['1', '2', '3', '4', '5']
+const weekendValues = ['0', '6']
 const deleteConfirmationToken = 'ELIMINAR'
-const startOfDayTime = '00:00'
-const endOfDayTime = '23:59'
 
 const bookingStatuses: BookingStatus[] = ['pending', 'confirmed', 'cancelled', 'completed']
 
@@ -185,11 +202,15 @@ const emptyProducerForm: ProducerForm = {
   isActive: true,
   name: '',
   role: '',
+  roleDescription: '',
   specialty: '',
+  userId: '',
 }
 
 const emptyRuleForm: RuleForm = {
+  groupId: null,
   id: null,
+  ids: [],
   endTime: '18:00',
   isActive: true,
   producerId: '',
@@ -197,14 +218,17 @@ const emptyRuleForm: RuleForm = {
   slotMinutes: '60',
   startTime: '10:00',
   studioId: '',
-  weekday: '1',
+  weekdays: workdayValues,
 }
 
 const emptyExceptionForm: ExceptionForm = {
+  groupId: null,
   id: null,
+  ids: [],
   endTime: '',
   endDate: '',
   exceptionDate: '',
+  isIndefinite: false,
   producerId: '',
   reason: '',
   serviceId: '',
@@ -274,21 +298,8 @@ function dateFromKey(dateKey: string) {
   return new Date(Number(year), Number(month) - 1, Number(day))
 }
 
-function dateToKey(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 function getWeekdayValue(dateKey: string) {
   return String(dateFromKey(dateKey).getDay())
-}
-
-function getNextDateKey(dateKey: string) {
-  const date = dateFromKey(dateKey)
-  date.setDate(date.getDate() + 1)
-  return dateToKey(date)
 }
 
 function minutesFromFormTime(value: string) {
@@ -296,59 +307,198 @@ function minutesFromFormTime(value: string) {
   return Number(hour) * 60 + Number(minute)
 }
 
-function buildExceptionDateKeys(startDate: string, endDate: string, weekdays: string[]) {
-  const start = dateFromKey(startDate)
-  const end = dateFromKey(endDate || startDate)
-  const allowedWeekdays = new Set(weekdays ?? [])
-  const dateKeys: string[] = []
-
-  for (const current = new Date(start); current <= end; current.setDate(current.getDate() + 1)) {
-    if (allowedWeekdays.has(String(current.getDay()))) {
-      dateKeys.push(dateToKey(current))
-    }
-  }
-
-  return dateKeys
+function normalizeWeekdaySelection(values: string[]) {
+  return [...new Set(values.filter((value) => allWeekdayValues.includes(value)))]
+    .sort((left, right) => Number(left) - Number(right))
 }
 
-function buildExceptionRows(dateKeys: string[], basePayload: ExceptionBasePayload) {
-  if (!basePayload.start_time || !basePayload.end_time) {
-    return dateKeys.map((exceptionDate): ExceptionInsertPayload => ({
-      ...basePayload,
-      end_time: null,
-      exception_date: exceptionDate,
-      start_time: null,
-    }))
-  }
+function weekdayNumbers(values: string[]) {
+  return normalizeWeekdaySelection(values).map(Number)
+}
 
-  const startMinutes = minutesFromFormTime(basePayload.start_time)
-  const endMinutes = minutesFromFormTime(basePayload.end_time)
+function weekdaysFromNumbers(values: number[] | null | undefined, fallback: string[] = []) {
+  const normalized = Array.isArray(values)
+    ? values.map(String).filter((value) => allWeekdayValues.includes(value))
+    : fallback
 
-  if (endMinutes > startMinutes) {
-    return dateKeys.map((exceptionDate): ExceptionInsertPayload => ({
-      ...basePayload,
-      exception_date: exceptionDate,
-    }))
-  }
+  return normalizeWeekdaySelection(normalized)
+}
 
-  return dateKeys.flatMap((exceptionDate): ExceptionInsertPayload[] => {
-    const currentDayRow: ExceptionInsertPayload = {
-      ...basePayload,
-      end_time: endOfDayTime,
-      exception_date: exceptionDate,
+function arraysHaveSameValues(left: string[], right: string[]) {
+  const normalizedLeft = normalizeWeekdaySelection(left)
+  const normalizedRight = normalizeWeekdaySelection(right)
+
+  return normalizedLeft.length === normalizedRight.length && normalizedLeft.every((value, index) => value === normalizedRight[index])
+}
+
+function getRuleWeekdays(rule: AvailabilityRule) {
+  return weekdaysFromNumbers(rule.weekdays, [String(rule.weekday)])
+}
+
+function getExceptionWeekdays(exception: AvailabilityException) {
+  return weekdaysFromNumbers(exception.weekdays, [getWeekdayValue(exception.exception_date)])
+}
+
+function getWeekdayGroupLabel(
+  weekdays: string[],
+  weekdayOptions: OndaSelectOption[],
+  labels: {
+    all: string
+    weekend: string
+    workdays: string
+  },
+) {
+  const normalized = normalizeWeekdaySelection(weekdays)
+
+  if (arraysHaveSameValues(normalized, allWeekdayValues)) return labels.all
+  if (arraysHaveSameValues(normalized, workdayValues)) return labels.workdays
+  if (arraysHaveSameValues(normalized, weekendValues)) return labels.weekend
+
+  return normalized
+    .map((weekday) => weekdayOptions.find((option) => option.value === weekday)?.label ?? weekday)
+    .join(', ')
+}
+
+function getDaysBetween(leftDateKey: string, rightDateKey: string) {
+  const left = dateFromKey(leftDateKey)
+  const right = dateFromKey(rightDateKey)
+  const millisecondsPerDay = 24 * 60 * 60 * 1000
+
+  return Math.round((right.getTime() - left.getTime()) / millisecondsPerDay)
+}
+
+function createGroupId() {
+  return globalThis.crypto.randomUUID()
+}
+
+function buildRuleGroups(rules: AvailabilityRule[]) {
+  const groups = new Map<string, RuleGroup>()
+
+  for (const rule of rules) {
+    const key = JSON.stringify({
+      endTime: normalizeTime(rule.end_time),
+      isActive: rule.is_active,
+      producerId: rule.producer_id ?? '',
+      serviceId: rule.service_id ?? '',
+      slotMinutes: rule.slot_minutes,
+      startTime: normalizeTime(rule.start_time),
+      studioId: rule.studio_id ?? '',
+    })
+    const group = groups.get(key)
+
+    if (group) {
+      group.ids.push(rule.id)
+      group.weekdays = normalizeWeekdaySelection([...group.weekdays, ...getRuleWeekdays(rule)])
+      continue
     }
 
-    if (endMinutes === 0) return [currentDayRow]
+    groups.set(key, {
+      ids: [rule.id],
+      isActive: rule.is_active,
+      key,
+      rule,
+      weekdays: getRuleWeekdays(rule),
+    })
+  }
 
-    return [
-      currentDayRow,
-      {
-        ...basePayload,
-        end_time: basePayload.end_time,
-        exception_date: getNextDateKey(exceptionDate),
-        start_time: startOfDayTime,
-      },
-    ]
+  return [...groups.values()].sort((left, right) => {
+    const leftWeekday = Number(left.weekdays[0] ?? 0)
+    const rightWeekday = Number(right.weekdays[0] ?? 0)
+
+    if (leftWeekday !== rightWeekday) return leftWeekday - rightWeekday
+    return normalizeTime(left.rule.start_time).localeCompare(normalizeTime(right.rule.start_time))
+  })
+}
+
+function getExceptionBaseKey(exception: AvailabilityException) {
+  return JSON.stringify({
+    endTime: exception.end_time ? normalizeTime(exception.end_time) : '',
+    producerId: exception.producer_id ?? '',
+    reason: exception.reason ?? '',
+    serviceId: exception.service_id ?? '',
+    startTime: exception.start_time ? normalizeTime(exception.start_time) : '',
+    studioId: exception.studio_id ?? '',
+    type: exception.type,
+  })
+}
+
+function buildExceptionGroupFromRows(rows: AvailabilityException[], key: string): ExceptionGroup {
+  const first = rows[0]
+  const dateFrom = rows.reduce((current, row) => (row.date_from < current ? row.date_from : current), first.date_from)
+  const hasIndefinite = rows.some((row) => row.date_to === null)
+  const dateTo = hasIndefinite
+    ? null
+    : rows.reduce((current, row) => {
+        const nextDate = row.date_to ?? row.date_from
+        return nextDate > current ? nextDate : current
+      }, first.date_to ?? first.date_from)
+
+  return {
+    dateFrom,
+    dateTo,
+    exception: first,
+    ids: rows.map((row) => row.id),
+    isIndefinite: hasIndefinite,
+    key,
+    weekdays: normalizeWeekdaySelection(rows.flatMap(getExceptionWeekdays)),
+  }
+}
+
+function buildExceptionGroups(exceptions: AvailabilityException[]) {
+  const rangedGroups = new Map<string, AvailabilityException[]>()
+  const legacyBuckets = new Map<string, AvailabilityException[]>()
+
+  for (const exception of exceptions) {
+    const weekdays = getExceptionWeekdays(exception)
+    const isSingleDayLegacy =
+      !exception.group_id &&
+      exception.date_from === exception.exception_date &&
+      exception.date_to === exception.exception_date &&
+      weekdays.length === 1
+
+    if (isSingleDayLegacy) {
+      const key = getExceptionBaseKey(exception)
+      legacyBuckets.set(key, [...(legacyBuckets.get(key) ?? []), exception])
+      continue
+    }
+
+    const key = exception.group_id
+      ? `group:${exception.group_id}`
+      : JSON.stringify({
+          base: getExceptionBaseKey(exception),
+          dateFrom: exception.date_from,
+          dateTo: exception.date_to ?? '',
+          weekdays,
+        })
+
+    rangedGroups.set(key, [...(rangedGroups.get(key) ?? []), exception])
+  }
+
+  const groups = [...rangedGroups.entries()].map(([key, rows]) => buildExceptionGroupFromRows(rows, key))
+
+  for (const [baseKey, rows] of legacyBuckets) {
+    const sortedRows = [...rows].sort((left, right) => left.exception_date.localeCompare(right.exception_date))
+    let segment: AvailabilityException[] = []
+
+    for (const row of sortedRows) {
+      const previous = segment[segment.length - 1]
+
+      if (!previous || getDaysBetween(previous.exception_date, row.exception_date) <= 3) {
+        segment.push(row)
+      } else {
+        groups.push(buildExceptionGroupFromRows(segment, `${baseKey}:${segment[0]?.exception_date ?? ''}`))
+        segment = [row]
+      }
+    }
+
+    if (segment.length > 0) {
+      groups.push(buildExceptionGroupFromRows(segment, `${baseKey}:${segment[0]?.exception_date ?? ''}`))
+    }
+  }
+
+  return groups.sort((left, right) => {
+    if (left.dateFrom !== right.dateFrom) return right.dateFrom.localeCompare(left.dateFrom)
+    return normalizeTime(left.exception.start_time).localeCompare(normalizeTime(right.exception.start_time))
   })
 }
 
@@ -431,7 +581,10 @@ export default function AdminAvailability() {
     () => bookingStatuses.map((status) => ({ value: status, label: t(`dashboard.status.${status}`) })),
     [t],
   )
-  const selectedExceptionWeekdays = exceptionForm.weekdays ?? []
+  const ruleGroups = useMemo(() => buildRuleGroups(rules), [rules])
+  const exceptionGroups = useMemo(() => buildExceptionGroups(exceptions), [exceptions])
+  const selectedRuleWeekdays = normalizeWeekdaySelection(ruleForm.weekdays ?? [])
+  const selectedExceptionWeekdays = normalizeWeekdaySelection(exceptionForm.weekdays ?? [])
 
   const loadData = useCallback(async ({ clearMessage = true }: { clearMessage?: boolean } = {}) => {
     setIsLoading(true)
@@ -447,16 +600,16 @@ export default function AdminAvailability() {
           supabase.from('studios').select('id, name, slug, description, is_active').order('name', { ascending: true }),
           supabase
             .from('producers')
-            .select('id, name, specialty, role, is_active')
+            .select('id, name, specialty, role, role_description, user_id, is_active')
             .order('name', { ascending: true }),
           supabase
             .from('availability_rules')
-            .select('id, service_id, studio_id, producer_id, weekday, start_time, end_time, slot_minutes, is_active')
+            .select('id, group_id, service_id, studio_id, producer_id, weekday, weekdays, start_time, end_time, slot_minutes, is_active')
             .order('weekday', { ascending: true })
             .order('start_time', { ascending: true }),
           supabase
             .from('availability_exceptions')
-            .select('id, service_id, studio_id, producer_id, exception_date, start_time, end_time, type, reason')
+            .select('id, group_id, service_id, studio_id, producer_id, exception_date, date_from, date_to, weekdays, start_time, end_time, type, reason')
             .order('exception_date', { ascending: false })
             .limit(80),
           supabase
@@ -510,7 +663,7 @@ export default function AdminAvailability() {
       setExceptions((exceptionsResult.data ?? []) as AvailabilityException[])
       setBookings(
         mapBookingRows(bookingRows, nextServices, nextStudios, nextProducers, profilesById, {
-          defaultProducer: t('dashboard.producer'),
+          defaultProducer: t('adminAvailability.responsible'),
           defaultService: t('adminAvailability.defaultBooking'),
           defaultStudio: t('dashboard.studio'),
           registeredClient: t('adminAvailability.registeredClient'),
@@ -538,10 +691,10 @@ export default function AdminAvailability() {
     () => [
       { label: t('adminAvailability.stats.services'), value: services.length, icon: Sparkles },
       { label: t('adminAvailability.stats.studios'), value: studios.filter((studio) => studio.is_active).length, icon: Building2 },
-      { label: t('adminAvailability.stats.producers'), value: producers.filter((producer) => producer.is_active).length, icon: Mic2 },
-      { label: t('adminAvailability.stats.rules'), value: rules.filter((rule) => rule.is_active).length, icon: Clock3 },
+      { label: t('adminAvailability.stats.producers'), value: producers.filter((producer) => producer.is_active).length, icon: UsersRound },
+      { label: t('adminAvailability.stats.rules'), value: ruleGroups.filter((group) => group.isActive).length, icon: Clock3 },
     ],
-    [producers, rules, services.length, studios, t],
+    [producers, ruleGroups, services.length, studios, t],
   )
 
   async function runAction(actionKey: string, task: () => Promise<void>, successMessage: string) {
@@ -586,13 +739,19 @@ export default function AdminAvailability() {
       isActive: producer.is_active,
       name: producer.name,
       role: producer.role ?? '',
+      roleDescription: producer.role_description ?? '',
       specialty: producer.specialty ?? '',
+      userId: producer.user_id ?? '',
     })
   }
 
-  function editRule(rule: AvailabilityRule) {
+  function editRule(group: RuleGroup) {
+    const { rule } = group
+
     setRuleForm({
+      groupId: rule.group_id,
       id: rule.id,
+      ids: group.ids,
       endTime: normalizeTime(rule.end_time),
       isActive: rule.is_active,
       producerId: rule.producer_id ?? '',
@@ -600,23 +759,28 @@ export default function AdminAvailability() {
       slotMinutes: String(rule.slot_minutes),
       startTime: normalizeTime(rule.start_time),
       studioId: rule.studio_id ?? '',
-      weekday: String(rule.weekday),
+      weekdays: group.weekdays,
     })
   }
 
-  function editException(exception: AvailabilityException) {
+  function editException(group: ExceptionGroup) {
+    const { exception } = group
+
     setExceptionForm({
+      groupId: exception.group_id,
       id: exception.id,
+      ids: group.ids,
       endTime: exception.end_time ? normalizeTime(exception.end_time) : '',
-      endDate: exception.exception_date,
-      exceptionDate: exception.exception_date,
+      endDate: group.dateTo ?? '',
+      exceptionDate: group.dateFrom,
+      isIndefinite: group.isIndefinite,
       producerId: exception.producer_id ?? '',
       reason: exception.reason ?? '',
       serviceId: exception.service_id ?? '',
       startTime: exception.start_time ? normalizeTime(exception.start_time) : '',
       studioId: exception.studio_id ?? '',
       type: exception.type,
-      weekdays: [getWeekdayValue(exception.exception_date)],
+      weekdays: group.weekdays,
     })
   }
 
@@ -674,6 +838,7 @@ export default function AdminAvailability() {
       is_active: producerForm.isActive,
       name: producerForm.name.trim(),
       role: producerForm.role.trim() || null,
+      role_description: producerForm.roleDescription.trim() || null,
       specialty: producerForm.specialty.trim() || null,
     }
 
@@ -698,25 +863,46 @@ export default function AdminAvailability() {
       return
     }
 
+    if (selectedRuleWeekdays.length === 0) {
+      setMessage({ tone: 'error', text: t('adminAvailability.error.weekdaysRequired') })
+      return
+    }
+
+    if (minutesFromFormTime(ruleForm.endTime) <= minutesFromFormTime(ruleForm.startTime)) {
+      setMessage({ tone: 'error', text: t('adminAvailability.error.invalidTimeRange') })
+      return
+    }
+
+    const weekdays = weekdayNumbers(selectedRuleWeekdays)
     const payload = {
       end_time: ruleForm.endTime,
+      group_id: ruleForm.groupId ?? createGroupId(),
       is_active: ruleForm.isActive,
       producer_id: ruleForm.producerId || null,
       service_id: ruleForm.serviceId || null,
       slot_minutes: Number(ruleForm.slotMinutes),
       start_time: ruleForm.startTime,
       studio_id: ruleForm.studioId || null,
-      weekday: Number(ruleForm.weekday),
+      weekday: weekdays[0],
+      weekdays,
     }
+    const editIds = ruleForm.ids.length > 0 ? ruleForm.ids : ruleForm.id ? [ruleForm.id] : []
 
     void runAction(
       'rule',
       async () => {
-        const result = ruleForm.id
-          ? await supabase.from('availability_rules').update(payload).eq('id', ruleForm.id)
+        const [primaryId, ...extraIds] = editIds
+        const result = primaryId
+          ? await supabase.from('availability_rules').update(payload).eq('id', primaryId)
           : await supabase.from('availability_rules').insert(payload)
 
         if (result.error) throw result.error
+
+        if (extraIds.length > 0) {
+          const deleteResult = await supabase.from('availability_rules').delete().in('id', extraIds)
+          if (deleteResult.error) throw deleteResult.error
+        }
+
         setRuleForm({ ...emptyRuleForm, serviceId: ruleForm.serviceId })
       },
       ruleForm.id ? t('adminAvailability.message.ruleUpdated') : t('adminAvailability.message.ruleCreated'),
@@ -735,8 +921,8 @@ export default function AdminAvailability() {
       return
     }
 
-    const finalDate = exceptionForm.endDate || exceptionForm.exceptionDate
-    if (dateFromKey(finalDate) < dateFromKey(exceptionForm.exceptionDate)) {
+    const finalDate = exceptionForm.isIndefinite ? null : exceptionForm.endDate || exceptionForm.exceptionDate
+    if (finalDate && dateFromKey(finalDate) < dateFromKey(exceptionForm.exceptionDate)) {
       setMessage({ tone: 'error', text: t('adminAvailability.error.invalidDateRange') })
       return
     }
@@ -749,63 +935,58 @@ export default function AdminAvailability() {
     if (
       exceptionForm.startTime &&
       exceptionForm.endTime &&
-      minutesFromFormTime(exceptionForm.startTime) === minutesFromFormTime(exceptionForm.endTime)
+      minutesFromFormTime(exceptionForm.endTime) <= minutesFromFormTime(exceptionForm.startTime)
     ) {
       setMessage({ tone: 'error', text: t('adminAvailability.error.invalidTimeRange') })
       return
     }
 
-    if (!exceptionForm.id && selectedExceptionWeekdays.length === 0) {
+    if (selectedExceptionWeekdays.length === 0) {
       setMessage({ tone: 'error', text: t('adminAvailability.error.noDatesInRange') })
       return
     }
 
-    const dateKeys = exceptionForm.id
-      ? [exceptionForm.exceptionDate]
-      : buildExceptionDateKeys(exceptionForm.exceptionDate, finalDate, selectedExceptionWeekdays)
-
-    if (dateKeys.length === 0) {
-      setMessage({ tone: 'error', text: t('adminAvailability.error.noDatesInRange') })
-      return
-    }
-
-    const basePayload: ExceptionBasePayload = {
+    const payload = {
+      date_from: exceptionForm.exceptionDate,
+      date_to: finalDate,
       end_time: exceptionForm.endTime || null,
+      exception_date: exceptionForm.exceptionDate,
+      group_id: exceptionForm.groupId ?? createGroupId(),
       producer_id: exceptionForm.producerId || null,
       reason: exceptionForm.reason.trim() || null,
       service_id: exceptionForm.serviceId || null,
       start_time: exceptionForm.startTime || null,
       studio_id: exceptionForm.studioId || null,
       type: exceptionForm.type,
+      weekdays: weekdayNumbers(selectedExceptionWeekdays),
     }
-    const exceptionRows = buildExceptionRows(dateKeys, basePayload)
+    const editIds = exceptionForm.ids.length > 0 ? exceptionForm.ids : exceptionForm.id ? [exceptionForm.id] : []
 
     void runAction(
       'exception',
       async () => {
-        const result = exceptionForm.id
+        const [primaryId, ...extraIds] = editIds
+        const result = primaryId
           ? await supabase
               .from('availability_exceptions')
-              .update(exceptionRows[0])
-              .eq('id', exceptionForm.id)
+              .update(payload)
+              .eq('id', primaryId)
           : await supabase
               .from('availability_exceptions')
-              .insert(exceptionRows)
+              .insert(payload)
 
         if (result.error) throw result.error
 
-        if (exceptionForm.id && exceptionRows.length > 1) {
-          const extraRowsResult = await supabase.from('availability_exceptions').insert(exceptionRows.slice(1))
-          if (extraRowsResult.error) throw extraRowsResult.error
+        if (extraIds.length > 0) {
+          const deleteResult = await supabase.from('availability_exceptions').delete().in('id', extraIds)
+          if (deleteResult.error) throw deleteResult.error
         }
 
         setExceptionForm(emptyExceptionForm)
       },
       exceptionForm.id
         ? t('adminAvailability.message.exceptionUpdated')
-        : exceptionRows.length > 1
-          ? t('adminAvailability.message.exceptionsCreated').replace('{count}', String(exceptionRows.length))
-          : t('adminAvailability.message.exceptionCreated'),
+        : t('adminAvailability.message.exceptionCreated'),
     )
   }
 
@@ -827,11 +1008,28 @@ export default function AdminAvailability() {
     )
   }
 
-  function deleteException(id: string) {
+  function toggleRuleGroup(group: RuleGroup) {
     void runAction(
-      `delete-exception-${id}`,
+      `availability-rules-${group.key}`,
       async () => {
-        const result = await supabase.from('availability_exceptions').delete().eq('id', id)
+        const result = await supabase
+          .from('availability_rules')
+          .update({ is_active: !group.isActive })
+          .in('id', group.ids)
+          .select('id, is_active')
+
+        if (result.error) throw result.error
+        if ((result.data ?? []).length === 0) throw new Error(t('adminAvailability.error.updateNotApplied'))
+      },
+      group.isActive ? t('adminAvailability.message.deactivated') : t('adminAvailability.message.activated'),
+    )
+  }
+
+  function deleteException(group: ExceptionGroup) {
+    void runAction(
+      `delete-exception-${group.key}`,
+      async () => {
+        const result = await supabase.from('availability_exceptions').delete().in('id', group.ids)
         if (result.error) throw result.error
       },
       t('adminAvailability.message.exceptionDeleted'),
@@ -847,24 +1045,39 @@ export default function AdminAvailability() {
     )
   }
 
-  function getSelectedExceptionDeleteDates() {
+  function getSelectedExceptionDeleteRange() {
     if (!exceptionForm.exceptionDate) return null
 
-    const finalDate = exceptionForm.endDate || exceptionForm.exceptionDate
+    const finalDate = exceptionForm.isIndefinite ? null : exceptionForm.endDate || exceptionForm.exceptionDate
 
-    if (dateFromKey(finalDate) < dateFromKey(exceptionForm.exceptionDate)) {
+    if (finalDate && dateFromKey(finalDate) < dateFromKey(exceptionForm.exceptionDate)) {
       throw new Error(t('adminAvailability.error.invalidDateRange'))
     }
 
-    const dateKeys = buildExceptionDateKeys(
-      exceptionForm.exceptionDate,
-      finalDate,
-      selectedExceptionWeekdays.length > 0 ? selectedExceptionWeekdays : allWeekdayValues,
-    )
+    return {
+      dateFrom: exceptionForm.exceptionDate,
+      dateTo: finalDate,
+    }
+  }
 
-    if (dateKeys.length === 0) throw new Error(t('adminAvailability.error.noDatesInRange'))
+  function applyExceptionFilters<T>(query: T): T {
+    let nextQuery = query as unknown as ExceptionFilterQuery
+    const range = getSelectedExceptionDeleteRange()
 
-    return dateKeys
+    if (exceptionForm.serviceId) nextQuery = nextQuery.eq('service_id', exceptionForm.serviceId)
+    if (exceptionForm.studioId) nextQuery = nextQuery.eq('studio_id', exceptionForm.studioId)
+    if (exceptionForm.producerId) nextQuery = nextQuery.eq('producer_id', exceptionForm.producerId)
+
+    if (range) {
+      if (range.dateTo) nextQuery = nextQuery.lte('date_from', range.dateTo)
+      nextQuery = nextQuery.or(`date_to.is.null,date_to.gte.${range.dateFrom}`)
+
+      if (selectedExceptionWeekdays.length > 0 && !arraysHaveSameValues(selectedExceptionWeekdays, allWeekdayValues)) {
+        nextQuery = nextQuery.overlaps('weekdays', weekdayNumbers(selectedExceptionWeekdays))
+      }
+    }
+
+    return nextQuery as unknown as T
   }
 
   async function assertActiveAdmin() {
@@ -885,12 +1098,7 @@ export default function AdminAvailability() {
     let query = supabase.from('availability_exceptions').select('id', { count: 'exact', head: true })
 
     if (scope === 'filtered') {
-      const dateKeys = getSelectedExceptionDeleteDates()
-
-      if (exceptionForm.serviceId) query = query.eq('service_id', exceptionForm.serviceId)
-      if (exceptionForm.studioId) query = query.eq('studio_id', exceptionForm.studioId)
-      if (exceptionForm.producerId) query = query.eq('producer_id', exceptionForm.producerId)
-      if (dateKeys) query = query.in('exception_date', dateKeys)
+      query = applyExceptionFilters(query)
     }
 
     const { count, error } = await query
@@ -932,12 +1140,7 @@ export default function AdminAvailability() {
     let query = supabase.from('availability_exceptions').delete({ count: 'exact' })
 
     if (scope === 'filtered') {
-      const dateKeys = getSelectedExceptionDeleteDates()
-
-      if (exceptionForm.serviceId) query = query.eq('service_id', exceptionForm.serviceId)
-      if (exceptionForm.studioId) query = query.eq('studio_id', exceptionForm.studioId)
-      if (exceptionForm.producerId) query = query.eq('producer_id', exceptionForm.producerId)
-      if (dateKeys) query = query.in('exception_date', dateKeys)
+      query = applyExceptionFilters(query)
     } else {
       query = query.not('id', 'is', null)
     }
@@ -998,6 +1201,40 @@ export default function AdminAvailability() {
       },
       t('adminAvailability.message.bookingStatusUpdated'),
     )
+  }
+
+  function cancelBooking(booking: Booking) {
+    if (!window.confirm(t('adminAvailability.bookings.deleteConfirm'))) return
+
+    void runAction(
+      `delete-booking-${booking.id}`,
+      async () => {
+        await assertActiveAdmin()
+
+        const result = await supabase
+          .from('bookings')
+          .update({ status: 'cancelled' satisfies BookingStatus })
+          .eq('id', booking.id)
+          .select('id, status')
+          .maybeSingle()
+
+        if (result.error) throw result.error
+        if (!result.data) throw new Error(t('adminAvailability.error.updateNotApplied'))
+      },
+      t('adminAvailability.message.bookingCancelled'),
+    )
+  }
+
+  function getExceptionDateRangeLabel(group: ExceptionGroup) {
+    if (group.isIndefinite) {
+      return t('adminAvailability.dateRange.indefinite').replace('{date}', group.dateFrom)
+    }
+
+    if (!group.dateTo || group.dateTo === group.dateFrom) return group.dateFrom
+
+    return t('adminAvailability.dateRange.finite')
+      .replace('{from}', group.dateFrom)
+      .replace('{to}', group.dateTo)
   }
 
   return (
@@ -1276,6 +1513,24 @@ export default function AdminAvailability() {
                         className={inputClassName}
                       />
                     </label>
+                    <label className={labelClassName}>
+                      {t('adminAvailability.roleDescription')}
+                      <textarea
+                        value={producerForm.roleDescription}
+                        onChange={(event) =>
+                          setProducerForm((current) => ({ ...current, roleDescription: event.target.value }))
+                        }
+                        className={`${inputClassName} min-h-24 resize-y`}
+                      />
+                    </label>
+                    <label className={labelClassName}>
+                      {t('adminAvailability.linkedUser')}
+                      <input
+                        value={producerForm.userId || t('adminAvailability.noLinkedUser')}
+                        className={cn(inputClassName, 'cursor-not-allowed opacity-80')}
+                        readOnly
+                      />
+                    </label>
                     <label className={checkboxLabelClassName}>
                       <input
                         type="checkbox"
@@ -1295,7 +1550,7 @@ export default function AdminAvailability() {
                       {producerForm.id ? t('adminAvailability.producers.save') : t('adminAvailability.producers.create')}
                     </button>
                   </form>
-                  <ResourceList
+                  <TeamMemberList
                     items={producers}
                     onEdit={editProducer}
                     onToggle={(producer) => toggleActive('producers', producer.id, producer.is_active)}
@@ -1327,12 +1582,53 @@ export default function AdminAvailability() {
                     onChange={(producerId) => setRuleForm((current) => ({ ...current, producerId }))}
                     options={producerAnyOptions}
                   />
-                  <OndaSelect
-                    label={t('adminAvailability.day')}
-                    value={ruleForm.weekday}
-                    onChange={(weekday) => setRuleForm((current) => ({ ...current, weekday }))}
-                    options={weekdayOptions}
-                  />
+                  <fieldset className="grid min-w-0 gap-3 rounded-md border border-onda-purple/15 bg-white/45 p-3 sm:col-span-2 xl:col-span-3 dark:border-onda-lavender/15 dark:bg-white/[0.04]">
+                    <legend className="px-1 font-display text-xs font-bold uppercase tracking-[0.12em] text-zinc-600 dark:text-onda-muted">
+                      {t('adminAvailability.weeklyDays')}
+                    </legend>
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setRuleForm((current) => ({ ...current, weekdays: allWeekdayValues }))}
+                        className={secondaryButtonClassName}
+                      >
+                        {t('adminAvailability.allDays')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRuleForm((current) => ({ ...current, weekdays: workdayValues }))}
+                        className={secondaryButtonClassName}
+                      >
+                        {t('adminAvailability.workdays')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRuleForm((current) => ({ ...current, weekdays: weekendValues }))}
+                        className={secondaryButtonClassName}
+                      >
+                        {t('adminAvailability.weekend')}
+                      </button>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {weekdayOptions.map((weekday) => (
+                        <label key={weekday.value} className={checkboxLabelClassName}>
+                          <input
+                            type="checkbox"
+                            checked={selectedRuleWeekdays.includes(weekday.value)}
+                            onChange={(event) =>
+                              setRuleForm((current) => ({
+                                ...current,
+                                weekdays: event.target.checked
+                                  ? normalizeWeekdaySelection([...(current.weekdays ?? []), weekday.value])
+                                  : normalizeWeekdaySelection((current.weekdays ?? []).filter((value) => value !== weekday.value)),
+                              }))
+                            }
+                          />
+                          {weekday.label}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                   <label className={labelClassName}>
                     {t('adminAvailability.start')}
                     <input
@@ -1382,32 +1678,48 @@ export default function AdminAvailability() {
                     <Save className="h-4 w-4" aria-hidden="true" />
                     {ruleForm.id ? t('adminAvailability.rules.save') : t('adminAvailability.rules.create')}
                   </button>
+                  {ruleForm.id ? (
+                    <button
+                      type="button"
+                      onClick={() => setRuleForm(emptyRuleForm)}
+                      className={cn(secondaryButtonClassName, 'self-end xl:w-full')}
+                    >
+                      {t('adminAvailability.cancelEdit')}
+                    </button>
+                  ) : null}
                 </form>
 
                 <div className="mt-5 grid gap-2">
-                  {rules.length === 0 ? (
+                  {ruleGroups.length === 0 ? (
                     <EmptyLine text={t('adminAvailability.rules.empty')} />
                   ) : (
-                    rules.map((rule) => (
-                      <article key={rule.id} className={listItemClassName}>
+                    ruleGroups.map((group) => (
+                      <article key={group.key} className={listItemClassName}>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-                              {getNameById(services, rule.service_id, t('adminAvailability.generalService'))} -{' '}
-                              {weekdayOptions.find((weekday) => weekday.value === String(rule.weekday))?.label}
+                              {getNameById(services, group.rule.service_id, t('adminAvailability.generalService'))} -{' '}
+                              {getWeekdayGroupLabel(group.weekdays, weekdayOptions, {
+                                all: t('adminAvailability.allDays'),
+                                weekend: t('adminAvailability.weekend'),
+                                workdays: t('adminAvailability.workdays'),
+                              })}
                             </h3>
                             <p className="mt-1 text-xs leading-5 text-onda-muted">
-                              {normalizeTime(rule.start_time)} - {normalizeTime(rule.end_time)} - {t('adminAvailability.every')}{' '}
-                              {rule.slot_minutes} {t('common.minutesShort')} - {getNameById(studios, rule.studio_id, t('adminAvailability.anyStudioLower'))} -{' '}
-                              {getNameById(producers, rule.producer_id, t('adminAvailability.anyProducerLower'))}
+                              {normalizeTime(group.rule.start_time)} - {normalizeTime(group.rule.end_time)} - {t('adminAvailability.every')}{' '}
+                              {group.rule.slot_minutes} {t('common.minutesShort')} - {getNameById(studios, group.rule.studio_id, t('adminAvailability.anyStudioLower'))} -{' '}
+                              {getNameById(producers, group.rule.producer_id, t('adminAvailability.anyProducerLower'))}
+                            </p>
+                            <p className="mt-1 text-xs font-semibold text-onda-muted">
+                              {group.isActive ? t('common.active') : t('common.inactive')}
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => editRule(rule)} className={secondaryButtonClassName}>
+                            <button type="button" onClick={() => editRule(group)} className={secondaryButtonClassName}>
                               {t('common.edit')}
                             </button>
-                            <button type="button" onClick={() => toggleActive('availability_rules', rule.id, rule.is_active)} className={secondaryButtonClassName}>
-                              {rule.is_active ? t('common.deactivate') : t('common.activate')}
+                            <button type="button" onClick={() => toggleRuleGroup(group)} className={secondaryButtonClassName}>
+                              {group.isActive ? t('common.deactivate') : t('common.activate')}
                             </button>
                           </div>
                         </div>
@@ -1473,14 +1785,14 @@ export default function AdminAvailability() {
                   </div>
                   <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <label className={labelClassName}>
-                      {exceptionForm.id ? t('dashboard.date') : t('adminAvailability.dateFrom')}
+                      {t('adminAvailability.dateFrom')}
                       <input
                         type="date"
                         value={exceptionForm.exceptionDate}
                         onChange={(event) =>
                           setExceptionForm((current) => ({
                             ...current,
-                            endDate: current.endDate || event.target.value,
+                            endDate: current.isIndefinite ? '' : current.endDate || event.target.value,
                             exceptionDate: event.target.value,
                           }))
                         }
@@ -1488,20 +1800,19 @@ export default function AdminAvailability() {
                         required
                       />
                     </label>
-                    {!exceptionForm.id ? (
-                      <label className={labelClassName}>
-                        {t('adminAvailability.dateTo')}
-                        <input
-                          type="date"
-                          min={exceptionForm.exceptionDate || undefined}
-                          value={exceptionForm.endDate}
-                          onChange={(event) =>
-                            setExceptionForm((current) => ({ ...current, endDate: event.target.value }))
-                          }
-                          className={inputClassName}
-                        />
-                      </label>
-                    ) : null}
+                    <label className={labelClassName}>
+                      {t('adminAvailability.dateTo')}
+                      <input
+                        type="date"
+                        min={exceptionForm.exceptionDate || undefined}
+                        value={exceptionForm.isIndefinite ? '' : exceptionForm.endDate}
+                        onChange={(event) =>
+                          setExceptionForm((current) => ({ ...current, endDate: event.target.value }))
+                        }
+                        className={inputClassName}
+                        disabled={exceptionForm.isIndefinite}
+                      />
+                    </label>
                     <label className={labelClassName}>
                       {t('adminAvailability.optionalStart')}
                       <input
@@ -1525,50 +1836,69 @@ export default function AdminAvailability() {
                       />
                     </label>
                   </div>
-                  {!exceptionForm.id ? (
-                    <fieldset className="grid min-w-0 gap-3 rounded-md border border-onda-purple/15 bg-white/45 p-3 dark:border-onda-lavender/15 dark:bg-white/[0.04]">
-                      <legend className="px-1 font-display text-xs font-bold uppercase tracking-[0.12em] text-zinc-600 dark:text-onda-muted">
-                        {t('adminAvailability.weekdaysInRange')}
-                      </legend>
-                      <div className="flex flex-wrap gap-2 sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExceptionForm((current) => ({ ...current, weekdays: allWeekdayValues }))
-                          }
-                          className={secondaryButtonClassName}
-                        >
-                          {t('adminAvailability.allDays')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setExceptionForm((current) => ({ ...current, weekdays: workdayValues }))}
-                          className={secondaryButtonClassName}
-                        >
-                          {t('adminAvailability.workdays')}
-                        </button>
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                        {weekdayOptions.map((weekday) => (
-                          <label key={weekday.value} className={checkboxLabelClassName}>
-                            <input
-                              type="checkbox"
-                              checked={selectedExceptionWeekdays.includes(weekday.value)}
-                              onChange={(event) =>
-                                setExceptionForm((current) => ({
-                                  ...current,
-                                  weekdays: event.target.checked
-                                    ? [...new Set([...(current.weekdays ?? []), weekday.value])]
-                                    : (current.weekdays ?? []).filter((value) => value !== weekday.value),
-                                }))
-                              }
-                            />
-                            {weekday.label}
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                  ) : null}
+                  <label className={checkboxLabelClassName}>
+                    <input
+                      type="checkbox"
+                      checked={exceptionForm.isIndefinite}
+                      onChange={(event) =>
+                        setExceptionForm((current) => ({
+                          ...current,
+                          endDate: event.target.checked ? '' : current.endDate || current.exceptionDate,
+                          isIndefinite: event.target.checked,
+                        }))
+                      }
+                    />
+                    {t('adminAvailability.indefinite')}
+                  </label>
+                  <fieldset className="grid min-w-0 gap-3 rounded-md border border-onda-purple/15 bg-white/45 p-3 dark:border-onda-lavender/15 dark:bg-white/[0.04]">
+                    <legend className="px-1 font-display text-xs font-bold uppercase tracking-[0.12em] text-zinc-600 dark:text-onda-muted">
+                      {t('adminAvailability.weekdaysInRange')}
+                    </legend>
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExceptionForm((current) => ({ ...current, weekdays: allWeekdayValues }))
+                        }
+                        className={secondaryButtonClassName}
+                      >
+                        {t('adminAvailability.allDays')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExceptionForm((current) => ({ ...current, weekdays: workdayValues }))}
+                        className={secondaryButtonClassName}
+                      >
+                        {t('adminAvailability.workdays')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExceptionForm((current) => ({ ...current, weekdays: weekendValues }))}
+                        className={secondaryButtonClassName}
+                      >
+                        {t('adminAvailability.weekend')}
+                      </button>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {weekdayOptions.map((weekday) => (
+                        <label key={weekday.value} className={checkboxLabelClassName}>
+                          <input
+                            type="checkbox"
+                            checked={selectedExceptionWeekdays.includes(weekday.value)}
+                            onChange={(event) =>
+                              setExceptionForm((current) => ({
+                                ...current,
+                                weekdays: event.target.checked
+                                  ? normalizeWeekdaySelection([...(current.weekdays ?? []), weekday.value])
+                                  : normalizeWeekdaySelection((current.weekdays ?? []).filter((value) => value !== weekday.value)),
+                              }))
+                            }
+                          />
+                          {weekday.label}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                   <OndaSelect
                     label={t('adminAvailability.type')}
                     value={exceptionForm.type}
@@ -1597,30 +1927,54 @@ export default function AdminAvailability() {
                         ? t('adminAvailability.exceptions.createOpening')
                         : t('adminAvailability.exceptions.createBlock')}
                   </button>
+                  {exceptionForm.id ? (
+                    <button
+                      type="button"
+                      onClick={() => setExceptionForm(emptyExceptionForm)}
+                      className={secondaryButtonClassName}
+                    >
+                      {t('adminAvailability.cancelEdit')}
+                    </button>
+                  ) : null}
                 </form>
 
                 <div className="mt-5 grid gap-2">
-                  {exceptions.length === 0 ? (
+                  {exceptionGroups.length === 0 ? (
                     <EmptyLine text={t('adminAvailability.exceptions.empty')} />
                   ) : (
-                    exceptions.map((exception) => (
-                      <article key={exception.id} className={listItemClassName}>
+                    exceptionGroups.map((group) => (
+                      <article key={group.key} className={listItemClassName}>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-                              {exception.type === 'blocked' ? t('adminAvailability.exception.blocked') : t('adminAvailability.exception.available')} - {exception.exception_date}
+                              {group.exception.type === 'blocked' ? t('adminAvailability.exception.blocked') : t('adminAvailability.exception.available')} -{' '}
+                              {getWeekdayGroupLabel(group.weekdays, weekdayOptions, {
+                                all: t('adminAvailability.allDays'),
+                                weekend: t('adminAvailability.weekend'),
+                                workdays: t('adminAvailability.workdays'),
+                              })}
                             </h3>
                             <p className="mt-1 text-xs leading-5 text-onda-muted">
-                              {getNameById(services, exception.service_id, t('adminAvailability.generalService'))} -{' '}
-                              {exception.start_time ? normalizeTime(exception.start_time) : t('adminAvailability.fullDay')}
-                              {exception.end_time ? ` - ${normalizeTime(exception.end_time)}` : ''}
+                              {getExceptionDateRangeLabel(group)}
                             </p>
+                            <p className="mt-1 text-xs leading-5 text-onda-muted">
+                              {getNameById(services, group.exception.service_id, t('adminAvailability.generalService'))} -{' '}
+                              {group.exception.start_time ? normalizeTime(group.exception.start_time) : t('adminAvailability.fullDay')}
+                              {group.exception.end_time ? ` - ${normalizeTime(group.exception.end_time)}` : ''} -{' '}
+                              {getNameById(studios, group.exception.studio_id, t('adminAvailability.anyStudioLower'))} -{' '}
+                              {getNameById(producers, group.exception.producer_id, t('adminAvailability.anyProducerLower'))}
+                            </p>
+                            {group.exception.reason ? (
+                              <p className="mt-1 text-xs font-semibold text-zinc-700 dark:text-onda-soft">
+                                {t('adminAvailability.reason')}: {group.exception.reason}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => editException(exception)} className={secondaryButtonClassName}>
+                            <button type="button" onClick={() => editException(group)} className={secondaryButtonClassName}>
                               {t('common.edit')}
                             </button>
-                            <button type="button" onClick={() => deleteException(exception.id)} className={dangerButtonClassName}>
+                            <button type="button" onClick={() => deleteException(group)} className={dangerButtonClassName}>
                               {t('common.delete')}
                             </button>
                           </div>
@@ -1646,6 +2000,7 @@ export default function AdminAvailability() {
                         <th className="px-4 py-3">{t('dashboard.date')}</th>
                         <th className="px-4 py-3">{t('adminAvailability.client')}</th>
                         <th className="px-4 py-3">{t('adminAvailability.status')}</th>
+                        <th className="px-4 py-3">{t('adminAvailability.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-onda-purple/10 bg-white/50 dark:divide-white/10 dark:bg-white/[0.03]">
@@ -1672,6 +2027,21 @@ export default function AdminAvailability() {
                                 statusClassName(booking.status),
                               )}
                             />
+                          </td>
+                          <td className="px-4 py-4 align-middle">
+                            <button
+                              type="button"
+                              onClick={() => cancelBooking(booking)}
+                              disabled={booking.status === 'cancelled' || busyKey === `delete-booking-${booking.id}`}
+                              className={dangerButtonClassName}
+                            >
+                              {busyKey === `delete-booking-${booking.id}` ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                              )}
+                              {t('adminAvailability.bookings.delete')}
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1793,6 +2163,64 @@ function EmptyLine({ text }: { text: string }) {
   return (
     <div className="rounded-md border border-dashed border-onda-purple/20 bg-white/45 p-4 text-sm text-zinc-600 dark:border-onda-lavender/20 dark:bg-transparent dark:text-onda-muted">
       {text}
+    </div>
+  )
+}
+
+function TeamMemberList({
+  items,
+  onEdit,
+  onToggle,
+}: {
+  items: Producer[]
+  onEdit: (item: Producer) => void
+  onToggle: (item: Producer) => void
+}) {
+  const { t } = useI18n()
+
+  return (
+    <div className="mt-5 grid gap-2">
+      {items.length === 0 ? (
+        <EmptyLine text={t('adminAvailability.emptyRecords')} />
+      ) : (
+        items.map((item) => (
+          <article key={item.id} className={listItemClassName}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="font-display text-sm font-bold uppercase tracking-[0.1em] text-zinc-950 dark:text-white">
+                  {item.name}
+                </h3>
+                <div className="mt-2 grid gap-1 text-xs leading-5 text-onda-muted">
+                  <p>
+                    <span className="font-bold text-zinc-700 dark:text-onda-soft">{t('adminAvailability.specialty')}:</span>{' '}
+                    {item.specialty || t('adminAvailability.notSet')}
+                  </p>
+                  <p>
+                    <span className="font-bold text-zinc-700 dark:text-onda-soft">{t('adminAvailability.internalRole')}:</span>{' '}
+                    {item.role || t('adminAvailability.notSet')}
+                  </p>
+                  {item.role_description ? (
+                    <p className="max-w-prose">{item.role_description}</p>
+                  ) : null}
+                  <p className="break-all">
+                    <span className="font-bold text-zinc-700 dark:text-onda-soft">{t('adminAvailability.linkedUser')}:</span>{' '}
+                    {item.user_id || t('adminAvailability.noLinkedUser')}
+                  </p>
+                  <p>{item.is_active ? t('common.active') : t('common.inactive')}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button type="button" onClick={() => onEdit(item)} className={secondaryButtonClassName}>
+                  {t('common.edit')}
+                </button>
+                <button type="button" onClick={() => onToggle(item)} className={secondaryButtonClassName}>
+                  {item.is_active ? t('common.deactivate') : t('common.activate')}
+                </button>
+              </div>
+            </div>
+          </article>
+        ))
+      )}
     </div>
   )
 }

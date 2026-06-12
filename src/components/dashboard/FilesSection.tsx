@@ -125,9 +125,9 @@ export default function FilesSection({ files, onError }: FilesSectionProps) {
                       <td className="px-4 py-4">
                         <div className="flex min-w-64 items-center gap-3">
                           <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-onda-purple/15 text-onda-lavender">
-                            {file.file_type === 'video' ? (
+                            {file.file_type === 'video' || file.file_type === 'reel' ? (
                               <Video className="h-5 w-5" aria-hidden="true" />
-                            ) : file.file_type === 'photo' ? (
+                            ) : file.file_type === 'photo' || file.file_type === 'editable' ? (
                               <FileText className="h-5 w-5" aria-hidden="true" />
                             ) : (
                               <Music className="h-5 w-5" aria-hidden="true" />

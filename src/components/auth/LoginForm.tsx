@@ -8,6 +8,13 @@ function getLoginErrorMessage(error: unknown) {
   return message || 'No pudimos iniciar sesion. Revisa tus datos e intenta nuevamente.'
 }
 
+function getSafeRedirectPath(redirect: string | null) {
+  if (!redirect) return '/dashboard'
+  if (!redirect.startsWith('/') || redirect.startsWith('//') || redirect.includes('\\')) return '/dashboard'
+
+  return redirect
+}
+
 export function LoginForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -18,6 +25,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null)
 
   const registered = searchParams.get('registered') === '1'
+  const redirectPath = getSafeRedirectPath(searchParams.get('redirect'))
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,7 +34,7 @@ export function LoginForm() {
 
     try {
       await login(email.trim(), password)
-      navigate('/dashboard', { replace: true })
+      navigate(redirectPath, { replace: true })
     } catch (loginError) {
       setError(getLoginErrorMessage(loginError))
     } finally {

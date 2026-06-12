@@ -103,6 +103,7 @@ export default function Dashboard() {
     Archivos: t('dashboard.issue.files'),
     'Disponibilidad semanal': t('dashboard.issue.weeklyAvailability'),
     'Excepciones de disponibilidad': t('dashboard.issue.availabilityExceptions'),
+    Equipo: t('dashboard.issue.producers'),
     Productores: t('dashboard.issue.producers'),
     Reservas: t('dashboard.issue.bookings'),
     Servicios: t('dashboard.issue.services'),
