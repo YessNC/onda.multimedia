@@ -4,7 +4,22 @@ import { supabase } from './supabaseClient'
 export type DashboardTab = 'calendar' | 'files'
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed'
 export type LegacyServiceType = 'recording' | 'mixing' | 'mastering' | 'production'
-export type FileType = 'master' | 'stem' | 'demo' | 'mix' | 'photo' | 'video'
+export type FileType =
+  | 'master'
+  | 'stem'
+  | 'demo'
+  | 'mix'
+  | 'premix'
+  | 'beat'
+  | 'session'
+  | 'reference'
+  | 'final'
+  | 'revision'
+  | 'photo'
+  | 'video'
+  | 'reel'
+  | 'editable'
+  | 'other'
 export type FileFilter = FileType | 'all'
 export type AvailabilityExceptionType = 'blocked' | 'available'
 
@@ -21,6 +36,8 @@ export interface Producer {
   name: string
   specialty: string | null
   role: string | null
+  role_description: string | null
+  user_id: string | null
   is_active: boolean
 }
 
@@ -36,10 +53,12 @@ export interface BookingService {
 
 export interface AvailabilityRule {
   id: string
+  group_id: string | null
   service_id: string | null
   studio_id: string | null
   producer_id: string | null
   weekday: number
+  weekdays: number[] | null
   start_time: string
   end_time: string
   slot_minutes: number
@@ -48,10 +67,14 @@ export interface AvailabilityRule {
 
 export interface AvailabilityException {
   id: string
+  group_id: string | null
   service_id: string | null
   studio_id: string | null
   producer_id: string | null
   exception_date: string
+  date_from: string
+  date_to: string | null
+  weekdays: number[] | null
   start_time: string | null
   end_time: string | null
   type: AvailabilityExceptionType
@@ -98,6 +121,19 @@ export interface AvailabilitySlot {
   source: 'rule' | 'exception'
 }
 
+export interface PublicAvailabilityPreviewSlot {
+  booking_date: string
+  start_time: string
+  end_time: string
+  service_id: string
+  service_name: string
+  studio_id: string | null
+  studio_name: string | null
+  producer_id: string | null
+  producer_name: string | null
+  source: 'rule' | 'exception'
+}
+
 export interface DashboardIssue {
   section: string
   message: string
@@ -141,6 +177,12 @@ export interface CreateBookingInput extends BookingSelection {
   notes: string | null
 }
 
+export interface PublicAvailabilityPreviewInput {
+  days?: number
+  fromDate?: string
+  limit?: number
+}
+
 type DashboardError = {
   code?: string
   message?: string
@@ -163,9 +205,9 @@ type BookingServiceRow = Partial<BookingService> & {
 
 type AvailabilityRuleRow = Partial<AvailabilityRule> & {
   id: string
-  weekday: number
-  start_time: string
-  end_time: string
+  end_time?: string | null
+  start_time?: string | null
+  weekday?: number | null
 }
 
 type AvailabilityExceptionRow = Partial<AvailabilityException> & {
@@ -213,6 +255,12 @@ type BookedSlotRow = {
   producer_id?: string | null
 }
 
+type PublicAvailabilityPreviewRow = Omit<PublicAvailabilityPreviewSlot, 'end_time' | 'source' | 'start_time'> & {
+  end_time: string | null
+  source: string | null
+  start_time: string | null
+}
+
 const activeBookingStatuses: BookingStatus[] = ['pending', 'confirmed', 'completed']
 
 export const legacyServiceLabels: Record<LegacyServiceType, string> = {
@@ -228,11 +276,37 @@ export const fileTypeLabels: Record<FileFilter, string> = {
   stem: 'Stem',
   demo: 'Demo',
   mix: 'Mix',
+  premix: 'Premix',
+  beat: 'Beat',
+  session: 'Sesion',
+  reference: 'Referencia',
+  final: 'Final',
+  revision: 'Revision',
   photo: 'Foto',
   video: 'Video',
+  reel: 'Reel',
+  editable: 'Editable',
+  other: 'Otro',
 }
 
-export const fileFilters: FileFilter[] = ['all', 'master', 'stem', 'demo', 'mix', 'photo', 'video']
+export const fileFilters: FileFilter[] = [
+  'all',
+  'master',
+  'stem',
+  'demo',
+  'mix',
+  'premix',
+  'beat',
+  'session',
+  'reference',
+  'final',
+  'revision',
+  'photo',
+  'video',
+  'reel',
+  'editable',
+  'other',
+]
 
 export const dayFormatter = new Intl.DateTimeFormat('es-CL', {
   weekday: 'long',
@@ -334,6 +408,17 @@ function dateFromKey(dateKey: string) {
   return new Date(Number(year), Number(month) - 1, Number(day))
 }
 
+function getWeekdayFromDateKey(dateKey: string) {
+  return dateFromKey(dateKey).getDay()
+}
+
+function normalizeWeekdays(weekdays: unknown, fallback: number[] = []) {
+  const values = Array.isArray(weekdays) ? weekdays : fallback
+
+  return [...new Set(values.map(Number).filter((weekday) => Number.isInteger(weekday) && weekday >= 0 && weekday <= 6))]
+    .sort((left, right) => left - right)
+}
+
 export function minutesFromTime(time: string) {
   const [hour = '0', minute = '0'] = normalizeTime(time).split(':')
   return Number(hour) * 60 + Number(minute)
@@ -419,6 +504,8 @@ function normalizeProducer(row: ProducerRow): Producer {
     name: row.name,
     specialty: row.specialty ?? null,
     role: row.role ?? null,
+    role_description: row.role_description ?? null,
+    user_id: row.user_id ?? null,
     is_active: row.is_active ?? true,
   }
 }
@@ -436,12 +523,17 @@ function normalizeBookingService(row: BookingServiceRow): BookingService {
 }
 
 function normalizeAvailabilityRule(row: AvailabilityRuleRow): AvailabilityRule {
+  const weekdays = normalizeWeekdays(row.weekdays, typeof row.weekday === 'number' ? [row.weekday] : [])
+  const weekday = typeof row.weekday === 'number' ? row.weekday : weekdays[0] ?? 0
+
   return {
     id: row.id,
+    group_id: row.group_id ?? null,
     service_id: row.service_id ?? null,
     studio_id: row.studio_id ?? null,
     producer_id: row.producer_id ?? null,
-    weekday: row.weekday,
+    weekday,
+    weekdays: weekdays.length > 0 ? weekdays : null,
     start_time: normalizeTime(row.start_time),
     end_time: normalizeTime(row.end_time),
     slot_minutes: row.slot_minutes ?? 60,
@@ -450,12 +542,24 @@ function normalizeAvailabilityRule(row: AvailabilityRuleRow): AvailabilityRule {
 }
 
 function normalizeAvailabilityException(row: AvailabilityExceptionRow): AvailabilityException {
+  const hasRangeColumns =
+    Object.prototype.hasOwnProperty.call(row, 'date_from') ||
+    Object.prototype.hasOwnProperty.call(row, 'date_to') ||
+    Object.prototype.hasOwnProperty.call(row, 'weekdays')
+  const dateFrom = row.date_from ?? row.exception_date
+  const dateTo = hasRangeColumns ? row.date_to ?? null : row.exception_date
+  const weekdays = normalizeWeekdays(row.weekdays, [getWeekdayFromDateKey(dateFrom)])
+
   return {
     id: row.id,
+    group_id: row.group_id ?? null,
     service_id: row.service_id ?? null,
     studio_id: row.studio_id ?? null,
     producer_id: row.producer_id ?? null,
     exception_date: row.exception_date,
+    date_from: dateFrom,
+    date_to: dateTo,
+    weekdays: weekdays.length > 0 ? weekdays : null,
     start_time: row.start_time ? normalizeTime(row.start_time) : null,
     end_time: row.end_time ? normalizeTime(row.end_time) : null,
     type: row.type,
@@ -583,7 +687,7 @@ async function fetchStudios(): Promise<Studio[]> {
 async function fetchProducers(): Promise<Producer[]> {
   const modernResult = await supabase
     .from('producers')
-    .select('id, name, specialty, role, is_active')
+    .select('id, name, specialty, role, role_description, user_id, is_active')
     .eq('is_active', true)
     .order('name', { ascending: true })
 
@@ -593,7 +697,7 @@ async function fetchProducers(): Promise<Producer[]> {
 
   const fallbackResult = await supabase
     .from('producers')
-    .select('id, name, specialty')
+    .select('id, name, specialty, role, is_active')
     .order('name', { ascending: true })
 
   if (!fallbackResult.error) return ((fallbackResult.data ?? []) as ProducerRow[]).map(normalizeProducer)
@@ -605,13 +709,25 @@ async function fetchProducers(): Promise<Producer[]> {
 async function fetchAvailabilityRules(): Promise<AvailabilityRule[]> {
   const result = await supabase
     .from('availability_rules')
-    .select('id, service_id, studio_id, producer_id, weekday, start_time, end_time, slot_minutes, is_active')
+    .select('id, group_id, service_id, studio_id, producer_id, weekday, weekdays, start_time, end_time, slot_minutes, is_active')
     .eq('is_active', true)
     .order('weekday', { ascending: true })
     .order('start_time', { ascending: true })
 
   if (!result.error) return ((result.data ?? []) as AvailabilityRuleRow[]).map(normalizeAvailabilityRule)
-  if (isMissingOrIncompleteSchema(result.error)) return []
+  if (isMissingOrIncompleteSchema(result.error)) {
+    const legacyResult = await supabase
+      .from('availability_rules')
+      .select('id, service_id, studio_id, producer_id, weekday, start_time, end_time, slot_minutes, is_active')
+      .eq('is_active', true)
+      .order('weekday', { ascending: true })
+      .order('start_time', { ascending: true })
+
+    if (!legacyResult.error) return ((legacyResult.data ?? []) as AvailabilityRuleRow[]).map(normalizeAvailabilityRule)
+    if (isMissingOrIncompleteSchema(legacyResult.error)) return []
+
+    throw legacyResult.error
+  }
 
   throw result.error
 }
@@ -620,13 +736,25 @@ async function fetchAvailabilityExceptions(): Promise<AvailabilityException[]> {
   const todayKey = toDateKey(getStartOfToday())
   const result = await supabase
     .from('availability_exceptions')
-    .select('id, service_id, studio_id, producer_id, exception_date, start_time, end_time, type, reason')
-    .gte('exception_date', todayKey)
+    .select('id, group_id, service_id, studio_id, producer_id, exception_date, date_from, date_to, weekdays, start_time, end_time, type, reason')
+    .or(`exception_date.gte.${todayKey},date_to.is.null,date_to.gte.${todayKey}`)
     .order('exception_date', { ascending: true })
     .order('start_time', { ascending: true })
 
   if (!result.error) return ((result.data ?? []) as AvailabilityExceptionRow[]).map(normalizeAvailabilityException)
-  if (isMissingOrIncompleteSchema(result.error)) return []
+  if (isMissingOrIncompleteSchema(result.error)) {
+    const legacyResult = await supabase
+      .from('availability_exceptions')
+      .select('id, service_id, studio_id, producer_id, exception_date, start_time, end_time, type, reason')
+      .gte('exception_date', todayKey)
+      .order('exception_date', { ascending: true })
+      .order('start_time', { ascending: true })
+
+    if (!legacyResult.error) return ((legacyResult.data ?? []) as AvailabilityExceptionRow[]).map(normalizeAvailabilityException)
+    if (isMissingOrIncompleteSchema(legacyResult.error)) return []
+
+    throw legacyResult.error
+  }
 
   throw result.error
 }
@@ -705,7 +833,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const [services, studios, producers, availabilityRules, availabilityExceptions] = await Promise.all([
     runDashboardSection(issues, 'Servicios', fetchBookingServices, []),
     runDashboardSection(issues, 'Estudios', fetchStudios, []),
-    runDashboardSection(issues, 'Productores', fetchProducers, []),
+    runDashboardSection(issues, 'Equipo', fetchProducers, []),
     runDashboardSection(issues, 'Disponibilidad semanal', fetchAvailabilityRules, []),
     runDashboardSection(issues, 'Excepciones de disponibilidad', fetchAvailabilityExceptions, []),
   ])
@@ -765,8 +893,18 @@ function ruleMatchesSelection(rule: AvailabilityRule, selection: BookingSelectio
   return true
 }
 
+function ruleMatchesWeekday(rule: AvailabilityRule, weekday: number) {
+  const weekdays = rule.weekdays?.length ? rule.weekdays : [rule.weekday]
+  return weekdays.includes(weekday)
+}
+
 function exceptionMatchesSelection(exception: AvailabilityException, selection: BookingSelection, dateKey: string) {
-  if (exception.exception_date !== dateKey) return false
+  const dateWeekday = getWeekdayFromDateKey(dateKey)
+  const weekdays = exception.weekdays?.length ? exception.weekdays : [getWeekdayFromDateKey(exception.exception_date)]
+
+  if (dateKey < exception.date_from) return false
+  if (exception.date_to && dateKey > exception.date_to) return false
+  if (!weekdays.includes(dateWeekday)) return false
   if (exception.service_id && exception.service_id !== selection.serviceId) return false
   if (!valueMatchesRule(exception.studio_id, selection.studioId)) return false
   if (!valueMatchesRule(exception.producer_id, selection.producerId)) return false
@@ -827,7 +965,7 @@ export function buildAvailableSlots({
   const weekday = dateValue.getDay()
   const duration = Math.max(service.duration_minutes, 5)
   const baseSlots = rules
-    .filter((rule) => rule.weekday === weekday && ruleMatchesSelection(rule, selection))
+    .filter((rule) => ruleMatchesWeekday(rule, weekday) && ruleMatchesSelection(rule, selection))
     .flatMap((rule) => generateSlots(rule.start_time, rule.end_time, duration, rule.slot_minutes))
 
   const matchingExceptions = exceptions.filter((exception) => exceptionMatchesSelection(exception, selection, dateKey))
@@ -902,6 +1040,27 @@ export function getAvailableDateKeys({
   }
 
   return dateKeys
+}
+
+export async function getPublicAvailabilityPreview({
+  days = 21,
+  fromDate = toDateKey(getStartOfToday()),
+  limit = 80,
+}: PublicAvailabilityPreviewInput = {}): Promise<PublicAvailabilityPreviewSlot[]> {
+  const { data, error } = await supabase.rpc('get_public_availability_preview', {
+    p_days: Math.min(Math.max(days, 1), 90),
+    p_from_date: fromDate,
+    p_limit: Math.min(Math.max(limit, 1), 200),
+  })
+
+  if (error) throw error
+
+  return ((data ?? []) as PublicAvailabilityPreviewRow[]).map((slot) => ({
+    ...slot,
+    end_time: normalizeTime(slot.end_time),
+    source: slot.source === 'exception' ? 'exception' : 'rule',
+    start_time: normalizeTime(slot.start_time),
+  }))
 }
 
 function bookedSlotMatchesSelection(row: BookedSlotRow, selection: BookingSelection) {

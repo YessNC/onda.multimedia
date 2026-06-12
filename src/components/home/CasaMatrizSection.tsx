@@ -3,8 +3,8 @@ import CTAButton from '../shared/CTAButton'
 import ScratchImageCard from './ScratchImageCard'
 import { useI18n } from '../../hooks/useI18n'
 import { useState } from 'react'
-import BookingModal from '../booking/BookingModal'
 import CalendarModal from '../booking/CalendarModal'
+import { useNavigate } from 'react-router-dom'
 
 const casaMatrizAssets = [
   {
@@ -51,8 +51,8 @@ const casaMatrizAssets = [
 
 export default function CasaMatrizSection() {
   const { t } = useI18n()
+  const navigate = useNavigate()
 
-  const [bookingOpen, setBookingOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
 
   return (
@@ -96,7 +96,7 @@ export default function CasaMatrizSection() {
                   {t('casamatriz.cta-studio')}
                 </CTAButton>
                 <CTAButton
-                  onClick={() => setBookingOpen(true)}
+                  onClick={() => navigate('/login?redirect=/dashboard')}
                   variant="secondary"
                   icon={<CalendarCheck className="h-4 w-4" aria-hidden="true" />}
                   className="w-full border-onda-lavender/30 bg-white/60 shadow-[0_0_28px_rgba(123,44,255,0.12)] backdrop-blur-xl dark:bg-white/10 sm:w-auto"
@@ -120,11 +120,6 @@ export default function CasaMatrizSection() {
           </div>
         </div>
       </div>
-      <BookingModal
-        open={bookingOpen}
-        onClose={() => setBookingOpen(false)}
-      />
-
       <CalendarModal
         open={calendarOpen}
         onClose={() => setCalendarOpen(false)}
