@@ -45,23 +45,24 @@ function splitName(fullName: string | null, email: string) {
   return { name, surname }
 }
 
-function buildReachNote(recipient: ReachRecipient) {
-  const variables = recipient.template_variables ?? {}
-  const noteParts = [
-    stringValue(variables.community_consent) === 'true' ? 'Comunidad Onda' : '',
-    'Reservas Onda',
-    `booking_id=${stringValue(variables.booking_id) || recipient.booking_id || ''}`,
-    `servicio=${stringValue(variables.service_name)}`,
-    `estudio=${stringValue(variables.studio_name)}`,
-    `responsable=${stringValue(variables.producer_name)}`,
-    `fecha=${stringValue(variables.booking_date)}`,
-    `hora=${stringValue(variables.start_time)}-${stringValue(variables.end_time)}`,
-    `pago=${stringValue(variables.payment_status)}`,
-    `descuento=${stringValue(variables.discount_code)}`,
-  ]
+  const REACH_NOTE_LIMIT = 75
 
-  return noteParts.filter((part) => part && !part.endsWith('=')).join(' | ')
-}
+  function truncateReachNote(note: string) {
+    if (note.length <= REACH_NOTE_LIMIT) return note
+    return `${note.slice(0, REACH_NOTE_LIMIT - 3).trimEnd()}...`
+  }
+
+  function buildReachNote(recipient: ReachRecipient) {
+    const variables = recipient.template_variables ?? {}
+    const noteParts = [
+      stringValue(variables.community_consent) === 'true' ? 'Comunidad Onda' : '',
+      'Reserva Onda',
+      stringValue(variables.discount_code) ? `Desc:${stringValue(variables.discount_code)}` : '',
+      stringValue(variables.payment_status) ? `Pago:${stringValue(variables.payment_status)}` : '',
+    ]
+
+    return truncateReachNote(noteParts.filter(Boolean).join(' | '))
+  }
 
 async function logEmail(recipient: ReachRecipient, status: 'failed' | 'synced', errorMessage?: string, providerMessageId?: string) {
   await supabase.from('email_logs').insert({
@@ -88,19 +89,13 @@ Deno.serve(async (request) => {
   }
 
   if (syncSecret) {
+    const syncHeader = request.headers.get('x-sync-secret')?.trim() ?? ''
     const authorization = request.headers.get('authorization') ?? ''
-    const token = authorization.replace(/^Bearer\s+/i, '').trim()
+    const bearerToken = authorization.replace(/^Bearer\s+/i, '').trim()
 
-    if (token !== syncSecret) {
+    if (syncHeader !== syncSecret && bearerToken !== syncSecret) {
       return jsonResponse({ error: 'Unauthorized' }, 401)
     }
-  }
-
-  if (!reachApiToken || !reachContactsUrl) {
-    return jsonResponse({
-      error: 'Hostinger Reach API settings are missing.',
-      required: ['HOSTINGER_REACH_API_TOKEN', 'HOSTINGER_REACH_CONTACTS_URL'],
-    }, 500)
   }
 
   const { data, error } = await supabase

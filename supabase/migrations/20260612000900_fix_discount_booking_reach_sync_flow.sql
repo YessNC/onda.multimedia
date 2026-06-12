@@ -422,11 +422,11 @@ begin
 
   v_slot_count := greatest(jsonb_array_length(p_selected_slots), 1);
 
-  select *
+  select service.*
   into v_service
-  from public.booking_services
-  where id = p_service_id
-    and is_active is true;
+  from public.booking_services service
+  where service.id = p_service_id
+    and service.is_active is true;
 
   if not found then
     raise exception 'Booking service is not available.' using errcode = '22023';
@@ -647,9 +647,9 @@ begin
   );
 
   if v_discount_code is not null then
-    update public.discount_codes
-    set used_count = used_count + 1
-    where id = v_discount.id;
+    update public.discount_codes discount_code
+    set used_count = discount_code.used_count + 1
+    where discount_code.id = v_discount.id;
   end if;
 
   insert into public.booking_payments (
