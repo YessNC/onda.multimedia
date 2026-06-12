@@ -523,6 +523,7 @@ export default {
   'adminAvailability.error.weekdaysRequired': 'Select at least one day.',
   'adminAvailability.error.updateNotApplied': "We couldn't apply the change. Check your permissions or try again.",
   'adminAvailability.error.bookingCancelFailed': "We couldn't cancel the booking. Check permissions or reload the page.",
+  'adminAvailability.error.bookingPermanentDeleteFailed': "We couldn't permanently delete the booking.",
   'adminAvailability.error.userAlreadyLinked': 'That user is already linked to another team member.',
   'adminAvailability.error.similarProducerExists': 'A similar team member already exists. Please review before creating another one.',
   'adminAvailability.error.adminPermission': 'Invalid admin session or missing RLS permissions to run this action.',
@@ -641,6 +642,11 @@ export default {
   'adminAvailability.bookings.cancelConfirm': 'Cancel this booking? The booking will be cancelled and the slot will become available again.',
   'adminAvailability.bookings.confirmCancel': 'Cancel booking',
   'adminAvailability.bookings.deleteConfirm': 'Delete this booking? The booking will be cancelled and the slot will become available again.',
+  'adminAvailability.bookings.deletePermanently': 'Delete permanently',
+  'adminAvailability.bookings.deletePermanentConfirm':
+    "Delete this booking permanently? This action can't be undone. Use this only for test bookings or records created by mistake.",
+  'adminAvailability.bookings.confirmDeletePermanently': 'Yes, delete permanently',
+  'adminAvailability.bookings.goBack': 'Go back',
   'adminAvailability.discounts.title': 'Discount codes',
   'adminAvailability.discounts.code': 'Code',
   'adminAvailability.discounts.type': 'Discount type',
@@ -685,6 +691,7 @@ export default {
   'adminAvailability.message.deactivated': 'Item deactivated.',
   'adminAvailability.message.bookingStatusUpdated': 'Booking status updated.',
   'adminAvailability.message.bookingCancelled': 'Booking cancelled successfully.',
+  'adminAvailability.message.bookingDeletedPermanently': 'Booking permanently deleted.',
   'adminAvailability.message.fileUploaded': 'File uploaded successfully.',
 
   // Scratch card

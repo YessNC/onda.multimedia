@@ -56,6 +56,10 @@ type BookingCancelDialogState = {
   booking: Booking
 }
 
+type BookingPermanentDeleteDialogState = {
+  booking: Booking
+}
+
 type ProducerDeleteDialogState = {
   producer: Producer
 }
@@ -784,6 +788,8 @@ export default function AdminAvailability() {
   const [fileUploadForm, setFileUploadForm] = useState<FileUploadForm>(emptyFileUploadForm)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [bookingCancelDialog, setBookingCancelDialog] = useState<BookingCancelDialogState | null>(null)
+  const [bookingPermanentDeleteDialog, setBookingPermanentDeleteDialog] =
+    useState<BookingPermanentDeleteDialogState | null>(null)
   const [producerDeleteDialog, setProducerDeleteDialog] = useState<ProducerDeleteDialogState | null>(null)
   const [deleteExceptionsDialog, setDeleteExceptionsDialog] = useState<DeleteExceptionsDialogState | null>(null)
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('')
@@ -1822,6 +1828,11 @@ export default function AdminAvailability() {
     setBookingCancelDialog({ booking })
   }
 
+  function openBookingPermanentDeleteDialog(booking: Booking) {
+    if (!isOwner || booking.status !== 'cancelled') return
+    setBookingPermanentDeleteDialog({ booking })
+  }
+
   function confirmCancelBooking(event: FormEvent) {
     event.preventDefault()
     const booking = bookingCancelDialog?.booking
@@ -1847,6 +1858,38 @@ export default function AdminAvailability() {
       },
       t('adminAvailability.message.bookingCancelled'),
     )
+  }
+
+  function confirmDeleteBookingPermanently(event: FormEvent) {
+    event.preventDefault()
+    const booking = bookingPermanentDeleteDialog?.booking
+
+    if (!booking) return
+
+    void (async () => {
+      setBusyKey(`delete-booking-${booking.id}`)
+      setMessage(null)
+
+      try {
+        await assertActiveAdmin()
+
+        if (!isOwner) throw new Error(t('adminAvailability.error.adminPermission'))
+
+        const result = await supabase.rpc('delete_booking_permanently_if_owner', {
+          p_booking_id: booking.id,
+        })
+
+        if (result.error) throw result.error
+
+        setBookingPermanentDeleteDialog(null)
+        setMessage({ tone: 'success', text: t('adminAvailability.message.bookingDeletedPermanently') })
+        await loadData({ clearMessage: false })
+      } catch {
+        setMessage({ tone: 'error', text: t('adminAvailability.error.bookingPermanentDeleteFailed') })
+      } finally {
+        setBusyKey(null)
+      }
+    })()
   }
 
   function openFileUpload(booking: Booking) {
@@ -2950,7 +2993,13 @@ export default function AdminAvailability() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-onda-purple/10 bg-white/50 dark:divide-white/10 dark:bg-white/[0.03]">
-                      {bookings.map((booking) => (
+                      {bookings.map((booking) => {
+                        const canCancelBooking = booking.status === 'pending' || booking.status === 'confirmed'
+                        const canDeleteBookingPermanently = booking.status === 'cancelled' && isOwner
+                        const isCancellingBooking = busyKey === `cancel-booking-${booking.id}`
+                        const isDeletingBooking = busyKey === `delete-booking-${booking.id}`
+
+                        return (
                         <tr key={booking.id}>
                           <td className="px-4 py-4 font-semibold text-zinc-950 dark:text-white">
                             {booking.service_name}
@@ -3017,25 +3066,46 @@ export default function AdminAvailability() {
                                   {t('adminAvailability.files.upload')}
                                 </button>
                               ) : null}
-                              <button
-                                type="button"
-                                onClick={() => openBookingCancelDialog(booking)}
-                                disabled={booking.status === 'cancelled' || busyKey === `cancel-booking-${booking.id}`}
-                                className={dangerButtonClassName}
-                              >
-                                {busyKey === `cancel-booking-${booking.id}` ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                                ) : (
-                                  <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                                )}
-                                {booking.status === 'cancelled'
-                                  ? t('adminAvailability.bookings.alreadyCancelled')
-                                  : t('adminAvailability.bookings.cancel')}
-                              </button>
+                              {canCancelBooking ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openBookingCancelDialog(booking)}
+                                  disabled={isCancellingBooking}
+                                  className={dangerButtonClassName}
+                                >
+                                  {isCancellingBooking ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                                  ) : (
+                                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                                  )}
+                                  {t('adminAvailability.bookings.cancel')}
+                                </button>
+                              ) : null}
+                              {canDeleteBookingPermanently ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openBookingPermanentDeleteDialog(booking)}
+                                  disabled={isDeletingBooking}
+                                  className={dangerButtonClassName}
+                                >
+                                  {isDeletingBooking ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                                  ) : (
+                                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                                  )}
+                                  {t('adminAvailability.bookings.deletePermanently')}
+                                </button>
+                              ) : null}
+                              {booking.status === 'cancelled' && !canDeleteBookingPermanently ? (
+                                <span className="inline-flex min-h-10 items-center rounded-md border border-onda-purple/15 px-3 py-2 text-xs font-bold uppercase text-onda-muted dark:border-white/10">
+                                  {t('adminAvailability.bookings.alreadyCancelled')}
+                                </span>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -3176,6 +3246,80 @@ export default function AdminAvailability() {
                     <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
                   )}
                   {t('adminAvailability.bookings.confirmCancel')}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
+
+        {bookingPermanentDeleteDialog ? (
+          <div
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onClick={() => {
+              if (busyKey !== `delete-booking-${bookingPermanentDeleteDialog.booking.id}`) {
+                setBookingPermanentDeleteDialog(null)
+              }
+            }}
+            role="presentation"
+          >
+            <form
+              onSubmit={confirmDeleteBookingPermanently}
+              className="max-h-[92vh] w-full max-w-lg overflow-y-auto overflow-x-hidden rounded-lg border border-red-400/25 bg-white p-5 text-zinc-950 shadow-[0_30px_90px_rgba(24,24,27,0.22)] sm:p-6 dark:border-red-300/25 dark:bg-onda-night dark:text-white"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-booking-modal-title"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-red-600 dark:text-red-200">
+                    {t('adminAvailability.bookings.deletePermanently')}
+                  </p>
+                  <h2 id="delete-booking-modal-title" className="mt-2 font-display text-xl font-bold uppercase tracking-[0.08em]">
+                    {bookingPermanentDeleteDialog.booking.service_name}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-onda-muted">
+                    {bookingPermanentDeleteDialog.booking.client_name ?? t('adminAvailability.registeredClient')} -{' '}
+                    {bookingPermanentDeleteDialog.booking.booking_date} - {normalizeTime(bookingPermanentDeleteDialog.booking.start_time)} -{' '}
+                    {normalizeTime(bookingPermanentDeleteDialog.booking.end_time)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBookingPermanentDeleteDialog(null)}
+                  disabled={busyKey === `delete-booking-${bookingPermanentDeleteDialog.booking.id}`}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-onda-lavender/25 text-onda-lavender transition hover:bg-onda-purple hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={t('common.close')}
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div className="mt-5 flex items-start gap-3 rounded-md border border-red-400/25 bg-red-500/10 p-4 text-sm leading-6 text-red-800 dark:text-red-100">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                <p>{t('adminAvailability.bookings.deletePermanentConfirm')}</p>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setBookingPermanentDeleteDialog(null)}
+                  disabled={busyKey === `delete-booking-${bookingPermanentDeleteDialog.booking.id}`}
+                  className={secondaryButtonClassName}
+                >
+                  {t('adminAvailability.bookings.goBack')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={busyKey === `delete-booking-${bookingPermanentDeleteDialog.booking.id}`}
+                  className={cn(dangerButtonClassName, 'bg-red-600 text-white hover:bg-red-700 dark:text-white')}
+                >
+                  {busyKey === `delete-booking-${bookingPermanentDeleteDialog.booking.id}` ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                  )}
+                  {t('adminAvailability.bookings.confirmDeletePermanently')}
                 </button>
               </div>
             </form>
