@@ -789,7 +789,38 @@ export default function AdminEventAttendees() {
     return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER
   }
 
-  async function fetchCommunityAttendeesForCsv(filter: CommunityFilter) {
+  async function fetchCommunityProfilesForCsv(filter: CommunityFilter) {
+    if (filter === 'sent') return []
+
+    const communityProfiles: CommunityCsvAttendee[] = []
+
+    for (let page = 0; ; page += 1) {
+      const from = page * COMMUNITY_CSV_PAGE_SIZE
+      const to = from + COMMUNITY_CSV_PAGE_SIZE - 1
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone, terms_accepted, terms_accepted_at, terms_source, community_consent, community_consent_at, community_consent_source, community_consent_revoked_at, created_at, updated_at')
+        .eq('community_consent', true)
+        .range(from, to)
+
+      if (error) throw error
+
+      const pageRows = ((data ?? []) as CommunityCsvAttendee[]).map((profile) => ({
+        ...profile,
+        accepted_privacy: profile.terms_accepted ?? true,
+        accepted_terms: profile.terms_accepted ?? true,
+        community_consent_source: profile.community_consent_source || 'dashboard',
+        source: 'dashboard',
+      }))
+      communityProfiles.push(...pageRows)
+
+      if (pageRows.length < COMMUNITY_CSV_PAGE_SIZE) break
+    }
+
+    return communityProfiles
+  }
+
+  async function fetchCommunityEventAttendeesForCsv(filter: CommunityFilter) {
     if (!eventId) return []
 
     const communityAttendees: CommunityCsvAttendee[] = []
@@ -821,7 +852,16 @@ export default function AdminEventAttendees() {
       if (pageRows.length < COMMUNITY_CSV_PAGE_SIZE) break
     }
 
-    return [...communityAttendees].sort(
+    return communityAttendees
+  }
+
+  async function fetchCommunityAttendeesForCsv(filter: CommunityFilter) {
+    const [communityAttendees, communityProfiles] = await Promise.all([
+      fetchCommunityEventAttendeesForCsv(filter),
+      fetchCommunityProfilesForCsv(filter),
+    ])
+
+    return [...communityAttendees, ...communityProfiles].sort(
       (firstAttendee, secondAttendee) =>
         getCommunityAttendeeSortTime(firstAttendee) - getCommunityAttendeeSortTime(secondAttendee),
     )

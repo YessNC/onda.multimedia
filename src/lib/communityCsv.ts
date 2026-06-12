@@ -4,6 +4,7 @@ export type CommunityCsvAttendee = Record<string, unknown> & {
   access_code?: string | null
   community_consent?: boolean | string | null
   community_consent_at?: string | null
+  community_consent_source?: string | null
   community_welcome_sent?: boolean | null
   community_welcome_sent_at?: string | null
   community_welcome_sent_by?: string | null
@@ -17,6 +18,10 @@ export type CommunityCsvAttendee = Record<string, unknown> & {
   instagram_handle?: string | null
   last_name?: string | null
   phone?: string | null
+  source?: string | null
+  terms_accepted?: boolean | null
+  terms_accepted_at?: string | null
+  terms_source?: string | null
   ticket_generated_at?: string | null
   updated_at?: string | null
 }
@@ -53,7 +58,17 @@ const COMMUNITY_CSV_HEADERS: Array<keyof CommunityCsvContact> = [
 
 const UTF8_BOM = '\uFEFF'
 const COMMUNITY_ACCEPTED_LABEL = 'S\u00ed'
-const COMMUNITY_SOURCE = 'ONDA Multimedia - Invitaci\u00f3n evento'
+const COMMUNITY_EVENT_SOURCE = 'ONDA Multimedia - Invitaci\u00f3n evento'
+const COMMUNITY_PROFILE_SOURCE = 'dashboard'
+const COMMUNITY_IDENTITY_HEADERS: Array<keyof CommunityCsvContact> = [
+  'First Name',
+  'Last Name',
+  'Full Name',
+  'Phone',
+  'Occupation',
+  'Instagram',
+  'Ticket Code',
+]
 
 function readString(value: unknown) {
   if (typeof value === 'string') return value.trim()
@@ -140,11 +155,69 @@ function formatDateForCsv(value: unknown) {
 function getDateSubscribed(attendee: CommunityCsvAttendee) {
   return formatDateForCsv(
     attendee.community_consent_at ||
+      attendee.terms_accepted_at ||
       attendee.created_at ||
       attendee.ticket_generated_at ||
       attendee.generated_at ||
       attendee.updated_at,
   )
+}
+
+function getCommunitySource(attendee: CommunityCsvAttendee) {
+  return (
+    readString(attendee.community_consent_source) ||
+    readString(attendee.source) ||
+    COMMUNITY_EVENT_SOURCE
+  )
+}
+
+function getContactCompletenessScore(contact: CommunityCsvContact) {
+  return COMMUNITY_IDENTITY_HEADERS.reduce(
+    (score, header) => score + (readString(contact[header]) ? 1 : 0),
+    0,
+  )
+}
+
+function mergeCommunityCsvContact(existing: CommunityCsvContact, candidate: CommunityCsvContact) {
+  const existingScore = getContactCompletenessScore(existing)
+  const candidateScore = getContactCompletenessScore(candidate)
+  const primary = candidateScore > existingScore ? candidate : existing
+  const secondary = primary === candidate ? existing : candidate
+  const merged: CommunityCsvContact = { ...primary }
+
+  for (const header of COMMUNITY_IDENTITY_HEADERS) {
+    merged[header] = readString(primary[header]) || readString(secondary[header])
+  }
+
+  merged.Email = readString(existing.Email) || readString(candidate.Email)
+  merged.Community =
+    existing.Community === COMMUNITY_ACCEPTED_LABEL || candidate.Community === COMMUNITY_ACCEPTED_LABEL
+      ? COMMUNITY_ACCEPTED_LABEL
+      : 'No'
+  merged['Consent Accepted'] =
+    existing['Consent Accepted'] === COMMUNITY_ACCEPTED_LABEL ||
+    candidate['Consent Accepted'] === COMMUNITY_ACCEPTED_LABEL
+      ? COMMUNITY_ACCEPTED_LABEL
+      : 'No'
+
+  const existingSource = readString(existing.Source)
+  const candidateSource = readString(candidate.Source)
+  const shouldUseCandidateSource =
+    candidateSource === COMMUNITY_PROFILE_SOURCE ||
+    !existingSource ||
+    (candidateScore > existingScore && existingSource !== COMMUNITY_PROFILE_SOURCE)
+
+  merged.Source = shouldUseCandidateSource ? candidateSource || existingSource : existingSource
+
+  const existingDate = readString(existing['Date Subscribed'])
+  const candidateDate = readString(candidate['Date Subscribed'])
+  const shouldUseCandidateDate =
+    !existingDate ||
+    (candidateSource === COMMUNITY_PROFILE_SOURCE && existingSource !== COMMUNITY_PROFILE_SOURCE)
+
+  merged['Date Subscribed'] = shouldUseCandidateDate ? candidateDate || existingDate : existingDate
+
+  return merged
 }
 
 function escapeCsvField(value: unknown) {
@@ -162,13 +235,16 @@ export function getCommunityCsvContacts(attendees: CommunityCsvAttendee[]) {
 
     const email = normalizeEmail(attendee.email)
 
-    if (!isValidEmail(email) || contactsByEmail.has(email)) continue
+    if (!isValidEmail(email)) continue
 
     const fullName = buildFullName(attendee)
     const { firstName, lastName } = getFirstAndLastName(attendee)
-    const hasLegalConsent = Boolean(attendee.accepted_privacy && attendee.accepted_terms)
+    const hasLegalConsent = Boolean(
+      attendee.terms_accepted ||
+      (attendee.accepted_privacy && attendee.accepted_terms),
+    )
 
-    contactsByEmail.set(email, {
+    const contact: CommunityCsvContact = {
       'Community': COMMUNITY_ACCEPTED_LABEL,
       'Consent Accepted': hasLegalConsent ? COMMUNITY_ACCEPTED_LABEL : 'No',
       'Date Subscribed': getDateSubscribed(attendee),
@@ -179,9 +255,12 @@ export function getCommunityCsvContacts(attendees: CommunityCsvAttendee[]) {
       'Last Name': lastName,
       'Occupation': readString(attendee.occupation) || readString(attendee.guest_type),
       'Phone': readString(attendee.phone),
-      'Source': COMMUNITY_SOURCE,
+      'Source': getCommunitySource(attendee),
       'Ticket Code': readString(attendee.access_code),
-    })
+    }
+    const existingContact = contactsByEmail.get(email)
+
+    contactsByEmail.set(email, existingContact ? mergeCommunityCsvContact(existingContact, contact) : contact)
   }
 
   return Array.from(contactsByEmail.values())
