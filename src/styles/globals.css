@@ -510,4 +510,340 @@ img {
 .animate-onda-glow {
   animation: ondaGlow 2.5s ease-in-out infinite;
 }
+
+.onda-calendar {
+  isolation: isolate;
+  width: 100% !important;
+  max-width: none !important;
+  border: 1px solid rgba(192, 132, 252, 0.22) !important;
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(135deg, rgba(123, 44, 255, 0.16), rgba(192, 132, 252, 0.05)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    rgba(5, 5, 5, 0.72) !important;
+  padding: 0.75rem;
+  color: #f5f3ff !important;
+  font-family: var(--font-sans);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 22px 56px rgba(5, 5, 5, 0.24);
+}
+
+.onda-calendar,
+.onda-calendar *,
+.onda-calendar *::before,
+.onda-calendar *::after {
+  box-sizing: border-box;
+}
+
+.onda-calendar button {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.onda-calendar .react-calendar__navigation {
+  display: flex !important;
+  align-items: stretch;
+  min-height: 3rem;
+  margin: 0 0 1rem !important;
+  gap: 0.5rem;
+}
+
+.onda-calendar .react-calendar__navigation button {
+  min-width: 2.7rem;
+  border: 1px solid rgba(192, 132, 252, 0.16) !important;
+  border-radius: 0.375rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
+    rgba(11, 11, 18, 0.82) !important;
+  color: #f5f3ff !important;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.onda-calendar .react-calendar__navigation__arrow {
+  flex: 0 0 2.8rem !important;
+  color: #c084fc !important;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.onda-calendar .react-calendar__navigation__label {
+  flex: 1 1 auto !important;
+  min-width: 0;
+  padding-inline: 0.8rem;
+  color: #ffffff !important;
+  text-shadow: 0 0 18px rgba(192, 132, 252, 0.36);
+}
+
+.onda-calendar .react-calendar__navigation button:enabled:hover,
+.onda-calendar .react-calendar__navigation button:enabled:focus {
+  border-color: rgba(192, 132, 252, 0.62) !important;
+  background:
+    linear-gradient(135deg, rgba(123, 44, 255, 0.34), rgba(192, 132, 252, 0.16)),
+    rgba(11, 11, 18, 0.92) !important;
+  box-shadow: 0 0 22px rgba(123, 44, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+.onda-calendar .react-calendar__navigation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.onda-calendar .react-calendar__viewContainer {
+  overflow: hidden;
+  border: 1px solid rgba(192, 132, 252, 0.14);
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+    rgba(5, 5, 5, 0.38);
+  padding: 0.75rem;
+}
+
+.onda-calendar .react-calendar__month-view__weekdays {
+  display: flex !important;
+  gap: 0.45rem;
+  margin: 0 0 0.55rem !important;
+  color: #c084fc !important;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.onda-calendar .react-calendar__month-view__weekdays__weekday {
+  flex: 0 0 calc((100% - 2.7rem) / 7) !important;
+  max-width: calc((100% - 2.7rem) / 7) !important;
+  padding: 0.2rem 0;
+  text-align: center;
+}
+
+.onda-calendar .react-calendar__month-view__weekdays abbr {
+  text-decoration: none !important;
+}
+
+.onda-calendar .react-calendar__tile {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex: 0 0 calc((100% - 2.7rem) / 7) !important;
+  max-width: calc((100% - 2.7rem) / 7) !important;
+  min-height: 4.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(192, 132, 252, 0.14) !important;
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.068), rgba(255, 255, 255, 0.02)),
+    rgba(11, 11, 18, 0.78) !important;
+  color: #f5f3ff !important;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.65rem;
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.onda-calendar .react-calendar__tile:enabled:hover,
+.onda-calendar .react-calendar__tile:enabled:focus {
+  border-color: rgba(192, 132, 252, 0.62) !important;
+  background:
+    linear-gradient(135deg, rgba(123, 44, 255, 0.26), rgba(192, 132, 252, 0.1)),
+    rgba(11, 11, 18, 0.86) !important;
+  box-shadow: 0 0 20px rgba(123, 44, 255, 0.22);
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+.onda-calendar .react-calendar__tile--now {
+  border-color: rgba(192, 132, 252, 0.72) !important;
+  background:
+    linear-gradient(180deg, rgba(192, 132, 252, 0.18), rgba(16, 185, 129, 0.06)),
+    rgba(11, 11, 18, 0.82) !important;
+  box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.18), 0 0 22px rgba(192, 132, 252, 0.2);
+}
+
+.onda-calendar .react-calendar__tile.onda-calendar-has-availability {
+  border-color: rgba(192, 132, 252, 0.36) !important;
+}
+
+.onda-calendar .react-calendar__tile.onda-calendar-no-availability {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.01)),
+    rgba(24, 24, 27, 0.62) !important;
+  color: rgba(212, 212, 216, 0.76) !important;
+  opacity: 0.7;
+}
+
+.onda-calendar .react-calendar__tile--active,
+.onda-calendar .react-calendar__tile--active:enabled:hover,
+.onda-calendar .react-calendar__tile--active:enabled:focus {
+  border-color: rgba(255, 255, 255, 0.42) !important;
+  background:
+    linear-gradient(135deg, #7b2cff 0%, #a855f7 52%, #c084fc 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 28px rgba(168, 85, 247, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  opacity: 1;
+}
+
+.onda-calendar .react-calendar__month-view__days {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.45rem;
+}
+
+.onda-calendar .react-calendar__month-view__days > button {
+  flex-basis: calc((100% - 2.7rem) / 7) !important;
+  max-width: calc((100% - 2.7rem) / 7) !important;
+}
+
+.onda-calendar .react-calendar__month-view__days__day--neighboringMonth {
+  color: rgba(161, 161, 170, 0.5) !important;
+  opacity: 0.42;
+}
+
+.onda-calendar .react-calendar__tile:disabled {
+  border-color: rgba(113, 113, 122, 0.12) !important;
+  background: rgba(24, 24, 27, 0.52) !important;
+  color: rgba(113, 113, 122, 0.72) !important;
+  cursor: not-allowed;
+}
+
+.onda-calendar .react-calendar__year-view__months,
+.onda-calendar .react-calendar__decade-view__years,
+.onda-calendar .react-calendar__century-view__decades {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.onda-calendar .react-calendar__year-view__months > button,
+.onda-calendar .react-calendar__decade-view__years > button,
+.onda-calendar .react-calendar__century-view__decades > button {
+  flex: initial !important;
+  max-width: none !important;
+  min-height: 3.25rem;
+  justify-content: center;
+  text-align: center;
+}
+
+.onda-calendar-dot {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
+}
+
+.onda-calendar-availability-dot {
+  position: absolute;
+  bottom: 0.55rem;
+  left: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #c084fc;
+  box-shadow: 0 0 14px rgba(192, 132, 252, 0.62);
+}
+
+.onda-calendar .react-calendar__tile--active .onda-calendar-dot {
+  background: #ffffff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.65);
+}
+
+.onda-calendar .react-calendar__tile--active .onda-calendar-availability-dot {
+  background: #ffffff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.65);
+}
+
+@media (max-width: 640px) {
+  .onda-calendar {
+    padding: 0.55rem;
+  }
+
+  .onda-calendar .react-calendar__navigation {
+    gap: 0.35rem;
+    margin-bottom: 0.7rem !important;
+  }
+
+  .onda-calendar .react-calendar__navigation button {
+    min-width: 2.25rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+  }
+
+  .onda-calendar .react-calendar__navigation__arrow {
+    flex-basis: 2.25rem !important;
+    font-size: 1rem;
+  }
+
+  .onda-calendar .react-calendar__viewContainer {
+    padding: 0.45rem;
+  }
+
+  .onda-calendar .react-calendar__month-view__weekdays {
+    gap: 0.25rem;
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+  }
+
+  .onda-calendar .react-calendar__month-view__weekdays__weekday {
+    flex-basis: calc((100% - 1.5rem) / 7) !important;
+    max-width: calc((100% - 1.5rem) / 7) !important;
+  }
+
+  .onda-calendar .react-calendar__tile {
+    min-height: 3.25rem;
+    padding: 0.45rem 0.2rem;
+    font-size: 0.82rem;
+  }
+
+  .onda-calendar .react-calendar__month-view__days {
+    gap: 0.25rem;
+  }
+
+  .onda-calendar .react-calendar__month-view__days > button {
+    flex-basis: calc((100% - 1.5rem) / 7) !important;
+    max-width: calc((100% - 1.5rem) / 7) !important;
+  }
+
+  .onda-calendar-dot,
+  .onda-calendar-availability-dot {
+    bottom: 0.38rem;
+    width: 0.38rem;
+    height: 0.38rem;
+  }
+
+  .onda-calendar-dot {
+    right: 0.38rem;
+  }
+
+  .onda-calendar-availability-dot {
+    left: 0.38rem;
+  }
+}
 }

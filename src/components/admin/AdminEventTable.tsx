@@ -9,21 +9,22 @@ import {
   EyeOff,
   MapPin,
   QrCode,
+  RotateCcw,
   Send,
   Ticket,
   Trash2,
   Users,
 } from 'lucide-react'
+import { useI18n } from '../../hooks/useI18n'
 import {
   type EventRecord,
+  type EventStatus,
   formatEventDate,
   getEventDateRaw,
   getEventLocation,
   getEventStatus,
-  getEventStatusLabel,
   getEventTitle,
   getEventVisibility,
-  getEventVisibilityLabel,
   getTicketButtonLabel,
   hasActiveTicketButton,
   readBoolean,
@@ -41,6 +42,7 @@ type AdminEventTableProps = {
   onDelete: (event: EventRecord) => void
   onEdit: (event: EventRecord) => void
   onPublish: (event: EventRecord) => void
+  onUnarchive: (event: EventRecord) => void
 }
 
 type ActionButtonProps = {
@@ -140,6 +142,10 @@ function ActionLink({
   )
 }
 
+function formatCountMessage(template: string, count: number) {
+  return template.replace('{count}', String(count))
+}
+
 export default function AdminEventTable({
   busyEventId = null,
   errorMessage = '',
@@ -150,15 +156,40 @@ export default function AdminEventTable({
   onDelete,
   onEdit,
   onPublish,
+  onUnarchive,
 }: AdminEventTableProps) {
+  const { t } = useI18n()
+  const eventStatusLabels: Record<EventStatus, string> = {
+    archived: t('event-table.status.archived'),
+    cancelled: t('event-table.status.cancelled'),
+    draft: t('event-table.status.draft'),
+    upcoming: t('event-table.status.published'),
+  }
+  const activeEventsCount = events.filter((event) => getEventStatus(event) !== 'archived').length
+  const archivedEventsCount = events.filter((event) => getEventStatus(event) === 'archived').length
+  const activeCountLabel = formatCountMessage(
+    t(activeEventsCount === 1 ? 'event-table.active-count-singular' : 'event-table.active-count-plural'),
+    activeEventsCount,
+  )
+  const archivedCountLabel = formatCountMessage(
+    t(archivedEventsCount === 1 ? 'event-table.archived-count-singular' : 'event-table.archived-count-plural'),
+    archivedEventsCount,
+  )
+  const panelCountLabel =
+    activeEventsCount > 0 && archivedEventsCount > 0
+      ? `${activeCountLabel} - ${archivedCountLabel}`
+      : archivedEventsCount > 0
+        ? archivedCountLabel
+        : activeCountLabel
+
   return (
     <div className="glass-panel w-full min-w-0 max-w-full overflow-hidden rounded-lg border-onda-lavender/30 bg-onda-black/72 shadow-[0_0_34px_rgba(123,44,255,0.18)]">
       <div className="min-w-0 border-b border-onda-purple/15 px-5 py-4">
         <h3 className="font-display text-lg font-bold uppercase tracking-[0.14em] text-zinc-950 dark:text-white">
-          Eventos
+          {t('event-table.title')}
         </h3>
         <p className="mt-1 text-sm text-zinc-600 dark:text-onda-muted">
-          {events.length} eventos activos en el panel
+          {panelCountLabel}
         </p>
       </div>
 
@@ -166,21 +197,21 @@ export default function AdminEventTable({
         <table className="w-full min-w-[1180px] text-left text-sm">
           <thead className="bg-onda-purple/10 text-xs uppercase tracking-[0.14em] text-onda-purple dark:text-onda-lavender">
             <tr>
-              <th className="px-4 py-3">Evento</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Lugar</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Acceso</th>
-              <th className="px-4 py-3">Tickets</th>
+              <th className="px-4 py-3">{t('event-table.event')}</th>
+              <th className="px-4 py-3">{t('event-table.date')}</th>
+              <th className="px-4 py-3">{t('event-table.location')}</th>
+              <th className="px-4 py-3">{t('event-table.status')}</th>
+              <th className="px-4 py-3">{t('event-table.access')}</th>
+              <th className="px-4 py-3">{t('event-table.tickets')}</th>
               <th className="px-4 py-3">QR</th>
-              <th className="w-[13rem] px-4 py-3">Acciones</th>
+              <th className="w-[13rem] px-4 py-3">{t('event-table.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-onda-purple/10">
             {isLoading ? (
               <tr>
                 <td className="px-4 py-6 text-zinc-600 dark:text-onda-muted" colSpan={8}>
-                  Cargando eventos...
+                  {t('event-table.loading')}
                 </td>
               </tr>
             ) : null}
@@ -196,7 +227,7 @@ export default function AdminEventTable({
             {!isLoading && !errorMessage && events.length === 0 ? (
               <tr>
                 <td className="px-4 py-6 text-zinc-600 dark:text-onda-muted" colSpan={8}>
-                  No hay eventos activos. Crea un borrador para empezar.
+                  {t('event-table.empty')}
                 </td>
               </tr>
             ) : null}
@@ -204,7 +235,7 @@ export default function AdminEventTable({
             {events.map((event) => {
               const eventTitle = getEventTitle(event)
               const eventDate = formatEventDate(getEventDateRaw(event))
-              const eventLocation = getEventLocation(event) || 'Sin lugar'
+              const eventLocation = getEventLocation(event) || t('event-table.no-location')
               const eventStatus = getEventStatus(event)
               const eventVisibility = getEventVisibility(event)
               const hasTickets = hasActiveTicketButton(event)
@@ -243,7 +274,7 @@ export default function AdminEventTable({
                   </td>
                   <td className="px-4 py-4">
                     <Badge variant={eventStatus === 'draft' ? 'warning' : 'neutral'}>
-                      {getEventStatusLabel(event)}
+                      {eventStatusLabels[eventStatus]}
                     </Badge>
                   </td>
                   <td className="px-4 py-4">
@@ -253,7 +284,7 @@ export default function AdminEventTable({
                       ) : (
                         <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
                       )}
-                      {eventVisibility === 'public' ? getEventVisibilityLabel(event) : 'Solo invitacion'}
+                      {eventVisibility === 'public' ? t('event-table.public-access') : t('event-table.invite-only')}
                     </Badge>
                   </td>
                   <td className="px-4 py-4 text-zinc-600 dark:text-onda-muted">
@@ -270,7 +301,7 @@ export default function AdminEventTable({
                     ) : (
                       <span className="inline-flex items-center gap-2 text-zinc-500 dark:text-onda-muted">
                         <Ticket className="h-4 w-4" aria-hidden="true" />
-                        No activo
+                        {t('common.inactive')}
                       </span>
                     )}
                   </td>
@@ -278,10 +309,10 @@ export default function AdminEventTable({
                     {qrEnabled ? (
                       <Badge variant="public">
                         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Activo
+                        {t('common.active')}
                       </Badge>
                     ) : (
-                      <span className="text-zinc-500 dark:text-onda-muted">Inactivo</span>
+                      <span className="text-zinc-500 dark:text-onda-muted">{t('common.inactive')}</span>
                     )}
                   </td>
                   <td className="px-4 py-4">
@@ -292,13 +323,13 @@ export default function AdminEventTable({
                         disabled={isBusy}
                         variant="ghost"
                       >
-                        Editar
+                        {t('common.edit')}
                       </ActionButton>
                       <ActionLink
                         to={`/admin/eventos/${event.id}/asistentes`}
                         icon={<Users className="h-4 w-4" aria-hidden="true" />}
                       >
-                        Invitaciones
+                        {t('event-table.invitations')}
                       </ActionLink>
                       {qrEnabled ? (
                         <ActionLink
@@ -306,7 +337,7 @@ export default function AdminEventTable({
                           icon={<QrCode className="h-4 w-4" aria-hidden="true" />}
                           variant="primary"
                         >
-                          Validar
+                          {t('event-table.validate')}
                         </ActionLink>
                       ) : null}
                       {eventStatus === 'draft' ? (
@@ -316,26 +347,35 @@ export default function AdminEventTable({
                           disabled={isBusy}
                           variant="primary"
                         >
-                          Publicar
+                          {t('event-table.publish')}
                         </ActionButton>
                       ) : null}
-                      {eventStatus !== 'archived' ? (
+                      {eventStatus === 'archived' ? (
+                        <ActionButton
+                          icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}
+                          onClick={() => onUnarchive(event)}
+                          disabled={isBusy}
+                          variant="primary"
+                        >
+                          {t('event-table.unarchive')}
+                        </ActionButton>
+                      ) : (
                         <ActionButton
                           icon={<Archive className="h-4 w-4" aria-hidden="true" />}
                           onClick={() => onArchive(event)}
                           disabled={isBusy}
                           variant="secondary"
                         >
-                          Archivar
+                          {t('event-table.archive')}
                         </ActionButton>
-                      ) : null}
+                      )}
                       <ActionButton
                         icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
                         onClick={() => onDelete(event)}
                         disabled={isBusy}
                         variant="danger"
                       >
-                        Eliminar
+                        {t('common.delete')}
                       </ActionButton>
                     </div>
                   </td>

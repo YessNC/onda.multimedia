@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CTAButton from '../components/shared/CTAButton'
 import SectionTitle from '../components/shared/SectionTitle'
-import { supabase } from '../lib/supabaseClient'
+import { supabaseAdmin } from '../lib/supabaseAdminClient'
 
 const resetEmailMessage =
   'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.'
@@ -32,13 +32,13 @@ export default function AdminResetPassword() {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabaseAdmin.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveryMode(true)
       }
     })
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabaseAdmin.auth.getSession().then(({ data }) => {
       if (data.session && hasRecoveryParams()) {
         setIsRecoveryMode(true)
       }
@@ -59,7 +59,7 @@ export default function AdminResetPassword() {
 
     setIsLoading(true)
 
-    await supabase.auth.resetPasswordForEmail(email.trim(), {
+    await supabaseAdmin.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/admin/reset-password`,
     })
 
@@ -84,7 +84,7 @@ export default function AdminResetPassword() {
 
     setIsLoading(true)
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    const { error } = await supabaseAdmin.auth.updateUser({ password: newPassword })
 
     if (error) {
       setErrorMessage('No pudimos actualizar la contraseña. Abre nuevamente el enlace del correo.')
@@ -92,7 +92,7 @@ export default function AdminResetPassword() {
       return
     }
 
-    await supabase.auth.signOut()
+    await supabaseAdmin.auth.signOut()
     navigate('/admin/login', { replace: true })
   }
 

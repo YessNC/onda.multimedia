@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import CTAButton from '../shared/CTAButton'
-import { supabase } from '../../lib/supabaseClient'
+import { supabaseAdmin } from '../../lib/supabaseAdminClient'
 
 type AdminSignOutButtonProps = {
   className?: string
@@ -20,7 +20,7 @@ export default function AdminSignOutButton({
     if (isSigningOut) return
 
     setIsSigningOut(true)
-    await supabase.auth.signOut()
+    await supabaseAdmin.auth.signOut()
     navigate('/admin/login', { replace: true })
   }
 

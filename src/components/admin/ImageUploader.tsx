@@ -9,7 +9,7 @@ import {
   readString,
 } from '../../lib/events'
 import { sanitizeFileName } from '../../lib/invitations'
-import { supabase } from '../../lib/supabaseClient'
+import { supabaseAdmin as supabase } from '../../lib/supabaseAdminClient'
 import { cn } from '../../lib/utils'
 
 type UploadState = 'idle' | 'drag-over' | 'uploading' | 'success' | 'error'
