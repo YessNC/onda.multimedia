@@ -524,6 +524,7 @@ export default {
   'adminAvailability.error.weekdaysRequired': 'Selecciona al menos un dia.',
   'adminAvailability.error.updateNotApplied': 'No pudimos aplicar el cambio. Revisa tus permisos o intenta nuevamente.',
   'adminAvailability.error.bookingCancelFailed': 'No se pudo cancelar la reserva. Verifica permisos o recarga la pagina.',
+  'adminAvailability.error.bookingPermanentDeleteFailed': 'No pudimos eliminar definitivamente la reserva.',
   'adminAvailability.error.userAlreadyLinked': 'Ese usuario ya esta vinculado a otro miembro del equipo.',
   'adminAvailability.error.similarProducerExists': 'Ya existe un miembro similar. Revisa antes de crear otro.',
   'adminAvailability.error.adminPermission': 'Sesion admin invalida o sin permisos RLS para ejecutar esta accion.',
@@ -642,6 +643,11 @@ export default {
   'adminAvailability.bookings.cancelConfirm': 'Cancelar esta reserva? La reserva quedara cancelada y el horario volvera a estar disponible.',
   'adminAvailability.bookings.confirmCancel': 'Cancelar reserva',
   'adminAvailability.bookings.deleteConfirm': 'Eliminar esta reserva? La reserva quedara cancelada y el horario volvera a estar disponible.',
+  'adminAvailability.bookings.deletePermanently': 'Eliminar definitivamente',
+  'adminAvailability.bookings.deletePermanentConfirm':
+    '¿Eliminar definitivamente esta reserva? Esta acción no se puede deshacer. Usa esto solo para reservas de prueba o registros creados por error.',
+  'adminAvailability.bookings.confirmDeletePermanently': 'Sí, eliminar definitivamente',
+  'adminAvailability.bookings.goBack': 'Volver',
   'adminAvailability.discounts.title': 'Codigos de descuento',
   'adminAvailability.discounts.code': 'Codigo',
   'adminAvailability.discounts.type': 'Tipo de descuento',
@@ -686,6 +692,7 @@ export default {
   'adminAvailability.message.deactivated': 'Elemento desactivado.',
   'adminAvailability.message.bookingStatusUpdated': 'Estado de reserva actualizado.',
   'adminAvailability.message.bookingCancelled': 'Reserva cancelada correctamente.',
+  'adminAvailability.message.bookingDeletedPermanently': 'Reserva eliminada definitivamente.',
   'adminAvailability.message.fileUploaded': 'Archivo subido correctamente.',
 
   // Scratch card
