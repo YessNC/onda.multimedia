@@ -582,7 +582,7 @@ export default function StudioBookingModal({
       const result = await createBooking({
         bookingDate: bookingForm.bookingDate,
         clientId,
-        discountCode: appliedDiscountCode,
+        discountCode: appliedDiscountCode || bookingForm.discountCode.trim() || null,
         endTime: selectedRangeEnd,
         notes: bookingForm.notes.trim() || null,
         producerId: selectedService.requires_producer ? bookingForm.producerId : null,
