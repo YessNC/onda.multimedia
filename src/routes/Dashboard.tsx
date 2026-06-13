@@ -290,7 +290,10 @@ export default function Dashboard() {
         <StudioBookingModal
           availabilityExceptions={availabilityExceptions}
           availabilityRules={availabilityRules}
+          clientEmail={user.email}
           clientId={user.id}
+          clientName={user.full_name}
+          clientPhone={user.phone ?? null}
           initialSelection={bookingInitialSelection}
           open={bookingModalOpen}
           producers={producers}
