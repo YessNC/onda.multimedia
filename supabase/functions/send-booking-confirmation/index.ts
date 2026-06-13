@@ -22,7 +22,7 @@ const internalBookingNotificationEmail = 'contacto@ondamultimedia.com'
 const producerEmails: Record<string, string> = {
   'giovan-e': 'ilgiovane2026@gmail.com',
   'raul allende': 'rnicolas.allende@gmail.com',
-  'yessie neira': '',
+  'yessie neira': 'yessie_neira@icloud.com',
   zeta: '',
 }
 
