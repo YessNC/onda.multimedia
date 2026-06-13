@@ -53,15 +53,15 @@ function splitName(fullName: string | null, email: string) {
   }
 
   function buildReachNote(recipient: ReachRecipient) {
-    const variables = recipient.template_variables ?? {}
-    const noteParts = [
-      stringValue(variables.community_consent) === 'true' ? 'Comunidad Onda' : '',
-      'Reserva Onda',
-      stringValue(variables.discount_code) ? `Desc:${stringValue(variables.discount_code)}` : '',
-      stringValue(variables.payment_status) ? `Pago:${stringValue(variables.payment_status)}` : '',
-    ]
+    if (recipient.event_type === 'booking_confirmed') {
+      return 'Reserva Onda'
+    }
 
-    return truncateReachNote(noteParts.filter(Boolean).join(' | '))
+    if (recipient.event_type === 'booking_cancelled') {
+      return 'Reserva cancelada'
+    }
+
+    return 'Onda Multimedia'
   }
 
 async function logEmail(recipient: ReachRecipient, status: 'failed' | 'synced', errorMessage?: string, providerMessageId?: string) {
