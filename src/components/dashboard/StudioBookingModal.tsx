@@ -28,6 +28,7 @@ import {
   timeFromMinutes,
   toDateKey,
 } from '../../lib/dashboard'
+import { supabase } from '../../lib/supabaseClient'
 import { cn } from '../../lib/utils'
 
 export interface BookingModalInitialSelection {
@@ -57,7 +58,10 @@ interface BookingForm {
 interface StudioBookingModalProps {
   availabilityExceptions: AvailabilityException[]
   availabilityRules: AvailabilityRule[]
+  clientEmail: string
   clientId: string
+  clientName: string
+  clientPhone?: string | null
   initialSelection: BookingModalInitialSelection | null
   open: boolean
   producers: Producer[]
@@ -133,7 +137,10 @@ function buildInitialForm(
 export default function StudioBookingModal({
   availabilityExceptions,
   availabilityRules,
+  clientEmail,
   clientId,
+  clientName,
+  clientPhone,
   initialSelection,
   open,
   producers,
@@ -594,6 +601,26 @@ export default function StudioBookingModal({
         startTime: selectedRangeStart,
         studioId: selectedService.requires_studio ? bookingForm.studioId : null,
       })
+
+      const selectedStudio = studios.find((studio) => studio.id === bookingForm.studioId)
+      const selectedProducer = producers.find((producer) => producer.id === bookingForm.producerId)
+      const bookingConfirmation = await supabase.functions.invoke('send-booking-confirmation', {
+        body: {
+          customerName: clientName,
+          date: bookingForm.bookingDate,
+          email: clientEmail,
+          phone: clientPhone ?? null,
+          producer: selectedProducer?.name ?? null,
+          service: selectedService.name,
+          studio: selectedStudio?.name ?? null,
+          time: `${selectedRangeStart} - ${selectedRangeEnd}`,
+        },
+      })
+
+      if (bookingConfirmation.error || bookingConfirmation.data?.success === false) {
+        console.warn('La reserva fue creada, pero no se pudo enviar el correo de confirmación.', bookingConfirmation.error ?? bookingConfirmation.data)
+      }
+
       await onBookingCreated(result)
       clearBookingDraft()
       onClose()
