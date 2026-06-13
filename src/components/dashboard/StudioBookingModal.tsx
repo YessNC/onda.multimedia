@@ -604,21 +604,27 @@ export default function StudioBookingModal({
 
       const selectedStudio = studios.find((studio) => studio.id === bookingForm.studioId)
       const selectedProducer = producers.find((producer) => producer.id === bookingForm.producerId)
-      const bookingConfirmation = await supabase.functions.invoke('send-booking-confirmation', {
-        body: {
-          customerName: clientName,
-          date: bookingForm.bookingDate,
-          email: clientEmail,
-          phone: clientPhone ?? null,
-          producer: selectedProducer?.name ?? null,
-          service: selectedService.name,
-          studio: selectedStudio?.name ?? null,
-          time: `${selectedRangeStart} - ${selectedRangeEnd}`,
-        },
-      })
+      const normalizedClientEmail = clientEmail.trim()
 
-      if (bookingConfirmation.error || bookingConfirmation.data?.success === false) {
-        console.warn('La reserva fue creada, pero no se pudo enviar el correo de confirmación.', bookingConfirmation.error ?? bookingConfirmation.data)
+      if (normalizedClientEmail) {
+        const bookingConfirmation = await supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            customerName: clientName,
+            date: bookingForm.bookingDate,
+            email: normalizedClientEmail,
+            phone: clientPhone ?? null,
+            producer: selectedProducer?.name ?? null,
+            service: selectedService.name,
+            studio: selectedStudio?.name ?? null,
+            time: `${selectedRangeStart} - ${selectedRangeEnd}`,
+          },
+        })
+
+        if (bookingConfirmation.error || bookingConfirmation.data?.success === false) {
+          console.warn('La reserva fue creada, pero no se pudo enviar el correo de confirmación.', bookingConfirmation.error ?? bookingConfirmation.data)
+        }
+      } else {
+        console.warn('La reserva fue creada, pero no hay email de cliente para enviar confirmación.')
       }
 
       await onBookingCreated(result)
