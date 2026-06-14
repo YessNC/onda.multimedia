@@ -84,7 +84,7 @@ export default function Header() {
             onClick={handleLogin}
             aria-label="Log in"
             className={cn(
-              'inline-flex items-center justify-center relative overflow-hidden',
+              'relative hidden items-center justify-center overflow-hidden lg:inline-flex',
               'h-9 px-5',
               'rounded-md',
               'font-display text-[0.7rem] font-semibold uppercase tracking-[0.2em]',
@@ -128,8 +128,10 @@ export default function Header() {
 
         <MobileMenu 
           isOpen={isOpen} 
-          navItems={[...navItems, { label: 'LOG IN', to: '/login' }]}
-          onClose={() => setIsOpen(false)} 
+          navItems={navItems}
+          loginLabel="LOG IN"
+          onClose={() => setIsOpen(false)}
+          onLoginClick={handleLogin} 
         />
       </div>
     </header>

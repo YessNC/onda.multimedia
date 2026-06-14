@@ -11,10 +11,12 @@ export type NavItem = {
 type MobileMenuProps = {
   isOpen: boolean
   navItems: NavItem[]
+  loginLabel: string
   onClose: () => void
+  onLoginClick: () => void
 }
 
-export default function MobileMenu({ isOpen, navItems, onClose }: MobileMenuProps) {
+export default function MobileMenu({ isOpen, navItems, loginLabel, onClose, onLoginClick }: MobileMenuProps) {
   const { t } = useI18n()
   return (
     <AnimatePresence>
@@ -46,6 +48,25 @@ export default function MobileMenu({ isOpen, navItems, onClose }: MobileMenuProp
                 </NavLink>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                onLoginClick()
+              }}
+              aria-label={loginLabel}
+              className="group relative mt-4 inline-flex h-11 w-full items-center justify-center overflow-hidden rounded-md border border-onda-purple/40 bg-white/90 px-5 font-display text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-onda-purple shadow-[0_0_15px_rgba(123,44,255,0.15)] transition-all duration-300 ease-out hover:border-onda-purple hover:bg-onda-purple/5 hover:shadow-[0_0_30px_rgba(123,44,255,0.35)] dark:border-onda-lavender/45 dark:bg-white/8 dark:text-onda-lavender dark:hover:shadow-[0_0_35px_rgba(123,44,255,0.45)]"
+            >
+              <span className="pointer-events-none absolute inset-0 rounded-md">
+                <span className="absolute inset-0 rounded-md bg-onda-purple/0 transition-all duration-500 group-hover:bg-onda-purple/5" />
+                <span className="absolute -inset-1 rounded-md border border-onda-purple/0 opacity-0 scale-90 transition-all duration-500 group-hover:scale-100 group-hover:border-onda-purple/30 group-hover:opacity-100" />
+              </span>
+              <span className="absolute inset-0 -translate-x-full skew-x-12 bg-gradient-to-r from-transparent via-onda-purple/15 to-transparent transition-transform duration-700 ease-in-out group-hover:translate-x-full" />
+              <span className="relative z-10 inline-block transition-transform duration-300 group-hover:scale-105">
+                {loginLabel}
+              </span>
+            </button>
+
             <CTAButton to="/contacto" className="mt-3 w-full" onClick={onClose}>
               {t('nav.quote-full')}
             </CTAButton>
