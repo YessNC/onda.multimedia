@@ -178,7 +178,7 @@ export function RegisterForm() {
         label="Contrasena"
         error={errors.password}
         autoComplete="new-password"
-        placeholder="Minimo 6 caracteres"
+        placeholder="Mínimo 8 caracteres"
       />
 
       <PasswordInput
