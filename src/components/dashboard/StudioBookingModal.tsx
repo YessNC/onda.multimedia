@@ -610,14 +610,21 @@ export default function StudioBookingModal({
         const bookingConfirmation = await supabase.functions.invoke('send-booking-confirmation', {
           body: {
             customerName: clientName,
+            bookingStatus: result.status,
+            currency: result.currency,
             date: bookingForm.bookingDate,
+            depositAmount: result.deposit_amount,
+            depositAmountDue: result.deposit_amount_due,
+            discountCode: appliedDiscountCode || bookingForm.discountCode.trim() || null,
             email: normalizedClientEmail || null,
+            paymentStatus: result.payment_status,
             phone: clientPhone ?? null,
             notes: bookingForm.notes.trim() || null,
             producer: selectedProducer?.name ?? null,
             service: selectedService.name,
             studio: selectedStudio?.name ?? null,
             time: `${selectedRangeStart} - ${selectedRangeEnd}`,
+            totalAmount: result.total_amount,
           },
         })
 

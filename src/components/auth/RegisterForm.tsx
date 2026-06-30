@@ -188,7 +188,7 @@ export function RegisterForm() {
         label="Confirmar contrasena"
         error={errors.confirmPassword}
         autoComplete="new-password"
-        placeholder="Repite tu contrasena"
+        placeholder="Repite tu contraseña"
       />
 
       {errors.submit ? (

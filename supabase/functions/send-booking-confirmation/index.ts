@@ -9,6 +9,13 @@ type BookingConfirmationPayload = {
   service?: string | null
   bookingType?: string | null
   notes?: string | null
+  bookingStatus?: string | null
+  currency?: string | null
+  depositAmount?: number | string | null
+  depositAmountDue?: number | string | null
+  discountCode?: string | null
+  paymentStatus?: string | null
+  totalAmount?: number | string | null
 }
 
 const corsHeaders = {
@@ -17,9 +24,10 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
 }
 
-const internalBookingNotificationEmail = 'contacto@ondamultimedia.com'
+const adminBookingUrl = 'https://ondamultimedia.com/admin'
 
-const producerEmails: Record<string, string> = {
+// Email de notificación por responsable/productor. Dejar vacío hasta confirmar el correo real.
+const producerNotificationEmails: Record<string, string> = {
   'giovan-e': 'ilgiovane2026@gmail.com',
   'raul allende': 'rnicolas.allende@gmail.com',
   'yessie neira': 'yessie_neira@icloud.com',
@@ -50,15 +58,22 @@ function normalizePayload(payload: BookingConfirmationPayload) {
   const service = readText(payload.service) || readText(payload.bookingType)
 
   return {
+    bookingStatus: readText(payload.bookingStatus),
+    currency: readText(payload.currency) || 'CLP',
     customerName: readText(payload.customerName),
     date: readText(payload.date),
+    depositAmount: payload.depositAmount,
+    depositAmountDue: payload.depositAmountDue,
+    discountCode: readText(payload.discountCode),
     email: readText(payload.email).toLowerCase(),
     notes: readText(payload.notes),
+    paymentStatus: readText(payload.paymentStatus),
     phone: readText(payload.phone),
     producer: readText(payload.producer),
     service,
     studio: readText(payload.studio),
     time: readText(payload.time),
+    totalAmount: payload.totalAmount,
   }
 }
 
@@ -81,72 +96,41 @@ function uniqueRecipients(recipients: string[]) {
     })
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+function formatMoney(value: number | string | null | undefined, currency: string) {
+  const amount = typeof value === 'number' ? value : Number(readText(value))
+
+  if (!Number.isFinite(amount) || amount <= 0) return '$0'
+
+  return new Intl.NumberFormat('es-CL', {
+    currency: currency || 'CLP',
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(amount)
 }
 
-function formatValue(value: string) {
-  return value || 'Por confirmar'
-}
+function buildResponsibleTemplateVariables(booking: ReturnType<typeof normalizePayload>) {
+  const depositAmount = Number(booking.depositAmountDue ?? booking.depositAmount ?? 0)
+  const totalAmount = Number(booking.totalAmount ?? 0)
+  const remainingAmount = Math.max(totalAmount - (Number.isFinite(depositAmount) ? depositAmount : 0), 0)
 
-function buildInternalBookingNotificationHtml(booking: ReturnType<typeof normalizePayload>) {
-  const rows = [
-    ['Nombre del cliente', formatValue(booking.customerName)],
-    ['Email del cliente', formatValue(booking.email)],
-    ['Teléfono', formatValue(booking.phone)],
-    ['Servicio', formatValue(booking.service)],
-    ['Estudio seleccionado', formatValue(booking.studio)],
-    ['Productor seleccionado', formatValue(booking.producer)],
-    ['Fecha', formatValue(booking.date)],
-    ['Hora', formatValue(booking.time)],
-  ]
-
-  if (booking.notes) {
-    rows.push(['Notas', booking.notes])
+  return {
+    ADMIN_BOOKING_URL: adminBookingUrl,
+    BOOKING_DATE: booking.date || '-',
+    BOOKING_STATUS: booking.bookingStatus || 'Pendiente',
+    BOOKING_TIME: booking.time || '-',
+    CUSTOMER_EMAIL: booking.email || '-',
+    CUSTOMER_NAME: booking.customerName || '-',
+    CUSTOMER_PHONE: booking.phone || '-',
+    DEPOSIT_AMOUNT: formatMoney(booking.depositAmountDue ?? booking.depositAmount, booking.currency),
+    DISCOUNT_CODE: booking.discountCode || 'Sin descuento',
+    PAYMENT_STATUS: booking.paymentStatus || 'Pendiente',
+    PRODUCER: booking.producer || '-',
+    REMAINING_AMOUNT: formatMoney(remainingAmount, booking.currency),
+    RESPONSIBLE_NAME: booking.producer || 'Equipo Onda Multimedia',
+    SERVICE: booking.service || '-',
+    STUDIO: booking.studio || '-',
+    TOTAL_AMOUNT: formatMoney(booking.totalAmount, booking.currency),
   }
-
-  const rowHtml = rows
-    .map(
-      ([label, value]) =>
-        `<tr><th align="left" style="padding:8px 12px;border-bottom:1px solid #eee;background:#fafafa;">${escapeHtml(label)}</th><td style="padding:8px 12px;border-bottom:1px solid #eee;">${escapeHtml(value)}</td></tr>`,
-    )
-    .join('')
-
-  return `
-    <div style="font-family:Arial,sans-serif;color:#18181b;line-height:1.5;">
-      <h1 style="font-size:20px;margin:0 0 12px;">Nueva reserva de estudio</h1>
-      <p style="margin:0 0 16px;">Se registró una nueva reserva en Onda Multimedia.</p>
-      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:640px;">
-        <tbody>${rowHtml}</tbody>
-      </table>
-    </div>
-  `
-}
-
-function buildInternalBookingNotificationText(booking: ReturnType<typeof normalizePayload>) {
-  const lines = [
-    'Nueva reserva de estudio',
-    '',
-    `Nombre del cliente: ${formatValue(booking.customerName)}`,
-    `Email del cliente: ${formatValue(booking.email)}`,
-    `Teléfono: ${formatValue(booking.phone)}`,
-    `Servicio: ${formatValue(booking.service)}`,
-    `Estudio seleccionado: ${formatValue(booking.studio)}`,
-    `Productor seleccionado: ${formatValue(booking.producer)}`,
-    `Fecha: ${formatValue(booking.date)}`,
-    `Hora: ${formatValue(booking.time)}`,
-  ]
-
-  if (booking.notes) {
-    lines.push(`Notas: ${booking.notes}`)
-  }
-
-  return lines.join('\n')
 }
 
 async function sendResendEmail(resendApiKey: string, body: Record<string, unknown>) {
@@ -195,7 +179,8 @@ Deno.serve(async (request) => {
   const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? ''
   const resendFrom = Deno.env.get('RESEND_FROM') ?? ''
   const resendBookingTemplateId = Deno.env.get('RESEND_BOOKING_TEMPLATE_ID') ?? ''
-  const resendInternalBookingTemplateId = Deno.env.get('RESEND_INTERNAL_BOOKING_TEMPLATE_ID') ?? ''
+  const resendResponsibleTemplateId = Deno.env.get('RESEND_RESPONSIBLE_TEMPLATE_ID') ?? ''
+  const resendContactEmail = Deno.env.get('RESEND_CONTACT_EMAIL') ?? ''
 
   if (!resendApiKey || !resendFrom) {
     console.error('Resend email service is missing required environment variables.', {
@@ -262,11 +247,11 @@ Deno.serve(async (request) => {
     console.warn('Client booking confirmation skipped because customer email is missing.')
   }
 
-  const internalRecipients = [internalBookingNotificationEmail]
+  const internalRecipients = [resendContactEmail]
 
   if (booking.producer) {
     const producerKey = normalizeProducerName(booking.producer)
-    const producerEmail = producerEmails[producerKey]
+    const producerEmail = producerNotificationEmails[producerKey]
 
     if (isConfiguredEmail(producerEmail)) {
       internalRecipients.push(producerEmail)
@@ -277,48 +262,39 @@ Deno.serve(async (request) => {
     console.warn('Producer email not configured for: Por confirmar')
   }
 
-  try {
-    console.log('Sending internal booking notification')
+  const responsibleTemplateVariables = buildResponsibleTemplateVariables(booking)
+  const internalRecipientsList = uniqueRecipients(internalRecipients)
 
-    const internalEmailBody: Record<string, unknown> = {
-      from: resendFrom,
-      subject: 'Nueva reserva de estudio - Onda Multimedia',
-      to: uniqueRecipients(internalRecipients),
-    }
+  if (!resendResponsibleTemplateId) {
+    console.warn('Internal booking notification skipped: missing RESEND_RESPONSIBLE_TEMPLATE_ID.')
+  } else if (internalRecipientsList.length === 0) {
+    console.warn('Internal booking notification skipped: no valid internal recipients configured.')
+  } else {
+    try {
+      console.log('Sending internal booking notification')
 
-    if (resendInternalBookingTemplateId) {
-      internalEmailBody.template = {
-        id: resendInternalBookingTemplateId,
-        variables: {
-          BOOKING_DATE: booking.date || 'Por confirmar',
-          BOOKING_TIME: booking.time || 'Por confirmar',
-          CUSTOMER_EMAIL: booking.email || 'Por confirmar',
-          CUSTOMER_NAME: booking.customerName || 'Por confirmar',
-          NOTES: booking.notes || '',
-          PHONE: booking.phone || 'Por confirmar',
-          PRODUCER: booking.producer || 'Por confirmar',
-          SERVICE: booking.service || 'Por confirmar',
-          STUDIO: booking.studio || 'Por confirmar',
+      const { resendResponse, responseBody } = await sendResendEmail(resendApiKey, {
+        from: resendFrom,
+        subject: 'Nueva reserva de estudio - Onda Multimedia',
+        template: {
+          id: resendResponsibleTemplateId,
+          variables: responsibleTemplateVariables,
         },
-      }
-    } else {
-      internalEmailBody.html = buildInternalBookingNotificationHtml(booking)
-      internalEmailBody.text = buildInternalBookingNotificationText(booking)
-    }
-
-    const { resendResponse, responseBody } = await sendResendEmail(resendApiKey, internalEmailBody)
-
-    if (!resendResponse.ok) {
-      console.error('Internal booking notification failed', {
-        message: responseBody.message ?? responseBody.error ?? 'Unknown Resend error.',
-        status: resendResponse.status,
+        to: internalRecipientsList,
       })
+
+      if (!resendResponse.ok) {
+        console.error('Internal booking notification failed', {
+          message: responseBody.message ?? responseBody.error ?? 'Unknown Resend error.',
+          status: resendResponse.status,
+        })
+      }
+    } catch (internalError) {
+      console.error(
+        'Internal booking notification failed',
+        internalError instanceof Error ? internalError.message : internalError,
+      )
     }
-  } catch (internalError) {
-    console.error(
-      'Internal booking notification failed',
-      internalError instanceof Error ? internalError.message : internalError,
-    )
   }
 
   if (clientEmailError) {
