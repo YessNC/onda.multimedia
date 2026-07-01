@@ -697,5 +697,6 @@ export default {
 
   // Scratch card
   'scratch.discover': 'Descubre con la manito',
+  'scratch.tap-discover': 'Toca para descubrir',
   'scratch.image-aria': 'Descubrir imagen:',
 } 

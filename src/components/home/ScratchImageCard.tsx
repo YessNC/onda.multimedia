@@ -1,5 +1,5 @@
 import { Hand, Sparkles } from 'lucide-react'
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { cn } from '../../lib/utils'
 import { useI18n } from '../../hooks/useI18n' 
@@ -79,6 +79,8 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
   const lastPointRef = useRef<ScratchPoint | null>(null)
   const [isMissing, setIsMissing] = useState(false)
   const [hasScratched, setHasScratched] = useState(false)
+  const [isTouchMode, setIsTouchMode] = useState(false)
+  const [isTapRevealed, setIsTapRevealed] = useState(false)
   const { t } = useI18n()
 
   const drawCover = useCallback(() => {
@@ -104,6 +106,25 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
     hasScratchedRef.current = false
     lastPointRef.current = null
     setHasScratched(false)
+    setIsTapRevealed(false)
+  }, [])
+
+  useEffect(() => {
+    const mobileQuery = window.matchMedia('(max-width: 1023px)')
+    const coarsePointerQuery = window.matchMedia('(pointer: coarse)')
+
+    const updateTouchMode = () => {
+      setIsTouchMode(mobileQuery.matches || coarsePointerQuery.matches)
+    }
+
+    updateTouchMode()
+    mobileQuery.addEventListener('change', updateTouchMode)
+    coarsePointerQuery.addEventListener('change', updateTouchMode)
+
+    return () => {
+      mobileQuery.removeEventListener('change', updateTouchMode)
+      coarsePointerQuery.removeEventListener('change', updateTouchMode)
+    }
   }, [])
 
   useLayoutEffect(() => {
@@ -184,6 +205,14 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
     })
   }
 
+  const revealForTouch = () => {
+    if (!isTouchMode || isTapRevealed) return
+
+    hasScratchedRef.current = true
+    setHasScratched(true)
+    setIsTapRevealed(true)
+  }
+
   const handlePointerLeave = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === 'mouse') {
       lastPointRef.current = null
@@ -191,6 +220,8 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    if (isTouchMode && event.pointerType !== 'mouse') return
+
     const point = getCanvasPoint(event)
 
     if (!point) return
@@ -205,6 +236,8 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (isTouchMode && event.pointerType !== 'mouse') return
+
     const point = getCanvasPoint(event)
 
     if (!point) return
@@ -234,6 +267,11 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
     if (event.key !== 'Enter' && event.key !== ' ') return
 
     event.preventDefault()
+    if (isTouchMode) {
+      revealForTouch()
+      return
+    }
+
     scratchCenter()
   }
 
@@ -243,11 +281,13 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
       type="button"
       aria-label={`${t('scratch.image-aria')} ${alt}`}
       className={cn(
-        'group/scratch relative block h-full min-h-56 w-full touch-none appearance-none overflow-hidden rounded-lg border border-onda-lavender/20 bg-onda-black/80 p-0 text-left outline-none',
+        'group/scratch relative block h-full min-h-56 w-full appearance-none overflow-hidden rounded-lg border border-onda-lavender/20 bg-onda-black/80 p-0 text-left outline-none',
+        isTouchMode ? 'touch-pan-y' : 'touch-none',
         'shadow-[0_18px_46px_rgba(5,5,5,0.18),0_0_34px_rgba(123,44,255,0.16)] transition duration-300',
         'focus-visible:border-onda-lavender focus-visible:ring-2 focus-visible:ring-onda-lavender/55',
         className,
       )}
+      onClick={revealForTouch}
       onKeyDown={handleKeyDown}
       onPointerDown={handlePointerDown}
       onPointerCancel={handlePointerUp}
@@ -274,7 +314,10 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
       <canvas
         ref={canvasRef}
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full rounded-[inherit]"
+        className={cn(
+          'pointer-events-none absolute inset-0 h-full w-full rounded-[inherit] transition-opacity duration-700',
+          isTouchMode && isTapRevealed && 'opacity-0',
+        )}
       />
 
       <div
@@ -287,7 +330,7 @@ export default function ScratchImageCard({ alt, className, src }: ScratchImageCa
         <span className="inline-flex max-w-[11rem] flex-col items-center gap-2 rounded-md border border-white/15 bg-onda-black/48 px-4 py-3 text-center text-onda-soft shadow-[0_0_28px_rgba(168,85,247,0.28)] backdrop-blur-xl">
           <Hand className="h-5 w-5 text-onda-lavender" />
           <span className="font-display text-[0.62rem] font-bold uppercase leading-5 tracking-[0.16em]">
-            {t('scratch.discover')}
+            {t(isTouchMode ? 'scratch.tap-discover' : 'scratch.discover')}
           </span>
         </span>
       </div>
