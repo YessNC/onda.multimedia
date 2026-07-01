@@ -696,5 +696,6 @@ export default {
 
   // Scratch card
   'scratch.discover': 'Discover with the hand',
+  'scratch.tap-discover': 'Tap to discover',
   'scratch.image-aria': 'Discover image:',
 }

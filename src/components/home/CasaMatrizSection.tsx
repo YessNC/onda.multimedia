@@ -9,42 +9,42 @@ import { useNavigate } from 'react-router-dom'
 const casaMatrizAssets = [
   {
     alt: 'casamatriz.img-1-alt',
-    className: 'aspect-[4/5] sm:aspect-auto sm:row-span-2',
+    className: 'aspect-[5/4] max-h-[380px] sm:aspect-auto sm:max-h-none sm:row-span-2',
     src: '/assets/casa-matriz/casa-matriz-01.webp',
   },
   {
     alt: 'casamatriz.img-2-alt',
-    className: 'aspect-[4/3] sm:aspect-auto',
+    className: 'aspect-[5/4] max-h-[360px] sm:aspect-auto sm:max-h-none',
     src: '/assets/casa-matriz/casa-matriz-02.webp',
   },
   {
     alt: 'casamatriz.img-3-alt',
-    className: 'aspect-[4/3] sm:aspect-auto',
+    className: 'aspect-[5/4] max-h-[360px] sm:aspect-auto sm:max-h-none',
     src: '/assets/casa-matriz/casa-matriz-03.webp',
   },
   {
     alt: 'casamatriz.img-4-alt',
-    className: 'aspect-[4/5] sm:aspect-auto sm:row-span-2',
+    className: 'aspect-[5/4] max-h-[380px] sm:aspect-auto sm:max-h-none sm:row-span-2',
     src: '/assets/casa-matriz/casa-matriz-04.webp',
   },
   {
     alt: 'casamatriz.img-5-alt',
-    className: 'aspect-[4/3] sm:aspect-auto',
+    className: 'aspect-[5/4] max-h-[360px] sm:aspect-auto sm:max-h-none',
     src: '/assets/casa-matriz/casa-matriz-05.webp',
   },
   {
     alt: 'casamatriz.img-6-alt',
-    className: 'aspect-[4/3] sm:aspect-auto',
+    className: 'aspect-[5/4] max-h-[360px] sm:aspect-auto sm:max-h-none',
     src: '/assets/casa-matriz/estudio-02.webp',
   },
   {
     alt: 'casamatriz.img-7-alt',
-    className: 'aspect-[4/3] sm:aspect-auto',
+    className: 'aspect-[5/4] max-h-[360px] sm:aspect-auto sm:max-h-none',
     src: '/assets/casa-matriz/grabacion-01.webp',
   },
   {
     alt: 'casamatriz.img-8-alt',
-    className: 'aspect-[4/3] sm:aspect-auto',
+    className: 'aspect-[5/4] max-h-[360px] sm:aspect-auto sm:max-h-none',
     src: '/assets/casa-matriz/evento-01.webp',
   },
 ]
