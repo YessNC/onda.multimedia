@@ -33,7 +33,7 @@ export type EventRecord = Record<string, unknown> & {
 }
 
 export const DEFAULT_TICKET_LABEL = 'Comprar entradas'
-export const DEFAULT_EVENT_PRODUCER = 'ONDA Multimedia x Martes de Alika'
+export const DEFAULT_EVENT_PRODUCER = 'ONDA Multimedia'
 export const EVENT_IMAGES_BUCKET = 'event-images'
 
 export const eventStatusOptions: Array<{ label: string; value: EventStatus }> = [
@@ -223,8 +223,8 @@ export function getEventProducerName(event: Record<string, unknown> | null | und
 
   return (
     readFirstText(event, [
-      'producer',
       'producer_name',
+      'producer',
       'produced_by',
       'collaboration',
       'collaborator',

@@ -4,6 +4,7 @@ import { CalendarDays, Camera, ExternalLink, Film, Eye, EyeOff, QrCode, Save, Se
 import CTAButton from '../shared/CTAButton'
 import { getEventGalleryContent, getInstagramEmbedUrl, getYouTubeEmbedUrl } from '../../lib/eventGallery'
 import {
+  DEFAULT_EVENT_PRODUCER,
   DEFAULT_TICKET_LABEL,
   type EventRecord,
   type EventStatus,
@@ -13,6 +14,7 @@ import {
   getEventDateInputValue,
   getEventDescription,
   getEventLocation,
+  getEventProducerName,
   getEventStatus,
   getEventTitle,
   getEventVisibility,
@@ -31,6 +33,7 @@ type EventFormState = {
   externalLinks: string
   galleryPhotoUrls: string
   instagramReelUrls: string
+  producerName: string
   location: string
   qrCheckinEnabled: boolean
   status: EventStatus
@@ -58,6 +61,7 @@ const emptyForm: EventFormState = {
   galleryPhotoUrls: '',
   instagramReelUrls: '',
   location: '',
+  producerName: DEFAULT_EVENT_PRODUCER,
   qrCheckinEnabled: false,
   status: 'draft',
   ticketButtonEnabled: false,
@@ -120,6 +124,7 @@ function buildFormState(event: EventRecord | null | undefined): EventFormState {
     galleryPhotoUrls: gallery.photos.map((photo) => photo.src).join('\n'),
     instagramReelUrls: gallery.instagramReels.map((reel) => reel.url).join('\n'),
     location: getEventLocation(event),
+    producerName: getEventProducerName(event),
     qrCheckinEnabled: readBoolean(event.qr_checkin_enabled),
     status: getEventStatus(event),
     ticketButtonEnabled: visibility === 'public' && readBoolean(event.ticket_button_enabled),
@@ -224,6 +229,7 @@ export default function EventForm({ initialEvent = null, onCancelEdit, onSaved }
       gallery_photos: readTextareaLines(form.galleryPhotoUrls),
       instagram_reel_urls: readTextareaLines(form.instagramReelUrls),
       location: form.location.trim(),
+      producer_name: form.producerName.trim() || DEFAULT_EVENT_PRODUCER,
       published_at: nextPublishedAt,
       qr_checkin_enabled: form.qrCheckinEnabled,
       status: nextStatus,
@@ -336,6 +342,18 @@ export default function EventForm({ initialEvent = null, onCancelEdit, onSaved }
           onChange={(event) => updateForm({ location: event.target.value })}
           className={inputClassName}
           placeholder="Trap House, Casa Matriz, estudio..."
+          disabled={isSaving}
+        />
+      </label>
+
+      <label className={labelClassName}>
+        Productor / Producción
+        <input
+          type="text"
+          value={form.producerName}
+          onChange={(event) => updateForm({ producerName: event.target.value })}
+          className={inputClassName}
+          placeholder="ONDA Multimedia"
           disabled={isSaving}
         />
       </label>
