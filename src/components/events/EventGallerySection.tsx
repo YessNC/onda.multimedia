@@ -23,6 +23,7 @@ type EventGallerySectionProps = {
 
 type LazyFrameProps = {
   className?: string
+  fillFrame?: boolean
   iframeClassName?: string
   icon: ReactNode
   src: string
@@ -83,13 +84,15 @@ function MediaPlaceholder({ icon, title }: { icon: ReactNode; title: string }) {
   )
 }
 
-function LazyFrame({ className = '', iframeClassName = '', icon, src, title }: LazyFrameProps) {
+function LazyFrame({ className = '', fillFrame = true, iframeClassName = '', icon, src, title }: LazyFrameProps) {
   const [frameRef, isVisible] = useInViewport<HTMLDivElement>()
 
   return (
     <div
       ref={frameRef}
-      className={`relative isolate aspect-video min-h-56 overflow-hidden rounded-lg border border-onda-purple/22 bg-onda-black shadow-[0_0_34px_rgba(123,44,255,0.14)] dark:border-onda-lavender/24 ${className}`}
+      className={`${
+        fillFrame ? 'relative aspect-video min-h-56 overflow-hidden' : 'overflow-visible'
+      } isolate rounded-lg border border-onda-purple/22 bg-onda-black shadow-[0_0_34px_rgba(123,44,255,0.14)] dark:border-onda-lavender/24 ${className}`}
     >
       {isVisible ? (
         <iframe
@@ -99,7 +102,7 @@ function LazyFrame({ className = '', iframeClassName = '', icon, src, title }: L
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
-          className={`absolute inset-0 h-full w-full border-0 ${iframeClassName}`}
+          className={`${fillFrame ? 'absolute inset-0 h-full w-full' : 'block w-full'} border-0 ${iframeClassName}`}
         />
       ) : (
         <MediaPlaceholder icon={icon} title={title} />
@@ -247,14 +250,14 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
         {hasContent ? (
           <div className="grid gap-8">
             {/* Tab Navigation */}
-            <div className="flex flex-wrap gap-2 border-b border-onda-purple/20 dark:border-onda-lavender/20 pb-4">
+            <div className="flex flex-wrap gap-2 border-b border-onda-purple/20 pb-4 dark:border-onda-lavender/20">
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-display text-xs font-bold uppercase tracking-[0.12em] transition ${
+                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 font-display text-xs font-bold uppercase tracking-[0.12em] transition ${
                       activeTab === tab.id
                         ? 'bg-onda-purple text-white shadow-[0_0_24px_rgba(123,44,255,0.3)] dark:bg-onda-lavender dark:text-onda-black'
                         : 'border border-onda-purple/30 text-onda-purple hover:border-onda-purple/60 dark:border-onda-lavender/30 dark:text-onda-lavender dark:hover:border-onda-lavender/60'
@@ -292,8 +295,8 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
                   className="w-full"
                 >
                   {gallery.photos.map((photo) => (
-                    <SwiperSlide key={photo.src} className="w-80 h-auto">
-                      <figure className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-onda-purple/18 bg-white/60 shadow-[0_0_28px_rgba(123,44,255,0.12)] dark:bg-onda-black/55 h-full">
+                    <SwiperSlide key={photo.src} className="h-auto w-80">
+                      <figure className="group relative h-full aspect-[4/3] overflow-hidden rounded-lg border border-onda-purple/18 bg-white/60 shadow-[0_0_28px_rgba(123,44,255,0.12)] dark:bg-onda-black/55">
                         <img
                           src={photo.src}
                           srcSet={photo.srcSet}
@@ -351,8 +354,9 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
                       src={reel.embedUrl}
                       title={reel.title}
                       icon={<Film className="h-5 w-5" aria-hidden="true" />}
-                      className="aspect-[9/16] min-h-0 w-full max-w-[460px] sm:max-w-[400px] lg:max-w-[420px] xl:max-w-[460px]"
-                      iframeClassName="overflow-hidden"
+                      fillFrame={false}
+                      className="mx-auto w-full max-w-[440px] overflow-visible rounded-2xl"
+                      iframeClassName="h-[clamp(660px,82vh,840px)] min-h-[660px] rounded-2xl md:min-h-[760px]"
                     />
                   ))}
                 </div>
