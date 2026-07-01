@@ -23,6 +23,7 @@ type EventGallerySectionProps = {
 
 type LazyFrameProps = {
   className?: string
+  iframeClassName?: string
   icon: ReactNode
   src: string
   title: string
@@ -82,7 +83,7 @@ function MediaPlaceholder({ icon, title }: { icon: ReactNode; title: string }) {
   )
 }
 
-function LazyFrame({ className = '', icon, src, title }: LazyFrameProps) {
+function LazyFrame({ className = '', iframeClassName = '', icon, src, title }: LazyFrameProps) {
   const [frameRef, isVisible] = useInViewport<HTMLDivElement>()
 
   return (
@@ -98,7 +99,7 @@ function LazyFrame({ className = '', icon, src, title }: LazyFrameProps) {
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
-          className="absolute inset-0 h-full w-full border-0"
+          className={`absolute inset-0 h-full w-full border-0 ${iframeClassName}`}
         />
       ) : (
         <MediaPlaceholder icon={icon} title={title} />
@@ -343,14 +344,15 @@ export default function EventGallerySection({ event }: EventGallerySectionProps)
 
             {activeTab === 'reels' && instagramEmbeds.length > 0 ? (
               <GalleryBlock icon={<Film className="h-4 w-4" aria-hidden="true" />} title="Reels">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid justify-items-center gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {instagramEmbeds.map((reel) => (
                     <LazyFrame
                       key={reel.url}
                       src={reel.embedUrl}
                       title={reel.title}
                       icon={<Film className="h-5 w-5" aria-hidden="true" />}
-                      className="aspect-[9/14] min-h-[34rem]"
+                      className="aspect-[9/16] min-h-0 w-full max-w-[460px] sm:max-w-[400px] lg:max-w-[420px] xl:max-w-[460px]"
+                      iframeClassName="overflow-hidden"
                     />
                   ))}
                 </div>
